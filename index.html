@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Grocery List</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Grocery List</h1>
+    <div class="global-controls">
+      <button type="button" id="undo-btn" disabled>Undo</button>
+      <button type="button" id="clear-checked-btn" disabled>Clear checked</button>
+    </div>
+  </header>
+
+  <!-- S1: always-visible single-item add control. Enter submits via the
+       <form>'s own default behavior - no separate keydown handling needed. -->
+  <form id="add-form" class="add-form">
+    <input type="text" id="add-input" placeholder="Add an item…" autocomplete="off">
+    <button type="submit">Add</button>
+  </form>
+
+  <!-- S4: paste-to-ingest bulk add, a separate control from the single-item
+       input above. Collapsed by default so it doesn't compete for space
+       with the primary single-add flow on a small phone screen. -->
+  <details class="paste-panel">
+    <summary>Paste a list</summary>
+    <form id="paste-form" class="paste-form">
+      <textarea id="paste-input" placeholder="Paste items, one per line…" rows="4"></textarea>
+      <button type="submit">Add all</button>
+    </form>
+  </details>
+
+  <!-- Row markup/CSS here is a placeholder pending the PO's pick from
+       density-picker.html (see BACKLOG.md's tracked follow-up note) - the
+       add/render/persist/check/delete/reorder mechanics don't depend on
+       which option wins, but this row will get a CSS/markup pass once it
+       does. Rendered entirely by script.js. -->
+  <main id="list-root">
+  </main>
+
+  <!-- S3: brief "Deleted '<item>' — Undo" toast, shown in addition to the
+       always-visible Undo control above, not instead of it. -->
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="script.js"></script>
+</body>
+</html>

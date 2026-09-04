@@ -1,0 +1,229 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* Same dark palette as vacking/vapanese/veather, reused verbatim - no new
+     colors invented. Dark-only (no light/dark toggle), matching this PO's
+     established precedent across sibling projects (see vacking/style.css
+     :root and AGENTIC_ORCHESTRATION_PLAYBOOK.md). */
+  --bg-page: #1a1a1a;
+  --bg-card: #2a2a2a;
+  --border: #555;
+  --text: #ddd;
+  --text-muted: #999;
+  --accent: #4da6ff;
+}
+
+/* Global box-sizing reset, applied up front - vacking's own postmortem
+   (AGENTIC_ORCHESTRATION_PLAYBOOK.md gotcha list) hit a real mobile-viewport
+   overflow bug from never doing this: any element combining a percentage
+   width with real padding/border renders wider than its own container under
+   the browser default `content-box`. Scoped to every element (`*`), not one
+   selector, so nothing added later can reintroduce the same class of bug. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 1rem;
+  line-height: 1.4;
+  background: var(--bg-page);
+  color: var(--text);
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+header h1 {
+  font-size: 1.5rem;
+  margin: 0;
+  color: var(--accent);
+}
+
+.global-controls {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+button {
+  font: inherit;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+button:hover {
+  background: rgba(128, 128, 128, 0.15);
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* S1: always-visible single-item add control. */
+.add-form {
+  display: flex;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.add-form input[type="text"] {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text);
+}
+
+/* S4: paste-to-ingest, collapsed by default (see index.html comment). */
+.paste-panel {
+  margin-bottom: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-card);
+}
+
+.paste-panel summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 0.25rem 0;
+}
+
+.paste-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.paste-form textarea {
+  font: inherit;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-page);
+  color: var(--text);
+  resize: vertical;
+}
+
+.paste-form button {
+  align-self: flex-start;
+}
+
+.empty-state {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ---------------------------------------------------------------------
+   Placeholder list-item row (2026-09-04) - TBD, NOT the locked spec.
+   Row density/checkbox size/spacing is pending the PO's pick from
+   density-picker.html (BACKLOG.md's tracked follow-up note, QA finding
+   M3: S1/S2/S5 cannot move to Done until a follow-up CSS pass applies
+   whatever gets picked and Tester verifies it). Add/render/persist/check/
+   delete/reorder mechanics don't depend on which option wins, so built
+   now against a functional, tight-vertical-rhythm placeholder. Carries
+   forward the already-proven mobile fixes from vacking/style.css and this
+   project's own density-picker.html revision: flex children need their
+   own `min-width: 0` to allow ellipsis/shrink (not just `flex: 1`),
+   multi-child rows need `flex-wrap: wrap` once a row gets crowded
+   (checkbox + name + up/down + delete = 5 elements here already, more
+   once S7/S8 land), and tap targets should not go below 24px per side
+   (WCAG 2.5.5 AA minimum). --------------------------------------------- */
+.items {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+}
+
+.items li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px solid var(--bg-card);
+}
+
+.items li.checked .item-name {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.items input[type="checkbox"] {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.items .item-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.items .icon-btn {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+}
+
+.items .icon-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.items .icon-btn.delete-btn {
+  color: #e08080;
+  border-color: #6b3d3d;
+}
+
+/* S3: brief delete-moment toast (QA finding R2, PO Option A) - reuses the
+   same fixed-bottom-center pattern as vacking's own .toast, no new colors. */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 1.5rem;
+  transform: translateX(-50%);
+  max-width: calc(100% - 2rem);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.6rem 1rem;
+  background: var(--bg-card);
+  color: var(--text);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  z-index: 100;
+}

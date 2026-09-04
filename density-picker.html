@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grocery List — Row Density Picker</title>
+<style>
+  * , *::before, *::after { box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #1a1a1a;
+    color: #ddd;
+    max-width: 40rem;
+    margin: 0 auto;
+    padding: 1.25rem 1rem 4rem;
+    line-height: 1.4;
+  }
+  h1 { color: #4da6ff; font-size: 1.3rem; margin: 0 0 0.25rem; }
+  .intro { color: #999; font-size: 0.88rem; margin-bottom: 1.75rem; }
+  .option-block {
+    border: 1px solid #444;
+    border-radius: 10px;
+    padding: 0.9rem 1rem 1rem;
+    margin-bottom: 1.5rem;
+    background: #222;
+  }
+  .option-block.recommended { border-color: #4da6ff; }
+  h2 { font-size: 1rem; margin: 0 0 0.15rem; display: flex; align-items: center; gap: 0.4rem; }
+  .tag { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; background: #4da6ff; color: #111; padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: 700; }
+  .note { color: #999; font-size: 0.82rem; margin: 0 0 0.6rem; }
+  .metrics {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 0.78rem;
+    color: #7fd6a4;
+    margin-top: 0.5rem;
+  }
+  .demo-frame {
+    border: 1px solid #444;
+    border-radius: 8px;
+    overflow-y: auto;
+    background: #1a1a1a;
+    height: 240px;
+    /* Revision (2026-09-04, QA finding R4): without a real width cap here,
+       this frame just inherits the page's own max-width (40rem/~640px) -
+       fine on a phone, but wide open on a desktop, hiding exactly the
+       phone-width crowding this tool exists to test. 375px matches the
+       "confirmed safe" test-width band vacking's own playbook write-up
+       cites (320-414px real phones, 480px breakpoint), so this stays
+       representative no matter what device/window actually opens the file. */
+    max-width: 375px;
+  }
+  .demo-frame ul { list-style: none; margin: 0; padding: 0; }
+  .hint { font-size: 0.72rem; color: #666; margin-top: 0.35rem; }
+
+  /* Revision (2026-09-04, QA finding R4): shared row-control styling for the
+     delete (S3), up/down (S5), and note/aisle-edit (S7/S8) affordances added
+     to every option below - these controls are the same regardless of which
+     checkbox/tap-target style wins, so one shared block instead of
+     duplicating per-option. Sized near the 24px WCAG AA tap-target floor.
+     `flex-shrink: 0` on every one - these must never be the thing that
+     shrinks; `.name` (which has its own `min-width: 0`) absorbs all the
+     squeeze instead, same precedent as vacking's checkbox/button sizing. */
+  .icon-btn {
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+    border: 1px solid #555;
+    border-radius: 4px;
+    background: transparent;
+    color: #bbb;
+    font-size: 0.8rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    cursor: pointer;
+  }
+  .icon-btn:active { background: #333; }
+  .icon-btn:disabled { opacity: 0.35; cursor: default; }
+  .icon-btn.delete-btn { color: #e08080; border-color: #6b3d3d; }
+  .aisle-tag-btn {
+    flex-shrink: 0;
+    border: none;
+    background: transparent;
+    font: inherit;
+    font-size: 0.72rem;
+    color: #888;
+    border-bottom: 1px dashed #666;
+    padding: 0.1rem 0.15rem;
+    cursor: pointer;
+  }
+
+  /* ---------- Option A: vacking baseline (reference only) ---------- */
+  /* flex-wrap added in this revision - a crowded row (checkbox+name+note+
+     aisle+up+down+delete, 7 elements) at real phone widths is exactly the
+     shape that caused vacking's own confirmed MV-1/MV-3 mobile overflow bugs
+     when it wasn't there. All 4 options get it, not just the tight ones -
+     A is reference-only but should still fail honestly, not overflow. */
+  .optA li { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; padding: 0.25rem 0.75rem; border-bottom: 1px solid #2a2a2a; }
+  .optA input[type=checkbox] { width: 44px; height: 44px; flex-shrink: 0; }
+  .optA .name { flex: 1; font-size: 1rem; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .optA li.checked .name { text-decoration: line-through; color: #777; }
+
+  /* ---------- Option B: small checkbox, checkbox-only tap target ---------- */
+  .optB li { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; padding: 0.2rem 0.75rem; border-bottom: 1px solid #2a2a2a; }
+  .optB input[type=checkbox] { width: 24px; height: 24px; flex-shrink: 0; }
+  .optB .name { flex: 1; font-size: 0.95rem; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .optB li.checked .name { text-decoration: line-through; color: #777; }
+
+  /* ---------- Option C: small glyph, but whole row is the tap target ---------- */
+  .optC li { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; padding: 0.32rem 0.75rem; border-bottom: 1px solid #2a2a2a; cursor: pointer; user-select: none; }
+  .optC li:active { background: #2d3f4d; }
+  .optC .box { width: 20px; height: 20px; border: 2px solid #666; border-radius: 4px; flex-shrink: 0; display:flex; align-items:center; justify-content:center; font-size: 0.7rem; color:#1a1a1a; }
+  .optC li.checked .box { background: #4da6ff; border-color: #4da6ff; }
+  .optC li.checked .box::after { content: '✓'; }
+  .optC .name { flex: 1; font-size: 0.95rem; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .optC li.checked .name { text-decoration: line-through; color: #777; }
+
+  /* ---------- Option D: no checkbox glyph, tap-row, strikethrough only ---------- */
+  .optD li { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; padding: 0.22rem 0.75rem; border-bottom: 1px solid #2a2a2a; cursor: pointer; user-select: none; }
+  .optD li:active { background: #2d3f4d; }
+  .optD .dot { width: 0.9em; color: #555; flex-shrink: 0; text-align:center; }
+  .optD li.checked .dot { color: #4da6ff; }
+  .optD .name { flex: 1; font-size: 0.95rem; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .optD li.checked .name { text-decoration: line-through; color: #777; }
+</style>
+</head>
+<body>
+
+<h1>Grocery List — Row Density Picker</h1>
+<p class="intro">
+  Four real, tappable candidates for how tight the list rows should be — same 10-item list rendered
+  each way inside a fixed-height frame (240px, a rough stand-in for the visible list area on a phone),
+  itself capped at 375px wide so it's honest about phone-width crowding even if you're viewing this on
+  a desktop. Tap the rows in each box; checking/unchecking works for real so you can feel how forgiving
+  each tap target is, not just look at it. The "items visible" number below each is measured live from
+  the actual rendered rows, not estimated. Option A is vacking's current style, included only as the
+  "too sparse" baseline to compare against — not a real option. Tell me the letter you want (or "mix
+  of B and C", etc.) and I'll lock that as the row spec.
+</p>
+<p class="intro">
+  <strong>Revised 2026-09-04:</strong> each row now also shows the delete, up/down-reorder, and
+  note/aisle-edit controls that will really share the row later (they were missing from the first
+  draft you may have already seen). Delete/Up/Down/note/aisle are visual placeholders only — they
+  don't do anything when tapped except (for the top row's Up and bottom row's Down) show disabled,
+  matching real behavior. Only the checkbox/row-tap itself is fully live. This is what actually
+  determines whether a given density survives once every real control lands on the row, not just how
+  it looks with checkbox+name+aisle alone.
+</p>
+
+<div id="root"></div>
+
+<script>
+  var items = [
+    { name: 'Milk (1 gal)', aisle: 'Dairy', checked: false },
+    { name: 'Eggs (dozen)', aisle: 'Dairy', checked: true },
+    { name: 'Bread', aisle: 'Bakery', checked: false },
+    { name: 'Bananas (6 ct)', aisle: 'Produce', checked: false },
+    { name: 'Chicken breast (2 lbs)', aisle: 'Meat', checked: false },
+    { name: 'Rice (1 bag)', aisle: 'Pantry', checked: true },
+    { name: 'Paper towels', aisle: 'Household', checked: false },
+    { name: 'Greek yogurt', aisle: 'Dairy', checked: false },
+    { name: 'Frozen peas', aisle: 'Frozen', checked: false },
+    { name: 'Coffee', aisle: 'Pantry', checked: false }
+  ];
+
+  // Revision (2026-09-04, QA finding R4): the delete (S3)/up-down (S5)/
+  // note+aisle-edit (S7-S8) controls below are the same real markup
+  // regardless of which option's checkbox/tap-target style wins, so they're
+  // built once here and appended by every renderRow rather than duplicated
+  // 4 times. `data-role` lets the row-building loop below find them to wire
+  // up disabled state (first/last row) and stopPropagation.
+  function extraControlsHtml(it) {
+    return '<button type="button" class="aisle-tag-btn" data-role="aisle" title="Edit aisle">' + it.aisle + '</button>' +
+      '<button type="button" class="icon-btn" data-role="note" title="Note">✎</button>' +
+      '<button type="button" class="icon-btn" data-role="up" title="Move up">▲</button>' +
+      '<button type="button" class="icon-btn" data-role="down" title="Move down">▼</button>' +
+      '<button type="button" class="icon-btn delete-btn" data-role="delete" title="Delete">✕</button>';
+  }
+
+  var options = [
+    {
+      key: 'A', cls: 'optA', recommended: false,
+      title: 'A — vacking baseline (reference only, not a real option)',
+      note: '44px checkbox, ~4px padding. This is the "too sparse" style you’re moving away from — included only so the others have something to compare against.',
+      renderRow: function (it) {
+        return '<label class="name-wrap" style="display:flex;align-items:center;gap:0.5rem;flex:1;min-width:0;">' +
+          '<input type="checkbox"' + (it.checked ? ' checked' : '') + '>' +
+          '<span class="name">' + it.name + '</span></label>' + extraControlsHtml(it);
+      },
+      toggle: 'checkbox'
+    },
+    {
+      key: 'B', cls: 'optB', recommended: false,
+      title: 'B — small checkbox, checkbox-only tap target',
+      note: '24px checkbox (WCAG AA minimum), tight padding. Max density, but only the checkbox itself is tappable — no margin for a slightly-off tap.',
+      renderRow: function (it) {
+        // Bug fix (2026-09-04): no wrapping <label> here (unlike Option A), so
+        // the checkbox had no accessible name at all for a screen reader -
+        // aria-label gives it the item name without changing anything visible.
+        return '<input type="checkbox" aria-label="' + it.name + '"' + (it.checked ? ' checked' : '') + '>' +
+          '<span class="name">' + it.name + '</span>' + extraControlsHtml(it);
+      },
+      toggle: 'checkbox'
+    },
+    {
+      key: 'C', cls: 'optC', recommended: true,
+      title: 'C — small glyph, whole row is the tap target',
+      note: '20px visual checkbox, but the entire row (name + aisle tag included) toggles on tap — same density as B, without needing the tap to land precisely on a tiny box.',
+      renderRow: function (it) {
+        return '<span class="box"></span><span class="name">' + it.name + '</span>' + extraControlsHtml(it);
+      },
+      toggle: 'row'
+    },
+    {
+      key: 'D', cls: 'optD', recommended: false,
+      title: 'D — no checkbox glyph, tap-row, dot + strikethrough only',
+      note: 'Tightest possible rows — no drawn checkbox at all, just a small dot indicator and strikethrough on check. Whole row taps. Most minimal, least "obviously a checklist" at a glance.',
+      renderRow: function (it) {
+        return '<span class="dot">' + (it.checked ? '●' : '○') + '</span><span class="name">' + it.name + '</span>' + extraControlsHtml(it);
+      },
+      toggle: 'row'
+    }
+  ];
+
+  var root = document.getElementById('root');
+
+  options.forEach(function (opt) {
+    var block = document.createElement('div');
+    block.className = 'option-block' + (opt.recommended ? ' recommended' : '');
+
+    var header = document.createElement('h2');
+    header.innerHTML = opt.title + (opt.recommended ? ' <span class="tag">Recommended</span>' : '');
+    block.appendChild(header);
+
+    var note = document.createElement('p');
+    note.className = 'note';
+    note.textContent = opt.note;
+    block.appendChild(note);
+
+    var frame = document.createElement('div');
+    frame.className = 'demo-frame';
+    var ul = document.createElement('ul');
+    ul.className = opt.cls;
+
+    items.forEach(function (it, i) {
+      var li = document.createElement('li');
+      li.dataset.checked = it.checked ? '1' : '0';
+      if (it.checked) li.classList.add('checked');
+      li.innerHTML = opt.renderRow(it);
+      var toggle = function () {
+        var isChecked = li.classList.toggle('checked');
+        var cb = li.querySelector('input[type=checkbox]');
+        if (cb) cb.checked = isChecked;
+        if (opt.toggle === 'row') li.setAttribute('aria-checked', isChecked ? 'true' : 'false');
+      };
+      if (opt.toggle === 'row') {
+        // Bug fix (2026-09-04): C/D have no real form control under the tap
+        // target, only a click listener - a keyboard-only user had no way to
+        // toggle these rows at all. role=checkbox + tabindex + aria-checked +
+        // Enter/Space handling brings them to parity with A/B's native
+        // <input type=checkbox> keyboard support. No visual change.
+        li.setAttribute('role', 'checkbox');
+        li.setAttribute('tabindex', '0');
+        li.setAttribute('aria-checked', it.checked ? 'true' : 'false');
+        li.setAttribute('aria-label', it.name);
+        li.addEventListener('click', toggle);
+        li.addEventListener('keydown', function (e) {
+          if (e.key === ' ' || e.key === 'Enter' || e.key === 'Spacebar') {
+            e.preventDefault();
+            toggle();
+          }
+        });
+      } else {
+        var cb = li.querySelector('input[type=checkbox]');
+        cb.addEventListener('change', function () { li.classList.toggle('checked', cb.checked); });
+      }
+
+      // Revision (2026-09-04, QA finding R4): the 4 new controls (aisle/
+      // note/up/down/delete) are visual placeholders only, matching this
+      // tool's scope (it's a density comparison, not a functional list) -
+      // but they still need stopPropagation. Without it, on options C/D
+      // (whole row is the tap target), tapping Delete or Up would bubble up
+      // to the row's own click listener and ALSO flip checked/unchecked -
+      // a real interaction bug this revision would otherwise have baked
+      // straight into the recommended option. Same requirement carries
+      // forward into the real S3/S5/S7/S8 buttons once built on top of
+      // whichever option the PO picks.
+      var upBtn = li.querySelector('[data-role="up"]');
+      var downBtn = li.querySelector('[data-role="down"]');
+      if (i === 0) upBtn.disabled = true;
+      if (i === items.length - 1) downBtn.disabled = true;
+      li.querySelectorAll('[data-role]').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+        });
+        // Bug fix (2026-09-04, caught in self-review of this same revision):
+        // stopPropagation on 'click' alone isn't enough on C/D - the row's
+        // OWN keydown listener (added for keyboard support) checks Enter/
+        // Space and fires `toggle()` directly, and keydown bubbles up to it
+        // from an inner button before that button's native Enter-to-click
+        // conversion ever happens. Without this, tabbing to Delete/Up/Down
+        // and pressing Enter would both activate that button AND wrongly
+        // flip the row's checked state via the bubbled keydown.
+        btn.addEventListener('keydown', function (e) {
+          e.stopPropagation();
+        });
+      });
+
+      ul.appendChild(li);
+    });
+
+    frame.appendChild(ul);
+    block.appendChild(frame);
+
+    var metrics = document.createElement('div');
+    metrics.className = 'metrics';
+    block.appendChild(metrics);
+
+    var hint = document.createElement('div');
+    hint.className = 'hint';
+    hint.textContent = opt.toggle === 'row' ? 'Tap anywhere on a row to toggle.' : 'Tap the checkbox to toggle.';
+    block.appendChild(hint);
+
+    root.appendChild(block);
+
+    requestAnimationFrame(function () {
+      var rows = ul.querySelectorAll('li');
+      var rowHeight = rows[0].getBoundingClientRect().height;
+      var frameHeight = frame.getBoundingClientRect().height;
+      var visible = Math.floor(frameHeight / rowHeight);
+      metrics.textContent = 'row height: ' + rowHeight.toFixed(0) + 'px  |  items visible without scrolling (240px frame): ' + visible;
+    });
+  });
+</script>
+
+</body>
+</html>

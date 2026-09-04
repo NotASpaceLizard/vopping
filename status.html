@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>vopping — Team Status</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg-page: #1a1a1a;
+    --bg-card: #2a2a2a;
+    --border: #555;
+    --text: #ddd;
+    --text-muted: #999;
+    /* Okabe-Ito colorblind-safe palette — settled once for this PO on the
+       vacking project (palette-picker.html comparison), carried over here
+       rather than re-litigated. Icon+text is still the real signal; color
+       is a secondary cue. */
+    --accent: #0072B2;
+    --ok: #009E73;
+    --busy: #E69F00;
+    --blocked: #CC79A7;
+  }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg-page);
+    color: var(--text);
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: 1.5rem 1rem 3rem;
+    line-height: 1.4;
+  }
+  h1 { color: var(--accent); font-size: 1.4rem; margin-bottom: 0.15rem; }
+  .subtitle { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem; }
+  .subtitle .stale { color: var(--busy); font-weight: 600; }
+  .subtitle code {
+    font-family: ui-monospace, Consolas, monospace;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.05rem 0.3rem;
+  }
+
+  .top-status {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.75rem;
+    margin: 0.75rem 0 1.25rem;
+  }
+  .top-status-box {
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    background: var(--bg-card);
+  }
+  .top-status-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--accent);
+    font-weight: 700;
+    margin-bottom: 0.3rem;
+  }
+  .top-status-value {
+    font-size: 1.15rem;
+    font-weight: 600;
+  }
+  .top-status-note {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-top: 0.3rem;
+  }
+  .top-status-note .stale { color: var(--busy); font-weight: 600; }
+  .top-status-note code {
+    font-family: ui-monospace, Consolas, monospace;
+    background: var(--bg-page);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.05rem 0.3rem;
+  }
+  .top-status-box.has-question {
+    border-color: var(--busy);
+    background: rgba(224, 169, 77, 0.12);
+  }
+  .top-status-box.has-question .top-status-label,
+  .top-status-box.has-question .top-status-value {
+    color: var(--busy);
+  }
+
+  .top-status-box.stale-yellow { border-color: #d9c94d; }
+  .top-status-box.stale-yellow .top-status-label,
+  .top-status-box.stale-yellow .top-status-value { color: #d9c94d; }
+
+  .top-status-box.stale-orange { border-color: var(--busy); }
+  .top-status-box.stale-orange .top-status-label,
+  .top-status-box.stale-orange .top-status-value { color: var(--busy); }
+
+  .top-status-box.stale-red {
+    border-color: var(--blocked);
+    animation: stale-glow 1.6s ease-in-out infinite;
+  }
+  .top-status-box.stale-red .top-status-label,
+  .top-status-box.stale-red .top-status-value { color: var(--blocked); }
+  @keyframes stale-glow {
+    0%, 100% { box-shadow: 0 0 4px 0 rgba(224, 108, 108, 0.4); }
+    50% { box-shadow: 0 0 14px 3px rgba(224, 108, 108, 0.85); }
+  }
+
+  .tabs {
+    display: flex;
+    gap: 0.25rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1.25rem;
+  }
+  .tab-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 0.95rem;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+  .view { display: none; }
+  .view.active { display: block; }
+
+  .sc-ok { color: var(--ok); }
+  .sc-busy { color: var(--busy); }
+  .sc-blocked { color: var(--blocked); }
+  .sc-muted { color: var(--text-muted); }
+  .sc-accent { color: var(--accent); }
+
+  .agents {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 0.6rem;
+    margin-bottom: 2rem;
+  }
+  .card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.6rem 0.75rem;
+    background: var(--bg-card);
+  }
+  .card .role {
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin-bottom: 0.3rem;
+  }
+  .card .status-line {
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-bottom: 0.4rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .status-icon {
+    font-size: 0.9rem;
+    line-height: 1;
+  }
+  .card .task {
+    font-size: 0.82rem;
+    color: var(--text);
+  }
+  h2 {
+    font-size: 1.05rem;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+  }
+  .feed {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-left: 2px solid var(--border);
+    padding-left: 1rem;
+  }
+  .feed li {
+    margin-bottom: 0.85rem;
+    position: relative;
+  }
+  .feed li::before {
+    content: "";
+    position: absolute;
+    left: -1.35rem;
+    top: 0.3rem;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .feed .who {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  .feed .time {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-left: 0.4rem;
+  }
+  .feed .text {
+    display: block;
+    margin-top: 0.15rem;
+  }
+
+  .feed-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 0.9rem;
+  }
+  .page-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 0.35rem 0.75rem;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.85rem;
+  }
+  .page-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .page-btn:disabled { opacity: 0.4; cursor: default; }
+  .page-indicator { color: var(--text-muted); font-size: 0.85rem; }
+
+  .backlog-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  .backlog-table th {
+    text-align: left;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 0.4rem 0.6rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .backlog-table td {
+    padding: 0.55rem 0.6rem;
+    border-bottom: 1px solid #3a3a3a;
+    vertical-align: top;
+  }
+  .backlog-table tr:last-child td { border-bottom: none; }
+  .rank-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.7rem;
+    height: 1.7rem;
+    border-radius: 50%;
+    background: var(--bg-page);
+    border: 1px solid var(--border);
+    font-weight: 600;
+    font-size: 0.8rem;
+  }
+  .story-id { font-weight: 600; }
+  .story-title { color: var(--text-muted); font-size: 0.8rem; margin-top: 0.1rem; }
+  .story-status {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 600;
+  }
+
+  .error {
+    color: var(--blocked);
+    font-size: 0.85rem;
+  }
+  .legend {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    margin: -0.5rem 0 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.9rem;
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 0.3rem; }
+
+  .legend-filter {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    margin: -0.5rem 0 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .legend-filter-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.25rem 0.6rem;
+    font: inherit;
+    font-size: 0.78rem;
+    cursor: pointer;
+  }
+  .legend-filter-btn:hover { border-color: currentColor; }
+  .legend-filter-btn.active {
+    border-color: currentColor;
+    background: rgba(255, 255, 255, 0.08);
+    font-weight: 700;
+  }
+</style>
+</head>
+<body>
+  <h1>vopping — Team Status</h1>
+
+  <div class="top-status">
+    <div class="top-status-box" id="box-updated">
+      <div class="top-status-label">Last Updated</div>
+      <div class="top-status-value" id="updated-value">Loading…</div>
+      <div class="top-status-note" id="updated-note"></div>
+    </div>
+    <div class="top-status-box">
+      <div class="top-status-label">Last Push</div>
+      <div class="top-status-value" id="push-value">Loading…</div>
+      <div class="top-status-note" id="push-note"></div>
+    </div>
+    <div class="top-status-box" id="box-question">
+      <div class="top-status-label">Outstanding Questions for PO</div>
+      <div class="top-status-value" id="question-value">Loading…</div>
+      <div class="top-status-note" id="question-note"></div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-view="view-status">Team Status</button>
+    <button class="tab-btn" data-view="view-backlog">Backlog</button>
+  </div>
+
+  <div class="view active" id="view-status">
+    <div class="legend legend-js"></div>
+    <div class="agents" id="agents"></div>
+
+    <h2>Recent activity</h2>
+    <ul class="feed" id="feed"></ul>
+    <div class="feed-pagination" id="feed-pagination"></div>
+  </div>
+
+  <div class="view" id="view-backlog">
+    <div class="legend-filter" id="backlog-legend"></div>
+    <div class="subtitle" id="backlog-subtitle">Loading…</div>
+    <table class="backlog-table">
+      <thead>
+        <tr><th>#</th><th>Story</th><th>Status</th></tr>
+      </thead>
+      <tbody id="backlog-body"></tbody>
+    </table>
+  </div>
+
+  <script>
+    var POLL_MS = 4000;
+    var STALE_YELLOW_MS = 20 * 60 * 1000;
+    var STALE_ORANGE_MS = 45 * 60 * 1000;
+    var STALE_RED_MS = 90 * 60 * 1000;
+    var FEED_PAGE_SIZE = 10;
+    var feedEvents = [];
+    var feedPage = 0;
+
+    function timeAgo(iso) {
+      var diffMs = Date.now() - new Date(iso).getTime();
+      if (diffMs < 0) diffMs = 0;
+      var s = Math.floor(diffMs / 1000);
+      if (s < 60) return s + 's ago';
+      var m = Math.floor(s / 60);
+      if (m < 60) return m + 'm ago';
+      var h = Math.floor(m / 60);
+      if (h < 24) return h + 'h ago';
+      return Math.floor(h / 24) + 'd ago';
+    }
+
+    function statusMeta(status) {
+      var full = status || '';
+      var dashIdx = full.indexOf('—');
+      var head = dashIdx !== -1 ? full.slice(0, dashIdx) : full;
+      var s = head.toLowerCase();
+      if (s.indexOf('block') !== -1) return { icon: '✖', cls: 'sc-blocked', label: 'Blocked' };
+      if (s.indexOf('done') !== -1 || s.indexOf('implement') !== -1 || s.indexOf('closed') !== -1 || s.indexOf('complete') !== -1) return { icon: '✓', cls: 'sc-ok', label: 'Done' };
+      if (s.indexOf('review') !== -1) return { icon: '⌛︎', cls: 'sc-busy', label: 'In Review' };
+      if (s.indexOf('progress') !== -1 || s.indexOf('active') !== -1 || s.indexOf('work') !== -1) return { icon: '⟳', cls: 'sc-ok', label: 'Working' };
+      if (s.indexOf('lock') !== -1 || s.indexOf('ready') !== -1) return { icon: '◆', cls: 'sc-accent', label: 'Locked' };
+      if (s.indexOf('parked') !== -1 || s.indexOf('optional') !== -1) return { icon: '⛱', cls: 'sc-muted', label: 'Parked' };
+      if (s.indexOf('stand') !== -1 || s.indexOf('wait') !== -1 || s.indexOf('pending') !== -1) return { icon: '⏸', cls: 'sc-muted', label: 'Standing by' };
+      if (s.indexOf('not started') !== -1 || s.indexOf('needs') !== -1) return { icon: '○', cls: 'sc-muted', label: 'Not Started' };
+      return { icon: '•', cls: 'sc-muted', label: status };
+    }
+
+    function renderLegend() {
+      var items = [
+        statusMeta('not started'), statusMeta('locked'), statusMeta('working'),
+        statusMeta('in review'), statusMeta('done'), statusMeta('standing by'),
+        statusMeta('parked'), statusMeta('blocked')
+      ];
+      var html = items.map(function (m) {
+        return '<span class="' + m.cls + '"><span class="status-icon">' + m.icon + '</span>' + m.label + '</span>';
+      }).join('');
+      document.querySelectorAll('.legend-js').forEach(function (el) { el.innerHTML = html; });
+    }
+
+    function renderTopStatus(data) {
+      var updatedBox = document.getElementById('box-updated');
+      var updatedValue = document.getElementById('updated-value');
+      var updatedNote = document.getElementById('updated-note');
+      var staleMs = Date.now() - new Date(data.updatedAt).getTime();
+      updatedBox.classList.remove('stale-yellow', 'stale-orange', 'stale-red');
+      updatedValue.textContent = timeAgo(data.updatedAt);
+      if (staleMs > STALE_RED_MS) {
+        updatedBox.classList.add('stale-red');
+        updatedNote.innerHTML = '<span class="stale">no update in ' + timeAgo(data.updatedAt) + ' — worth checking</span>';
+      } else if (staleMs > STALE_ORANGE_MS) {
+        updatedBox.classList.add('stale-orange');
+        updatedNote.innerHTML = '<span class="stale">no update in ' + timeAgo(data.updatedAt) + ' — quiet a while, worth a peek</span>';
+      } else if (staleMs > STALE_YELLOW_MS) {
+        updatedBox.classList.add('stale-yellow');
+        updatedNote.innerHTML = '<span class="stale">no update in ' + timeAgo(data.updatedAt) + ', likely idle between turns</span>';
+      } else {
+        updatedNote.textContent = 'polls every ' + (POLL_MS / 1000) + 's — not a live push feed';
+      }
+
+      var pushValue = document.getElementById('push-value');
+      var pushNote = document.getElementById('push-note');
+      var p = data.lastPush;
+      if (!p) {
+        pushValue.textContent = '—';
+        pushNote.textContent = 'no push recorded yet';
+      } else {
+        pushValue.textContent = timeAgo(p.time);
+        pushNote.innerHTML = '<code>' + p.sha + '</code> "' + p.subject + '"';
+      }
+
+      var box = document.getElementById('box-question');
+      var qValue = document.getElementById('question-value');
+      var qNote = document.getElementById('question-note');
+      var q = data.pendingQuestion;
+      if (!q || !q.asked) {
+        box.classList.remove('has-question');
+        qValue.textContent = 'None';
+        qNote.textContent = '';
+      } else {
+        box.classList.add('has-question');
+        qValue.textContent = 'Yes — asked ' + timeAgo(q.time);
+        qNote.textContent = q.summary;
+      }
+    }
+
+    function renderFeedPage() {
+      var feedEl = document.getElementById('feed');
+      var pagEl = document.getElementById('feed-pagination');
+      var total = feedEvents.length;
+
+      if (total === 0) {
+        feedEl.innerHTML = '';
+        pagEl.innerHTML = '';
+        return;
+      }
+
+      var maxPage = Math.ceil(total / FEED_PAGE_SIZE) - 1;
+      if (feedPage > maxPage) feedPage = maxPage;
+      if (feedPage < 0) feedPage = 0;
+
+      var start = feedPage * FEED_PAGE_SIZE;
+      feedEl.innerHTML = '';
+      feedEvents.slice(start, start + FEED_PAGE_SIZE).forEach(function (e) {
+        var li = document.createElement('li');
+        li.innerHTML = '<span class="who">' + e.who + '</span><span class="time">' + timeAgo(e.time) + '</span>' +
+          '<span class="text">' + e.text + '</span>';
+        feedEl.appendChild(li);
+      });
+
+      if (total <= FEED_PAGE_SIZE) {
+        pagEl.innerHTML = '';
+        return;
+      }
+      pagEl.innerHTML =
+        '<button class="page-btn" id="feed-newer"' + (feedPage <= 0 ? ' disabled' : '') + '>&larr; Newer</button>' +
+        '<span class="page-indicator">Page ' + (feedPage + 1) + ' of ' + (maxPage + 1) + '</span>' +
+        '<button class="page-btn" id="feed-older"' + (feedPage >= maxPage ? ' disabled' : '') + '>Older &rarr;</button>';
+      document.getElementById('feed-newer').addEventListener('click', function () { feedPage--; renderFeedPage(); });
+      document.getElementById('feed-older').addEventListener('click', function () { feedPage++; renderFeedPage(); });
+    }
+
+    function renderStatus(data) {
+      var agentsEl = document.getElementById('agents');
+      agentsEl.innerHTML = '';
+      Object.keys(data.agents).forEach(function (key) {
+        var a = data.agents[key];
+        var meta = statusMeta(a.status);
+        var card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML =
+          '<div class="role">' + a.role + '</div>' +
+          '<div class="status-line ' + meta.cls + '">' +
+          '<span class="status-icon">' + meta.icon + '</span>' + a.status + '</div>' +
+          '<div class="task">' + a.task + '</div>';
+        agentsEl.appendChild(card);
+      });
+
+      feedEvents = data.events || [];
+      renderFeedPage();
+    }
+
+    var backlogStatusFilters = new Set();
+    var lastBacklogData = null;
+
+    function renderBacklogLegend() {
+      var items = [
+        statusMeta('not started'), statusMeta('locked'), statusMeta('working'),
+        statusMeta('in review'), statusMeta('done'), statusMeta('standing by'),
+        statusMeta('parked'), statusMeta('blocked')
+      ];
+      var el = document.getElementById('backlog-legend');
+      el.innerHTML = items.map(function (m) {
+        var isActive = backlogStatusFilters.has(m.label);
+        return '<button type="button" class="legend-filter-btn ' + m.cls + (isActive ? ' active' : '') + '" data-label="' +
+          m.label + '"><span class="status-icon">' + m.icon + '</span>' + m.label + '</button>';
+      }).join('');
+      el.querySelectorAll('.legend-filter-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var label = btn.dataset.label;
+          if (backlogStatusFilters.has(label)) backlogStatusFilters.delete(label);
+          else backlogStatusFilters.add(label);
+          if (lastBacklogData) renderBacklog(lastBacklogData);
+        });
+      });
+    }
+
+    function renderBacklog(data) {
+      lastBacklogData = data;
+      var subtitle = document.getElementById('backlog-subtitle');
+      subtitle.textContent = 'Priority order per BACKLOG.md — last updated ' + timeAgo(data.updatedAt);
+
+      renderBacklogLegend();
+
+      var body = document.getElementById('backlog-body');
+      body.innerHTML = '';
+      var filterActive = backlogStatusFilters.size > 0;
+      var stories = data.stories.filter(function (s) {
+        if (s.divider) return !filterActive;
+        return !filterActive || backlogStatusFilters.has(statusMeta(s.status).label);
+      });
+      if (stories.length === 0 || (filterActive && stories.every(function (s) { return s.divider; }))) {
+        body.innerHTML = '<tr><td colspan="3" style="color:var(--text-muted); text-align:center; padding:1.25rem;">No stories match the selected filter(s).</td></tr>';
+        return;
+      }
+      stories.forEach(function (s) {
+        var tr = document.createElement('tr');
+        if (s.divider) {
+          tr.innerHTML = '<td colspan="3" style="color:var(--text-muted); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.03em; padding-top:1rem;">' + s.label + '</td>';
+          body.appendChild(tr);
+          return;
+        }
+        var meta = statusMeta(s.status);
+        tr.innerHTML =
+          '<td><span class="rank-badge">' + s.rank + '</span></td>' +
+          '<td><span class="story-id">' + s.id + '</span><div class="story-title">' + s.title + '</div></td>' +
+          '<td><span class="story-status ' + meta.cls + '"><span class="status-icon">' + meta.icon + '</span>' + s.status + '</span></td>';
+        body.appendChild(tr);
+      });
+    }
+
+    var liveScripts = {};
+    function loadScript(src, onload) {
+      if (liveScripts[src]) liveScripts[src].remove();
+      var el = document.createElement('script');
+      el.src = src + '?_=' + Date.now();
+      el.onload = onload;
+      el.onerror = function () {
+        document.getElementById('updated-value').innerHTML =
+          '<span class="error">Could not load ' + src + '</span>';
+      };
+      document.body.appendChild(el);
+      liveScripts[src] = el;
+    }
+
+    function poll() {
+      loadScript('status.js', function () {
+        if (window.STATUS_DATA) { renderTopStatus(window.STATUS_DATA); renderStatus(window.STATUS_DATA); }
+      });
+      loadScript('backlog-status.js', function () {
+        if (window.BACKLOG_STATUS) renderBacklog(window.BACKLOG_STATUS);
+      });
+    }
+
+    var tabButtons = document.querySelectorAll('.tab-btn');
+    tabButtons.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        tabButtons.forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        document.querySelectorAll('.view').forEach(function (v) { v.classList.remove('active'); });
+        document.getElementById(btn.dataset.view).classList.add('active');
+      });
+    });
+
+    renderLegend();
+    poll();
+    setInterval(poll, POLL_MS);
+  </script>
+
+  <p style="color:var(--text-muted); font-size:0.8rem; margin-top:2rem; border-top:1px solid var(--border); padding-top:1rem;">
+    This polls status.js and backlog-status.js, files the Orchestrator updates as work happens — it is not a real-time push feed.
+    If nothing's actively happening in the session, this page will show the last known state rather than new movement.
+  </p>
+</body>
+</html>
