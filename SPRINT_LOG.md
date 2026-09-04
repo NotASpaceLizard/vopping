@@ -117,6 +117,30 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   stories (S1-S6, S12).
 - **Outcome:** AC locked for S1-S6 and S12 (all of Sprint 1); implementation has
   not started.
+- **Formal pass, 2026-09-04:** Tester's independent formal pass landed —
+  67/67 assertions passed, zero required-assertion failures (see
+  `test-plans/REGRESSION_LOG.md`, 2026-09-04 row, script
+  `vopping-tests-tester-s1-s6-s12-formal.js`, citation of record per the
+  playbook's "independent formal-pass script supersedes self-check" rule).
+  **S3, S6, S12 → Done.** S1/S2/S5 correctly held at Locked (not Done) per
+  their own pre-existing M3 density-CSS gate — Tester's pass is complete for
+  them too (same 67/67 run) but the gate is working exactly as designed, not
+  a gap. **S4 also held at Locked, for a different reason:** Tester disclosed
+  one real MINOR defect despite the scripted TC4.3 assertion technically
+  passing — a paste line that's only a marker glyph + trailing whitespace
+  (e.g. `"- "`) creates a spurious junk item instead of being skipped, because
+  `parsePasteLines()`'s blank-check runs before marker-stripping, so the
+  trailing whitespace that would let the marker regex match is already gone
+  by the time it runs (full root-cause and repro in
+  `test-plans/S4-paste-ingest.md` Findings). Sequencing call made directly
+  (scrum-master's, no PO input needed, same category of call as Developer's
+  toast question on S12): **fix now, not backlogged** — narrow, well-understood,
+  cheap (Tester's own proposed fix: run the blank/empty check on the
+  post-marker-strip result, not the raw line). Added a dated technical note to
+  S4's AC stating the correct intended behavior explicitly (a post-strip-empty
+  line must be treated as blank) and gated S4's Done status on the fix landing
+  plus Tester re-verifying TC4.3 — same Done-gate *pattern* as S1/S2/S5's, just
+  a different underlying reason (a real disclosed bug, not a pending PO pick).
 - **Carryover:** N/A yet.
 
 ## Sprint 2 — planned, not yet started

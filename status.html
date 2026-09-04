@@ -309,6 +309,55 @@
     background: rgba(255, 255, 255, 0.08);
     font-weight: 700;
   }
+
+  /* Messages tab — curated PO-facing notes, distinct from the raw Team
+     Status activity feed. This is a one-way push (Orchestrator writes,
+     PO reads) since status.html has no server behind it and can't accept
+     input; the hint banner below says so explicitly rather than letting
+     the PO discover that the hard way. */
+  .messages-hint {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin-bottom: 1.25rem;
+  }
+  .message-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    background: var(--bg-card);
+    margin-bottom: 0.75rem;
+  }
+  .message-card.needs-reply { border-color: var(--busy); background: rgba(224, 169, 77, 0.08); }
+  .message-card.answered { opacity: 0.6; }
+  .message-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.35rem;
+  }
+  .message-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  .message-badge.needs-reply { background: var(--busy); color: #1a1a1a; }
+  .message-badge.fyi { background: var(--bg-page); border: 1px solid var(--border); color: var(--text-muted); }
+  .message-badge.answered { background: var(--ok); color: #1a1a1a; }
+  .message-time { color: var(--text-muted); font-size: 0.78rem; }
+  .message-summary { font-weight: 600; margin-bottom: 0.25rem; }
+  .message-body { font-size: 0.88rem; white-space: pre-wrap; }
 </style>
 </head>
 <body>
@@ -335,6 +384,7 @@
   <div class="tabs">
     <button class="tab-btn active" data-view="view-status">Team Status</button>
     <button class="tab-btn" data-view="view-backlog">Backlog</button>
+    <button class="tab-btn" data-view="view-messages">Messages</button>
   </div>
 
   <div class="view active" id="view-status">
@@ -357,6 +407,12 @@
     </table>
   </div>
 
+  <div class="view" id="view-messages">
+    <div class="messages-hint">This page can't send anything back — it's a static file with no server behind it. When a message below is tagged <strong>Needs your reply</strong>, come back to the Claude Code chat window to answer it. Everything else is FYI only, no action needed.</div>
+    <div id="messages"></div>
+    <div class="feed-pagination" id="messages-pagination"></div>
+  </div>
+
   <script>
     var POLL_MS = 4000;
     var STALE_YELLOW_MS = 20 * 60 * 1000;
@@ -365,6 +421,10 @@
     var FEED_PAGE_SIZE = 10;
     var feedEvents = [];
     var feedPage = 0;
+
+    var MESSAGES_PAGE_SIZE = 10;
+    var messagesList = [];
+    var messagesPage = 0;
 
     function timeAgo(iso) {
       var diffMs = Date.now() - new Date(iso).getTime();
@@ -440,16 +500,69 @@
       var box = document.getElementById('box-question');
       var qValue = document.getElementById('question-value');
       var qNote = document.getElementById('question-note');
-      var q = data.pendingQuestion;
-      if (!q || !q.asked) {
+      var open = (data.messages || []).filter(function (m) { return m.needsReply && !m.answered; });
+      if (open.length === 0) {
         box.classList.remove('has-question');
         qValue.textContent = 'None';
         qNote.textContent = '';
       } else {
         box.classList.add('has-question');
-        qValue.textContent = 'Yes — asked ' + timeAgo(q.time);
-        qNote.textContent = q.summary;
+        qValue.textContent = open.length + ' waiting — see Messages tab';
+        qNote.textContent = open[0].summary + (open.length > 1 ? ' (+' + (open.length - 1) + ' more)' : '');
       }
+    }
+
+    function renderMessages(data) {
+      // Sort: unanswered-needs-reply first (as a group), then everything else,
+      // reverse-chronological within each group — matches the PO's explicit
+      // ask (open questions surface first regardless of age, newest-first
+      // otherwise) rather than pure chronological like the Team Status feed.
+      messagesList = (data.messages || []).slice().sort(function (a, b) {
+        var aOpen = a.needsReply && !a.answered;
+        var bOpen = b.needsReply && !b.answered;
+        if (aOpen !== bOpen) return aOpen ? -1 : 1;
+        return new Date(b.time) - new Date(a.time);
+      });
+      renderMessagesPage();
+    }
+
+    function renderMessagesPage() {
+      var el = document.getElementById('messages');
+      var pagEl = document.getElementById('messages-pagination');
+      var total = messagesList.length;
+
+      if (total === 0) {
+        el.innerHTML = '<p style="color:var(--text-muted);">Nothing here yet.</p>';
+        pagEl.innerHTML = '';
+        return;
+      }
+
+      var maxPage = Math.ceil(total / MESSAGES_PAGE_SIZE) - 1;
+      if (messagesPage > maxPage) messagesPage = maxPage;
+      if (messagesPage < 0) messagesPage = 0;
+
+      var start = messagesPage * MESSAGES_PAGE_SIZE;
+      el.innerHTML = messagesList.slice(start, start + MESSAGES_PAGE_SIZE).map(function (m) {
+        var badgeCls = m.needsReply ? (m.answered ? 'answered' : 'needs-reply') : 'fyi';
+        var badgeText = m.needsReply ? (m.answered ? '✓ Answered' : '⌛︎ Needs your reply') : 'FYI only';
+        var cardCls = 'message-card' + (m.needsReply && !m.answered ? ' needs-reply' : '') + (m.answered ? ' answered' : '');
+        return '<div class="' + cardCls + '">' +
+          '<div class="message-top"><span class="message-badge ' + badgeCls + '">' + badgeText + '</span><span class="message-time">' + timeAgo(m.time) + '</span></div>' +
+          '<div class="message-summary">' + m.summary + '</div>' +
+          (m.body ? '<div class="message-body">' + m.body + '</div>' : '') +
+          '</div>';
+      }).join('');
+
+      if (total <= MESSAGES_PAGE_SIZE) {
+        pagEl.innerHTML = '';
+        return;
+      }
+      pagEl.innerHTML =
+        '<button class="page-btn" id="messages-newer"' + (messagesPage <= 0 ? ' disabled' : '') + '>&larr; Newer</button>' +
+        '<span class="page-indicator">Page ' + (messagesPage + 1) + ' of ' + (maxPage + 1) + '</span>' +
+        '<button class="page-btn" id="messages-older"' + (messagesPage >= maxPage ? ' disabled' : '') + '>Older &rarr;</button>';
+      document.getElementById('messages-newer').addEventListener('click', function () { messagesPage--; renderMessagesPage(); });
+      document.getElementById('messages-older').addEventListener('click', function () { messagesPage++; renderMessagesPage(); });
     }
 
     function renderFeedPage() {
@@ -583,7 +696,7 @@
 
     function poll() {
       loadScript('status.js', function () {
-        if (window.STATUS_DATA) { renderTopStatus(window.STATUS_DATA); renderStatus(window.STATUS_DATA); }
+        if (window.STATUS_DATA) { renderTopStatus(window.STATUS_DATA); renderStatus(window.STATUS_DATA); renderMessages(window.STATUS_DATA); }
       });
       loadScript('backlog-status.js', function () {
         if (window.BACKLOG_STATUS) renderBacklog(window.BACKLOG_STATUS);
@@ -599,6 +712,14 @@
         document.getElementById(btn.dataset.view).classList.add('active');
       });
     });
+
+    document.getElementById('box-question').addEventListener('click', function () {
+      tabButtons.forEach(function (b) { b.classList.remove('active'); });
+      document.querySelector('.tab-btn[data-view="view-messages"]').classList.add('active');
+      document.querySelectorAll('.view').forEach(function (v) { v.classList.remove('active'); });
+      document.getElementById('view-messages').classList.add('active');
+    });
+    document.getElementById('box-question').style.cursor = 'pointer';
 
     renderLegend();
     poll();

@@ -114,7 +114,28 @@
   // a leading number+"."/")" - each followed by whitespace, before the real
   // item text. No quantity/unit stripping, no aisle-guessing (that's S11,
   // parked, not built here).
-  var LEADING_LIST_MARKER_RE = /^(?:[-*•]|\d+[.)])\s+/;
+  // Bug fix (2026-09-04, Tester TC4.3 / Scrum Master's dated S4 AC note):
+  // was `\s+` only, requiring a marker be followed by real trailing
+  // whitespace to be recognized. That broke on a marker-only line (e.g.
+  // "- ", "1. ") - by the time this regex runs, parsePasteLines' own
+  // pre-strip `.trim()` (below) has already consumed that trailing
+  // whitespace, so "- " became "-" with nothing left for `\s+` to match,
+  // the regex silently failed to strip anything, and the bare marker
+  // character got pushed as a real item. Widening to `(?:\s+|$)` - marker
+  // followed by whitespace OR by the end of the (already-trimmed) string -
+  // catches exactly that residue while leaving every other case unchanged:
+  // a real marker+space+text line still only matches via the `\s+` branch
+  // (text after the space blocks `$`), and a no-space boundary case like
+  // "-NoSpaceMarker" still doesn't match either branch (next char is
+  // neither whitespace nor end-of-string), so it's still added verbatim
+  // per TC4.2. Deliberately NOT restructuring parsePasteLines' trim/strip
+  // order to check blankness only post-strip (Tester's alternate suggested
+  // fix) - that would require re-deriving the pre-strip trim from scratch to
+  // avoid breaking a marker preceded by leading whitespace (e.g. "  - Milk"),
+  // which today relies on that pre-strip trim to align the regex's `^`
+  // anchor with the marker. This is the smaller, lower-risk diff for the
+  // same required outcome.
+  var LEADING_LIST_MARKER_RE = /^(?:[-*•]|\d+[.)])(?:\s+|$)/;
 
   function parsePasteLines(raw) {
     // \r?\n - handles both LF and CRLF line endings (QA nitpick N1).
@@ -124,7 +145,13 @@
       var line = lines[i].trim();
       if (!line) continue; // blank lines skipped, no empty rows
       line = line.replace(LEADING_LIST_MARKER_RE, '').trim();
-      if (!line) continue; // a line that was ONLY a marker glyph still skips
+      // A line that was ONLY a marker glyph (with or without trailing
+      // whitespace) reduces to "" here and gets the same treatment as an
+      // originally-blank line - this check was already present before this
+      // fix, but was effectively unreachable dead code for marker-only
+      // input until the regex above was widened to actually strip it down
+      // to empty in that case.
+      if (!line) continue;
       names.push(line);
     }
     return names;

@@ -19,6 +19,7 @@ don't overwrite the old one silently.
 | Date | Story/Scope | Script | Result | Cumulative total | Notes |
 |------|-------------|--------|--------|-------------------|-------|
 | — | — | — | — | 0 | No stories implemented yet; backlog not drafted. Ledger opened 2026-09-04 in advance of any formal passes. |
+| 2026-09-04 | S1, S2, S3, S4, S5, S6, S12 (Sprint 1, first formal pass) | `c:\tmp\pw-test\vopping-tests-tester-s1-s6-s12-formal.js` (Tester-independent — supersedes Developer's self-check `vopping-selfcheck.js` as citation of record per playbook) | 67/67 assertions passed, single script run, no prior baseline to re-run against (first formal pass of the project) | 67 | No arithmetic required — this is the script's own single printed total ("67/67 passed"), quoted directly, not summed from sub-parts. Zero console/page errors, zero confirm/alert dialogs, zero external network requests (only the app's own local file:// asset loads). One MINOR non-blocking defect found and disclosed separately (does not affect this pass/fail count, which reflects assertions-as-written): a paste line consisting of only a marker glyph + trailing whitespace creates a spurious junk item — see `S4-paste-ingest.md` Findings section. Full raw transcript archived in `S6-undo.md` (canonical copy, cross-referenced by all other Sprint-1 files rather than duplicated). |
 
 ## How to add a row
 
