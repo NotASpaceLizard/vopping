@@ -1,8 +1,11 @@
-# Test Plan — S12: Clear all checked items in one tap
+# Test Plan — S12: Clear all crossed-off items in one tap
 
 **STATUS: DONE — formally executed 2026-09-04, PASS (all S12-relevant assertions, part of a
-67/67 combined Sprint 1 run), zero defects.** Citation of record:
-`c:\tmp\pw-test\vopping-tests-tester-s1-s6-s12-formal.js`.
+67/67 combined Sprint 1 run), zero defects. Re-confirmed clean 2026-09-04 after the S1/S2/S5
+density-lock CSS pass (74/74 combined re-run) — see Regression reconfirmation section below,
+which also newly verifies the toast text/pluralization that the original pass didn't check.**
+Citation of record: `c:\tmp\pw-test\vopping-tests-tester-s1-s6-s12-formal.js` (original),
+`vopping-tests-tester-s1-s2-s5-density-formal.js` (re-confirmation).
 
 **Story:** As a user, I want to clear all checked items off my list in one tap, so that I can
 quickly reset for a new shopping trip without deleting each checked item one at a time.
@@ -56,6 +59,23 @@ S10's own formal pass in Sprint 2, not before.
 
 **Overall verdict: PASS, 0 defects in S12.** Part of the combined 67/67 Sprint 1 run — see
 `REGRESSION_LOG.md` (2026-09-04 row).
+
+## Regression reconfirmation, 2026-09-04 (density-picker CSS pass for S1/S2/S5)
+
+Two things worth noting from this same-day re-run (script
+`vopping-tests-tester-s1-s2-s5-density-formal.js`, 74/74, no regressions):
+
+1. **Terminology rename**, applied consistently across the app as part of the same density work:
+   the global control's visible label changed from "Clear checked" to "Clear crossed off" (id
+   attribute `clear-checked-btn` kept stable/internal, only the user-facing text changed).
+   Confirmed via `textContent`.
+2. **Toast content, newly verified** (the original pass only checked that no confirm dialog fired
+   for S12 — it never asserted the toast's actual text/pluralization, even though the toast itself
+   already existed at that point). Now confirmed directly: `"Cleared 3 items — Undo"` for a
+   3-item bulk clear, and `"Cleared 1 item — Undo"` for a solo clear — correct singular/plural
+   agreement in both directions.
+
+Full transcript: `S5-reorder-buttons.md`'s Commands section.
 
 ## Commands run and output
 Script: `c:\tmp\pw-test\vopping-tests-tester-s1-s6-s12-formal.js`. Full raw transcript in

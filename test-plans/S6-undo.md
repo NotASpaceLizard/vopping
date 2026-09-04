@@ -55,6 +55,18 @@ consistently across S3/S4/S12's analogous forward-references, per the pre-lock r
 
 **Overall verdict: PASS, 0 defects in S6.** Part of the combined 67/67 Sprint 1 run.
 
+## Regression reconfirmation, 2026-09-04 (density-picker CSS pass for S1/S2/S5)
+
+S6's own undo mechanics are independent of the toggle-target change (checkbox removed, whole row
+now the tap/keyboard target for cross-off) — the undo buffer itself doesn't care how `toggleChecked()`
+gets invoked. Re-ran the full suite against the new mechanic (script
+`vopping-tests-tester-s1-s2-s5-density-formal.js`, 74/74): undo of a cross-off, a reorder swap, a
+delete, a whole paste-batch, and the single-slot clobber semantics (action A then B, one Undo
+reverses only B) all re-confirmed clean using the new click-on-row-name / keyboard-Space
+interaction instead of the old checkbox click. No regressions. See `S5-reorder-buttons.md`'s
+Commands section for the full transcript — that file is now the canonical copy for this script,
+same convention this file used for the prior (67/67) script.
+
 ## Regression note
 This is the canonical full raw transcript for the combined S1-S6/S12 formal pass — every other
 S1-S6/S12 test-plan file cross-references this section rather than duplicating it, to avoid the
@@ -157,3 +169,12 @@ skipped. Not an S6 issue (S6's own undo mechanics are unaffected — undoing suc
 correctly removes the junk item along with the rest of that batch); documented against S4 where
 it belongs, cross-referenced here for visibility since this file carries the canonical raw
 transcript.
+
+**Update, same day (2026-09-04):** the TC4.3 defect above has been fixed by Developer and
+independently re-verified. The script this file documents was updated in place with 2 new
+fix-verification checks and re-run in full — new total **69/69**, zero regressions elsewhere in
+this same transcript. This file's raw-output block above is left as originally captured (the
+first, 67/67 run) rather than rewritten, per this project's transparency convention — full detail
+of the re-run and its own raw output lines are in `S4-paste-ingest.md`'s "Re-verification,
+2026-09-04" section, and the canonical current count is `REGRESSION_LOG.md`'s second 2026-09-04
+row (69/69), not this file's original 67/67 figure.

@@ -46,6 +46,16 @@ now closed — S6 shipped in the same Sprint 1 batch, verified together in this 
 **Overall verdict: PASS, 0 defects in S3.** Part of the combined 67/67 Sprint 1 run — see
 `REGRESSION_LOG.md` (2026-09-04 row).
 
+## Regression reconfirmation, 2026-09-04 (density-picker CSS pass for S1/S2/S5)
+
+S2's toggle mechanic changed substantially (checkbox removed, whole row is now the toggle target)
+as part of the S1/S2/S5 density-lock follow-up. Re-ran the full suite against the new mechanic
+(script `vopping-tests-tester-s1-s2-s5-density-formal.js`, 74/74) — no S3 regression: delete,
+toast text, no-dialog, and undo-restores-position all still pass unchanged. Added one new check
+not present in the original pass: deleting a row does NOT toggle a SIBLING row's cross-off state
+(a nested-control-precedence concern that became more relevant once the whole row became
+clickable) — confirmed clean. Full transcript: `S5-reorder-buttons.md`'s Commands section.
+
 ## Commands run and output
 Script: `c:\tmp\pw-test\vopping-tests-tester-s1-s6-s12-formal.js`. Full raw transcript in
 `test-plans/S6-undo.md`. S3-specific lines:

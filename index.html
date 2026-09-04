@@ -11,7 +11,10 @@
     <h1>Grocery List</h1>
     <div class="global-controls">
       <button type="button" id="undo-btn" disabled>Undo</button>
-      <button type="button" id="clear-checked-btn" disabled>Clear checked</button>
+      <!-- Terminology (locked AC, 2026-09-04): user-facing text for S12/S3
+           renamed "checked"/"check" -> "crossed off"/"cross off" - id kept
+           stable (internal, not user-visible), only the label text changed. -->
+      <button type="button" id="clear-checked-btn" disabled>Clear crossed off</button>
     </div>
   </header>
 
@@ -33,11 +36,30 @@
     </form>
   </details>
 
-  <!-- Row markup/CSS here is a placeholder pending the PO's pick from
-       density-picker.html (see BACKLOG.md's tracked follow-up note) - the
-       add/render/persist/check/delete/reorder mechanics don't depend on
-       which option wins, but this row will get a CSS/markup pass once it
-       does. Rendered entirely by script.js. -->
+  <!-- S10: "What am I missing?" suggestion chips - populated by script.js's
+       renderSuggestions(), hidden entirely when there are none. -->
+  <div id="suggestions-root" class="suggestions-root" hidden></div>
+
+  <!-- S9: sort control - view-only, in-memory (script.js's sortMode),
+       resets to Manual on reload. -->
+  <div class="sort-controls">
+    <label for="sort-select">Sort:</label>
+    <select id="sort-select">
+      <option value="manual">Manual</option>
+      <option value="alpha">Alphabetical</option>
+      <option value="aisle">By Aisle</option>
+    </select>
+  </div>
+
+  <!-- S8: shared datalist for the aisle-edit affordance's suggested+dynamic
+       pool - populated by script.js's renderAisleDatalist(). -->
+  <datalist id="aisle-options"></datalist>
+
+  <!-- Row density/interaction - LOCKED, 2026-09-04 (PO's final pick from
+       density-picker.html): whole row is the tap target for crossing off,
+       no checkbox/dot glyph. Rendered entirely by script.js - see its
+       renderList()/event-delegation comments for the actual markup and the
+       nested-control-precedence handling for Up/Down/Delete. -->
   <main id="list-root">
   </main>
 

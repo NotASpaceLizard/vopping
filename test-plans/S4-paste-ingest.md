@@ -34,7 +34,7 @@ BACKLOG.md (and verified below), and the S6 forward-reference is closed now that
 |----|-----------|-------|----------|
 | TC4.1 | Marker-stripping, all four glyph forms | Paste `- Chicken`, `1. Rice`, `* Paper towels`, `2) Coffee`, `Plain Item` | Items added as `Chicken`, `Rice`, `Paper towels`, `Coffee`, `Plain Item` (markers stripped, not left in the name) |
 | TC4.2 | Marker regex requires whitespace after the glyph (boundary case) | Paste `-NoSpaceMarker` and `•NoSpaceBullet` (no space after the glyph) | Added verbatim, NOT stripped — `-NoSpaceMarker`/`•NoSpaceBullet` |
-| TC4.3 | A line that's only a marker+space, nothing after (boundary case) | Paste a line `"- "` (dash, space, nothing) | Intent: no real item created (pure formatting noise, nothing to ingest). **Actual/found:** see Findings — a literal `"-"` item IS created. |
+| TC4.3 | A line that's only a marker+space, nothing after (boundary case) | Paste a line `"- "` (dash, space, nothing) | No real item created (pure formatting noise, nothing to ingest). **Original run found a literal `"-"` item WAS created (see Findings) — fixed and re-verified same day (see Re-verification).** |
 | TC4.4 | Blank lines skipped | Paste text with blank lines interspersed | No empty rows |
 | TC4.5 | Textarea clears only on successful ingest | Paste valid lines, submit | Textarea empty afterward |
 | TC4.6 | Whole-blank paste is a no-op | Paste only whitespace/blank lines, submit | Item count unchanged; textarea left exactly as typed (not cleared) |
@@ -45,16 +45,16 @@ BACKLOG.md (and verified below), and the S6 forward-reference is closed now that
 |-----------|--------|-----------|
 | TC4.1 | All 5 target names present in rendered list | Pass |
 | TC4.2 | Both `-NoSpaceMarker` and `•NoSpaceBullet` present verbatim, unstripped | Pass |
-| TC4.3 | No blank-*string* item in rendered list — technically Pass as literally scripted, **but see Findings: this assertion was checking the wrong thing** | Pass (as scripted) / see Findings |
+| TC4.3 | Original run: no blank-*string* item — technically Pass as scripted, but see Findings (wrong check). **Re-run with the precise check: zero marker-residue junk items (`-`,`1.`,`*`,`2)`) — genuinely Pass.** | Pass (fixed, re-verified) |
 | TC4.4 | Confirmed as part of TC4.1's same run (blank/whitespace-only lines interspersed, no gaps) | Pass |
 | TC4.5 | `pasteInputVal === ''` after successful ingest | Pass |
 | TC4.6 | Item count unchanged; textarea value still contains the typed whitespace/newlines | Pass |
 | TC4.7 | Single Undo click removed all 3 pasted items (Chicken/Rice/Paper towels/Coffee/Plain Item minus the boundary-case lines from TC4.2/4.3, which were part of the same paste batch) back to the pre-paste 3-item baseline | Pass |
 
-**Overall verdict: PASS on all scripted assertions (7/7 in this file's own scope), but 1 MINOR
-defect found and disclosed below that the original scripted assertion didn't target.** Part of
-the combined 67/67 Sprint 1 run — see `REGRESSION_LOG.md` (2026-09-04 row); the 67/67 figure
-reflects that every assertion AS WRITTEN passed, not that zero real issues exist — see Findings.
+**Overall verdict: PASS, 0 defects remaining.** Original pass found 1 MINOR defect (TC4.3) that
+the original scripted assertion had mischaracterized as passing — disclosed below, then fixed by
+Developer and independently re-verified same-day (see Re-verification section at the end of this
+file). Current citation: 69/69, `REGRESSION_LOG.md` 2026-09-04 second row.
 
 ## Findings — MINOR defect, disclosed 2026-09-04 (Tester) — FIXED, see Re-verification below
 
@@ -150,3 +150,13 @@ relies on that pre-strip trim to align the regex's `^` anchor. Reasonable call; 
 **Verdict: defect closed, no regressions. S4 moves to DONE.** Updated cumulative regression count
 (69/69) recorded in `REGRESSION_LOG.md`, 2026-09-04 (second row) — cite that row going forward,
 not the original 67/67 row, which is left in place as history rather than overwritten.
+
+## Second regression reconfirmation, 2026-09-04 (density-picker CSS pass for S1/S2/S5)
+
+S4's own paste-ingest mechanic is untouched by the S1/S2/S5 density-lock work (that work only
+changed how S2's cross-off toggle and S3/S5's nested controls interact with the row — S4's
+textarea/Add-control flow is separate). Re-ran the full suite anyway for a genuine regression
+check (script `vopping-tests-tester-s1-s2-s5-density-formal.js`, 74/74): marker-stripping, the
+no-space boundary case, and the TC4.3 fix (no `"-"` junk item) all still hold with zero changes.
+Current canonical count remains `REGRESSION_LOG.md`'s latest row (74/74) — S4 itself has no new
+findings from this pass.

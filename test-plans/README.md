@@ -3,6 +3,18 @@
 Owned by: **Tester**. One file per story: `S<N>-slug.md`. Never edits
 `script.js`/`style.css`/`index.html`.
 
+## Accessibility scope (PO decision, relayed by Orchestrator, 2026-09-04)
+
+Keyboard-only/screen-reader coverage is **not a required test gate** going forward — the PO's
+real user base doesn't need it. Whatever ARIA/keyboard-focus behavior Developer builds (e.g.
+S1/S2/S5's `role="checkbox"`/`tabindex`/`aria-checked`/focus-restoration work) is fine to sanity-
+check if it's already covered in an existing pass, but don't invest further effort expanding this
+coverage, and don't block a story's Done status on a gap here. **The one real accessibility
+requirement is a colorblind-safe palette wherever color conveys state** (Okabe-Ito, per the
+playbook's §7 — same standing PO preference as vacking) — relevant starting Sprint 2 if S8/S9's
+aisle grouping introduces any color-coding; not applicable to Sprint 1's strikethrough+dim-based
+crossed-off state.
+
 This folder is empty until there's a locked (or at least drafted)
 backlog to write plans against — see `TEAM_LOG.md` / `BACKLOG.md` at
 the project root for current state. Per the playbook
@@ -136,6 +148,58 @@ formal-test-plan time rather than relying on chat memory:
   endings from pasted text, not just `\n`. Worth a dedicated test case
   (paste text containing `\r\n` line endings, confirm correct per-line
   split, no stray `\r` character trailing into an item name).
+
+## Known implementation details (Developer sanity-check, Sprint 2, relayed by
+Orchestrator 2026-09-04) — build these into S7-S10 assertions once AC locks and implementation lands
+
+- **S7/S8 shared inline-edit mechanism:** note and aisle editing both use the
+  same underlying widget, committed via a delegated `focusout` listener (not
+  `blur`, which doesn't bubble and so can't be handled via delegation the way
+  the rest of this app's event handling already works). **Real landmine
+  flagged by Developer, worth a dedicated test:** an in-progress edit (typed
+  but not yet committed) must survive a re-render triggered by an unrelated
+  action (e.g. checking off a different row while a note field is open and
+  mid-edit) without losing the draft — same capture/restore pattern as the
+  S1/S2/S5 focus-preservation fix, just for an editable value instead of
+  keyboard focus alone. Developer's asked Scrum Master to add this as an
+  explicit AC clause so it's a locked guarantee, not just an implementation
+  detail — check whether that clause landed before writing S7/S8's test
+  cases; if so, this needs its own test (open note edit on row A, type a
+  draft, don't commit, trigger a mutation on row B, confirm row A's draft
+  text is still exactly what was typed, not reverted/lost).
+- **S8 aisle input:** plain `<input list="aisle-options">` + `<datalist>` —
+  no custom dropdown widget. Free-text entry is just typing into the input
+  normally (datalist never restricts input, only offers suggestions), so
+  "accepts arbitrary free text" is satisfied by the native element itself,
+  not something Developer had to build. No color-coding on aisle tags in
+  this first pass (plain text) — the colorblind-palette requirement (see
+  Accessibility scope, above) does NOT apply yet; only relevant if/when a
+  future pass adds color-coded aisle tags.
+- **S9 sort is a derived view, never a mutation:** rendering goes through a
+  `getSortedItems()`-style function that computes a sorted view from
+  `state.items` without touching the underlying array — `state.items`
+  itself is never `.sort()`-ed in place. This is exactly what S9's own AC
+  asks to be tested ("testable by sorting, reloading, and diffing the
+  stored array") — write that test literally: sort by Alphabetical or By
+  Aisle, reload, and diff the raw `localStorage` `items` array against its
+  pre-sort content. This also doubles as a regression guard against a
+  future edit that reaches for `.sort()` directly on the real array instead
+  of going through the derived-view function.
+- **S10 shared add-path:** both S1's single-add and S4's paste-ingest funnel
+  through one shared `pushNewItem()`-style helper where the frequency
+  counter actually increments, using one normalization helper
+  (`trim().toLowerCase()`) consistently as both the counter key AND the
+  on-list-presence comparison (deciding whether a suggestion should be
+  hidden because it's already on the list). Worth a test that explicitly
+  exercises BOTH add paths and confirms they increment the SAME counter
+  entry identically (e.g. add "Milk" via single-add, add "milk" via paste,
+  confirm the counter for the normalized key is 2, not two separate
+  entries at 1 each) — don't just test one path and assume the other
+  matches.
+- **S7/S8 accessibility scope confirmed:** per the PO's scoping decision
+  (see Accessibility scope, above), the new note/aisle-edit affordances are
+  plain click/tap-only with no keyboard/ARIA machinery — this is consistent
+  with scope, not a gap to flag or test for.
 
 ## Regression watch-list (carried over from vacking's real findings —
 categories to actively probe for on this project, not just wait to trip over)

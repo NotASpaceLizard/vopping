@@ -135,20 +135,23 @@ button:disabled {
 }
 
 /* ---------------------------------------------------------------------
-   Placeholder list-item row (2026-09-04) - TBD, NOT the locked spec.
-   Row density/checkbox size/spacing is pending the PO's pick from
-   density-picker.html (BACKLOG.md's tracked follow-up note, QA finding
-   M3: S1/S2/S5 cannot move to Done until a follow-up CSS pass applies
-   whatever gets picked and Tester verifies it). Add/render/persist/check/
-   delete/reorder mechanics don't depend on which option wins, so built
-   now against a functional, tight-vertical-rhythm placeholder. Carries
-   forward the already-proven mobile fixes from vacking/style.css and this
-   project's own density-picker.html revision: flex children need their
-   own `min-width: 0` to allow ellipsis/shrink (not just `flex: 1`),
-   multi-child rows need `flex-wrap: wrap` once a row gets crowded
-   (checkbox + name + up/down + delete = 5 elements here already, more
-   once S7/S8 land), and tap targets should not go below 24px per side
-   (WCAG 2.5.5 AA minimum). --------------------------------------------- */
+   List-item row - LOCKED, 2026-09-04 (PO's final pick from
+   density-picker.html, replacing the earlier placeholder). The entire row
+   is the tap target for crossing an item off - no checkbox or dot glyph
+   of any kind; crossed-off state is strikethrough + dimmed .item-name
+   text only. `cursor: pointer` + `user-select: none` + the `:active` press
+   feedback below are the same treatment density-picker.html's Options C/D
+   used for their whole-row-tap variants. Up/Down/Delete remain distinct
+   nested controls (see script.js's click/keydown handlers for how their
+   taps are kept from also firing the row's own toggle - "nested-control
+   precedence", locked AC on S2/S3/S5). Carries forward the already-proven
+   mobile fixes from vacking/style.css and this project's own
+   density-picker.html: flex children need their own `min-width: 0` to
+   allow ellipsis/shrink (not just `flex: 1`), multi-child rows need
+   `flex-wrap: wrap` once a row gets crowded (name + up/down + delete = 4
+   elements here, more once S7/S8 land), and tap targets should not go
+   below 24px per side (WCAG 2.5.5 AA minimum) - satisfied here by the
+   whole row itself, not by a dedicated glyph. --------------------------- */
 .items {
   list-style: none;
   margin: 0.5rem 0 0;
@@ -160,19 +163,19 @@ button:disabled {
   align-items: center;
   flex-wrap: wrap;
   gap: 0.4rem;
-  padding: 0.3rem 0.5rem;
+  padding: 0.4rem 0.5rem;
   border-bottom: 1px solid var(--bg-card);
+  cursor: pointer;
+  user-select: none;
+}
+
+.items li:active {
+  background: var(--bg-card);
 }
 
 .items li.checked .item-name {
   text-decoration: line-through;
   color: var(--text-muted);
-}
-
-.items input[type="checkbox"] {
-  width: 26px;
-  height: 26px;
-  flex-shrink: 0;
 }
 
 .items .item-name {

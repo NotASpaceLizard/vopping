@@ -141,18 +141,112 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   line must be treated as blank) and gated S4's Done status on the fix landing
   plus Tester re-verifying TC4.3 — same Done-gate *pattern* as S1/S2/S5's, just
   a different underlying reason (a real disclosed bug, not a pending PO pick).
-- **Carryover:** N/A yet.
+- **S4 fix verified, 2026-09-04 (same day, continued):** Developer's fix landed
+  (corrected the blank-check/marker-strip ordering in `parsePasteLines()`) and
+  Tester re-verified — 69/69 assertions passed (67 original + 2 new TC4.3
+  fix-verification checks, zero regressions in the other 67), same script
+  `vopping-tests-tester-s1-s6-s12-formal.js` updated in place and re-run in
+  full. Cited to `REGRESSION_LOG.md`'s second 2026-09-04 row, which explicitly
+  supersedes the first (67/67) row — do not cite the 67/67 figure going
+  forward. **S4 → Done.** Sprint 1 is now 4/7 Done (S3, S4, S6, S12) and 3/7
+  Locked-not-Done (S1, S2, S5 — density-CSS gate only, working as designed).
+- **Row-density decision landed, 2026-09-04 (same day, continued):** PO's final pick from
+  `density-picker.html`: whole-row tap target (Option C) + no checkbox/dot glyph at all
+  (Option D) — the whole row already toggles on tap, so a dedicated glyph isn't needed for
+  the everyday cross-off gesture. Crossed-off visual state is strikethrough + dimmed text
+  only. Locked this into S1/S2/S5's AC directly, replacing every remaining TBD note.
+  **New requirement surfaced while locking this in, not previously written down anywhere:**
+  once the whole row is a tap target, S3's delete button and S5's Up/Down buttons need
+  explicit "nested-control precedence" — tapping one of those must fire ONLY that control's
+  own action, never also the row's cross-off toggle. Added this rule to S2 (where the core
+  tap behavior lives) and cross-referenced it from S3 and S5. **Also caught and fixed a
+  citation-drift bug of my own:** S1/S2/S5's existing "Tester's formal pass is complete"
+  notes were still citing the superseded 67/67 REGRESSION_LOG.md figure instead of the
+  current 69/69 row — corrected while I was already in these three rows for the density
+  update, exactly the kind of drift the playbook's citation-hygiene lesson warns about.
+  **PO's explicit terminology ask, also actioned:** renamed "checked"-adjacent language in
+  S12 (story text, control label "Clear checked items" → "Clear crossed-off items",
+  checked(S2)/unchecked/checked-state references) and S3 (story text's "checking it off" →
+  "crossing it off", the undo-retention "checked state" → "crossed-off state", and the
+  now-checkbox-free delete-control description) to "crossed off," per the PO's explicit
+  request since the app no longer has a checkbox to refer to. **Deliberately left out of
+  scope:** S2's own story title ("check an item off") and S6/S7/S8/S9/S10's internal
+  check/uncheck vocabulary (undo-eligible-type name, sort-mode availability lists, etc.)
+  — the PO's ask was scoped to S12/S3's "clear checked"-adjacent terminology specifically,
+  not a full-project rename; flagging this scoping choice back to the Orchestrator in case
+  broader consistency is wanted later. All edits grep-verified as single physical GFM lines;
+  BACKLOG.md is still 12 rows. Routing to Developer for the CSS/markup pass and Tester for
+  re-verification of S1/S2/S5's Done-gate, per the Orchestrator's instruction.
+- **Sprint 1 CLOSED, 2026-09-04:** Tester's density-picker.html CSS/markup Done-gate
+  re-verification landed clean — 74/74 assertions passed, zero defects, zero regressions
+  across all of Sprint 1 (independent script rewrite, not a copy, since the toggle
+  mechanic fundamentally changed — see REGRESSION_LOG.md's latest/current row, script
+  `vopping-tests-tester-s1-s2-s5-density-formal.js`). **S1, S2, S5 → Done.** Sprint 1 is
+  now 7/7 Done: S1, S2, S3, S4, S5, S6, S12. Every gate that opened during this sprint
+  (M3's density-CSS hold, S4's disclosed paste-marker defect, R2's delete/undo tension,
+  R3's missing bulk-clear story) closed before Done, none left open or silently dropped.
+- **Outcome:** Sprint 1 complete, 7/7 stories Done, zero open defects.
+- **Carryover:** None — Sprint 1 finished clean, all 7 stories Done.
 
-## Sprint 2 — planned, not yet started
+## Sprint 2 — sanity-check pass started 2026-09-04
 
-- **Goal:** Organization/enrichment on top of a working core list: text notes (S7),
-  aisle designation (S8), sort view (S9), frequency-based "What am I missing?"
-  suggestions (S10).
-- **Committed stories:** S7, S8, S9, S10, in that sequence — S9 depends on S8's
-  aisle field; S10 depends on S1's and S4's add paths (delivered in sprint 1)
-  already existing for its history counter to hook into.
-- **Outcome:** Not yet started.
-- **Carryover:** N/A yet.
+- **Goal:** Organization/enrichment on top of the now-complete core list: text notes (S7),
+  aisle designation (S8), sort view (S9), frequency-based "What am I missing?" suggestions
+  (S10). Started as a natural checkpoint right after Sprint 1 closed, so Developer/Tester
+  aren't idle.
+- **Committed stories:** S7, S8, S9, S10, in that sequence (S9 depends on S8's aisle
+  field; S10 depends on S1's/S4's add paths, both Done).
+- **Scrum-master sanity-check, 2026-09-04:** Re-read all four stories fresh against
+  everything that changed during Sprint 1 (whole-row tap target, no checkbox, nested-
+  control precedence, crossed-off terminology) rather than assuming they were still
+  accurate as originally drafted. Found and fixed two real gaps before Developer's own
+  sanity-check starts: (1) S7's note-edit affordance and S8's aisle-edit affordance are
+  both new nested controls inside what's now a whole-row tap target — added explicit
+  cross-references to S2's nested-control-precedence rule (which, on re-reading, already
+  named "note/aisle-edit affordances" by name when it was written, so this just makes
+  that visible on S7/S8 themselves); (2) S1/S2's locked-spec phrase "crossed-off visual
+  state is strikethrough + dimmed text only, nothing else" could be misread as banning
+  any other row content — clarified on S7 that this describes the cross-off indicator
+  specifically, not a ban on additive content like a note or aisle tag, and stated
+  explicitly that a row may grow to a second line to fit a non-empty note/aisle while an
+  empty row stays at S1/S2's locked single-line height. S9/S10 reviewed with no gaps
+  found — S9's sort control is page-level, not a per-row nested control, so the
+  whole-row-tap conflict doesn't apply to it; S10's suggestion chips live in their own
+  panel, same reasoning. All four stories' AC checked for internal consistency,
+  right-sized scope, and testability; no PO-level ambiguity surfaced this pass — both
+  fixes were resolved directly. All edits grep-verified as single physical GFM lines;
+  BACKLOG.md still 12 rows.
+- **Outcome:** Sanity-check complete. Ready for Developer's sanity-check + Tester's
+  testability-check per the doc pipeline.
+- **Testability-check + Developer sanity-check landed, 2026-09-04 (same day, continued):**
+  Tester: S7/S9/S10 clean, no gaps. S8 had two items, both resolved directly (no PO input
+  needed): (1) added the same forward-reference hedge S3/S4→S6 and S12→S10 already carry,
+  now on S8's "Unassigned for S9's grouping" clause (not verifiable until S9 ships); (2)
+  a real ambiguity in "suggestion-matching" normalization — confirmed Tester's reading was
+  right, but it exposed a previously-implicit gap: the aisle datalist isn't purely the
+  static 9-item starter set, it also grows with every distinct free-typed aisle value used
+  elsewhere in the list (otherwise the normalization clause would have nothing to dedupe).
+  Made that mechanism explicit, plus a chronological-first tie-break for which casing
+  displays when two entries merge. Developer's sanity-check then found one real landmine:
+  S7/S8's inline note/aisle editors are the app's first multi-keystroke, in-progress UI
+  state, and an unrelated re-render (Undo, another row's reorder, a new add) would
+  otherwise silently discard unsaved draft text. Added an explicit, testable guarantee to
+  both S7 and S8 (draft text must survive such a re-render intact), same
+  capture-before-rebuild/restore-after pattern as S1/S2/S5's focus-preservation fix. No
+  other blockers. **S7, S8, S9, S10 → Locked.** All edits grep-verified as single physical
+  GFM lines; BACKLOG.md still 12 rows, all four Sprint 2 stories now read "Locked | 2".
+- **Outcome:** Sprint 2 AC locked for all 4 stories.
+- **Implementation status, 2026-09-04 (wind-down check before compaction):** Developer
+  has started implementing against the locked AC — index.html wired for Sprint 2's new
+  UI elements, script.js written including note/aisle logic, but functionally verified
+  so far only for basic add, per Developer's own status — the full note/aisle/sort/
+  suggestion feature set has not yet been exercised. style.css not yet touched for the
+  new UI. No Status flips in BACKLOG.md yet — S7-S10 correctly remain "Locked," not "In
+  Progress" or further, since nothing has self-verified or formally passed yet; this is
+  accurate, not a gap. Stopping for the day here; resume with Developer's
+  self-verification once wired up, then Tester's formal pass, same pipeline as Sprint 1.
+- **Carryover:** None — Sprint 2 implementation continues next session; already
+  recorded above, not a dangling loose end.
 
 ## Parked / unscheduled
 

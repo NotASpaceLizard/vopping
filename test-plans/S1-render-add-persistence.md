@@ -1,15 +1,22 @@
 # Test Plan — S1: Render list + single-item add + localStorage persistence
 
-**STATUS: FORMAL PASS COMPLETE, PASS (all S1-relevant assertions, part of a 67/67 combined
-Sprint 1 run), zero defects in currently-testable mechanics — NOT YET DONE.** Per BACKLOG.md's
-top-of-file Tracked follow-up note (QA finding M3), S1's Status may not flip to Done until the
-PO picks a row-density option from `density-picker.html`, a CSS/markup follow-up pass applies it,
-and Tester re-verifies that pass — none of which has happened yet. This pass covers everything
-currently verifiable (add/render/persist/storage-guard mechanics); the density-dependent
-follow-up is a separate, still-open gate, not a defect in what's covered here. This Tester
-formal-pass script (`c:\tmp\pw-test\vopping-tests-tester-s1-s6-s12-formal.js`) is the citation of
-record for S1, superseding Developer's own self-verification script
-(`c:\tmp\pw-test\vopping-selfcheck.js`) per the playbook's standing rule.
+**STATUS: DONE — density-picker.html CSS/markup follow-up pass re-verified 2026-09-04, PASS
+(74/74 combined re-run), zero defects.** BACKLOG.md's Tracked follow-up gate (QA finding M3) is
+now closed: the PO's final pick (whole row is the tap target, no checkbox glyph, strikethrough+dim
+crossed-off state) has been implemented by Developer and independently re-verified below. Citation
+of record: `c:\tmp\pw-test\vopping-tests-tester-s1-s2-s5-density-formal.js` — supersedes the prior
+`vopping-tests-tester-s1-s6-s12-formal.js` (67/69-era placeholder-layout pass) for S1's own
+Done-gate. See "Density re-verification, 2026-09-04" section below for the full new evidence.
+
+**Accessibility-scope note (PO decision relayed 2026-09-04):** this pass includes ARIA/keyboard
+checks (role, tabindex, aria-checked/label, focus-restoration) because Developer built them and I
+had already written/run them before this scoping call landed. Per the PO, keyboard-only/
+screen-reader coverage is **not a required gate going forward** — real user base doesn't need it.
+These checks are kept as informational sanity-check coverage (they pass, which is good to know),
+not as a blocking requirement — no further investment planned here, and a future failure in this
+specific area would not by itself block a story's Done status. The one real accessibility
+requirement going forward is a colorblind-safe palette wherever color conveys state (not
+applicable to S1's own row markup, which uses strikethrough+dim rather than color).
 
 **Story:** As a user, I want to see my grocery list and add items to it one at a time, so that
 I can build up what I need to buy and have it survive closing and reopening the app.
@@ -22,13 +29,14 @@ N }` (not a bare array), survives an ordinary refresh in exact prior order; sing
 offline, no network calls of any kind; no de-duplication (same name twice creates two independent
 rows); defensive load-time guard — any parse failure or shape mismatch (not a plain object, or
 `items` not an array) falls back to `{ items: [], nextId: 0 }` and never throws before the render
-loop runs. Row density is an explicit placeholder pending the PO's `density-picker.html` pick —
-**not evaluated here as pass/fail; tracked separately in BACKLOG.md's Tracked follow-up note.**
+loop runs. **Row density/interaction — LOCKED (PO's final pick from `density-picker.html`):** the
+entire row is the tap target for crossing an item off (Option C), no checkbox or dot glyph of any
+kind (Option D); crossed-off state is strikethrough + dimmed item-name text only.
 
 **Deliverable under test:** `index.html`/`script.js`/`style.css`, opened via `file://` URL.
-Implemented 2026-09-04. List-item row markup is an explicit functional-but-not-final placeholder
-per Developer/Orchestrator note — visual/pixel spec is out of scope for this pass by design, not
-an oversight.
+Add/render/persist mechanics implemented 2026-09-04; row markup/CSS updated to the locked density
+spec 2026-09-04 (checkbox removed, whole `<li>` carries `role="checkbox"`/`tabindex="0"`/
+`aria-checked`/`aria-label`, event delegation updated for nested-control precedence).
 
 **Tooling:** Playwright (`playwright-core` 1.62.1, already installed at `c:\tmp\pw-test\node_modules`),
 driven via `chromium.launch({ channel: 'chrome' })` against the system-installed Chrome — Playwright's
@@ -71,8 +79,36 @@ remained by lock time.
 | TC1.11 | Pre/post-reload `items` arrays byte-identical (JSON diff) | Pass |
 | TC1.12 | Only `file:///.../index.html`, `style.css`, `script.js` requests captured (repeated across multiple `goto`/`reload` calls in the script) — zero external/backend calls | Pass |
 
-**Overall verdict: PASS, 0 defects in S1.** Part of the combined 67/67 Sprint 1 run — see
-`REGRESSION_LOG.md` (2026-09-04 row) for the canonical cumulative count and script citation.
+**Overall verdict (original placeholder-layout pass): PASS, 0 defects in S1.** Superseded as the
+Done-gate citation by the density re-verification below — see `REGRESSION_LOG.md` for the current
+canonical count (74/74).
+
+## Density re-verification, 2026-09-04 (closes BACKLOG.md's Tracked follow-up gate, QA finding M3)
+
+Developer's CSS/markup pass implementing the PO's locked density pick: checkbox `<input>` removed
+entirely; the `<li>` itself now carries `role="checkbox"`, `tabindex="0"`, `aria-checked`,
+`aria-label="<item name>"`; crossed-off visual state is strikethrough + dimmed `.item-name` text
+only (no glyph). Independently re-verified against the live app (script:
+`vopping-tests-tester-s1-s2-s5-density-formal.js`):
+
+| Check | Actual | Pass/Fail |
+|-------|--------|-----------|
+| Row carries `role="checkbox"` | confirmed | Pass |
+| Row is `tabindex="0"` | confirmed | Pass |
+| `aria-checked` starts `"false"`, flips to `"true"` in sync with the `checked` class | confirmed | Pass |
+| `aria-label` matches the item's name | confirmed | Pass |
+| Zero `<input>` elements anywhere in a row (glyph fully removed) | 0 found | Pass |
+| Crossed-off `.item-name` has computed `text-decoration-line: line-through` | confirmed | Pass |
+| Crossed-off `.item-name` color visibly differs from an un-crossed sibling (dimmed) | `rgb(153,153,153)` vs `rgb(221,221,221)` | Pass |
+| Row height meets WCAG 2.5.5 AA tap-target minimum (≥24px) | measured 39.8px | Pass |
+| No horizontal overflow at 320/360/375/390px with the new (glyph-free) row markup | 0px overflow at all four | Pass |
+| Full S1-S6/S12 regression re-run (add/delete/paste/reorder/undo/clear-checked) | 74/74 | Pass |
+
+Full raw transcript archived in `S5-reorder-buttons.md`'s Commands section (canonical copy for
+this script, cross-referenced rather than duplicated across files, same convention as the prior
+`S6-undo.md` arrangement).
+
+**Overall verdict: PASS, 0 defects. S1 is DONE.**
 
 ## Commands run and output
 Script: `c:\tmp\pw-test\vopping-tests-tester-s1-s6-s12-formal.js` (covers S1-S6, S12 in one run):
