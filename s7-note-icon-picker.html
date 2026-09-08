@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grocery List — S7 Note-Icon Picker</title>
+<style>
+  * , *::before, *::after { box-sizing: border-box; }
+  :root {
+    --bg-page: #1a1a1a;
+    --bg-card: #2a2a2a;
+    --border: #555;
+    --text: #ddd;
+    --text-muted: #999;
+    --accent: #4da6ff;
+  }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg-page);
+    color: var(--text);
+    max-width: 40rem;
+    margin: 0 auto;
+    padding: 1.25rem 1rem 4rem;
+    line-height: 1.45;
+  }
+  h1 { color: var(--accent); font-size: 1.3rem; margin: 0 0 0.25rem; }
+  h2 { font-size: 1rem; margin: 0; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+  .intro, .note { color: var(--text-muted); font-size: 0.88rem; }
+  .intro { margin-bottom: 1.1rem; }
+  code { background: var(--bg-card); padding: 0.05rem 0.3rem; border-radius: 4px; font-size: 0.85em; }
+  .section {
+    border: 1px solid #444; border-radius: 10px; padding: 0.9rem 1rem 1rem;
+    margin-bottom: 1.4rem; background: #222;
+  }
+  .section.mine { border-color: #3a6b4a; }
+  .meta-line { font-size: 0.8rem; color: var(--text-muted); margin: 0.2rem 0 0.7rem; }
+  .status-pill {
+    font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.03em;
+    padding: 0.12rem 0.45rem; border-radius: 4px; font-weight: 700;
+  }
+  .status-pill.ok { background: #1f4a2e; color: #7fd6a4; }
+  .status-pill.tofu { background: #5a1f1f; color: #f0a0a0; }
+  .status-pill.mine-tag { background: #1f3a4a; color: #7fc4e6; }
+  .status-pill.caveat { background: #4a3a1f; color: #f0cf7f; }
+
+  /* ---- Real row markup/styling, byte-for-byte from style.css - including
+     S14's already-shipped icon shrink (19.5px) and today's actual row
+     (Up/Down buttons still present - S13 hasn't shipped yet, so this is
+     what a real row looks like right now, not a speculative future one).
+     Only the note-toggle icon's glyph varies per section below. ---- */
+  .items { list-style: none; margin: 0; padding: 0; }
+  .items li {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem;
+    padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--bg-card);
+    cursor: pointer; user-select: none;
+  }
+  .items li:last-child { border-bottom: none; }
+  .items .item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .icon-btn {
+    flex-shrink: 0; width: 19.5px; height: 19.5px; min-width: 19.5px;
+    border: 1px solid var(--border); border-radius: 4px; background: transparent;
+    color: var(--text-muted); font-size: 0.6rem; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center; padding: 0; cursor: pointer;
+  }
+  .icon-btn.delete-btn { color: #e08080; border-color: #6b3d3d; }
+  .icon-btn.note-candidate { font-size: 0.7rem; }
+  .row-meta { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.15rem; }
+  .note-display, .aisle-tag { flex-shrink: 1; min-width: 0; max-width: 100%; overflow-wrap: break-word;
+    border: none; background: transparent; font: inherit; font-size: 0.78rem;
+    padding: 0.1rem 0.2rem; cursor: default; text-align: left; border-bottom: 1px dashed var(--border); }
+  .note-display { color: var(--text-muted); }
+  .aisle-tag { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<h1>Grocery List — S7 Note-Icon Picker</h1>
+<p class="intro">
+  You flagged the current note icon (pencil, ✎) as reading too much like "edit" now that S15's own
+  edit affordance is coming. Two candidates below, by Unicode codepoint, rendered via
+  <code>String.fromCodePoint(N)</code> - same discipline as the S16 aisle-icon comparison, not
+  guessed from memory. Shown in the ACTUAL note-toggle position in a real row (today's real
+  markup/CSS, including S14's already-shipped icon shrink and S8's delete/aisle controls alongside
+  it), across three rows so you see it in its natural empty-state position, in the most crowded
+  baseline case (both fields empty), AND what happens once a note IS set (the icon disappears, same
+  as always) - not the icon floating in isolation.
+</p>
+<p class="intro">
+  Same automated check as S16's picker: each candidate is rendered to an offscreen canvas and
+  compared, pixel-for-pixel, against a guaranteed-unassigned codepoint (U+10FFFD). A match means this
+  test browser is showing a "tofu" placeholder instead of a real glyph - an actual rendered-pixel
+  comparison, not a guess. Flagged results are the ones most worth confirming directly on your phone.
+</p>
+
+<div id="root"></div>
+
+<script>
+  var candidates = [
+    { cp: 128459, hex: '1F5CB', nameGuess: 'EMPTY DOCUMENT (best-effort name, the codepoint itself is the authoritative id)', mine: false },
+    { cp: 128462, hex: '1F5CE', nameGuess: 'DOCUMENT (best-effort name)', mine: false },
+    { cp: 128434, hex: '1F5D2', nameGuess: 'SPIRAL NOTE PAD (best-effort name)', mine: true, colorNote: 'Colored emoji, not monochrome - unlike S16\'s pick, there isn\'t a well-established plain-dingbat equivalent for "sticky note" in standard Unicode, flagging that tradeoff explicitly given the S16 precedent for text-colorable icons.' },
+    { cp: 128172, hex: '1F4AC', nameGuess: 'SPEECH BALLOON (best-effort name)', mine: true, colorNote: 'Also a colored emoji, same tradeoff as above - included since it reads clearly as "annotation/comment," a different metaphor from "document" than the other three.' }
+  ];
+
+  function isLikelyTofu(ch) {
+    var referenceChar = String.fromCodePoint(0x10FFFD);
+    var fonts = ['system-ui', 'sans-serif', 'monospace'];
+    function render(c, font) {
+      var canvas = document.createElement('canvas');
+      canvas.width = 48; canvas.height = 48;
+      var ctx = canvas.getContext('2d');
+      ctx.font = '32px ' + font;
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = '#000';
+      ctx.clearRect(0, 0, 48, 48);
+      ctx.fillText(c, 2, 2);
+      return canvas.toDataURL();
+    }
+    for (var i = 0; i < fonts.length; i++) {
+      if (render(ch, fonts[i]) === render(referenceChar, fonts[i])) return true;
+    }
+    return false;
+  }
+
+  function rowsHtml(glyph) {
+    var icon = '<button type="button" class="icon-btn note-candidate" title="Add note">' + glyph + '</button>';
+    var aisleAddIcon = '<button type="button" class="icon-btn" title="Add aisle">⚑</button>';
+    var upDown = '<button type="button" class="icon-btn" title="Move up">▲</button><button type="button" class="icon-btn" title="Move down">▼</button>';
+    var del = '<button type="button" class="icon-btn delete-btn" title="Delete">✕</button>';
+    return '<ul class="items">' +
+      // Row 1: aisle already set, note empty - icon + full aisle tag on line 2.
+      '<li><span class="item-name">Milk (1 gal)</span>' + icon + upDown + del +
+        '<div class="row-meta"><span class="aisle-tag">Dairy</span></div></li>' +
+      // Row 2: both empty - maximum icon crowding on line 1, the baseline worst case for THIS decision.
+      '<li><span class="item-name">Bread</span>' + icon + aisleAddIcon + upDown + del + '</li>' +
+      // Row 3: note ALREADY set - candidate icon is hidden, real note text shows instead (same as always).
+      '<li><span class="item-name">Greek yogurt</span>' + upDown + del +
+        '<div class="row-meta"><button type="button" class="note-display">plain, full-fat</button><span class="aisle-tag">Dairy</span></div></li>' +
+      '</ul>';
+  }
+
+  var root = document.getElementById('root');
+  candidates.forEach(function (c) {
+    var glyph = String.fromCodePoint(c.cp);
+    var tofu = isLikelyTofu(glyph);
+
+    var section = document.createElement('div');
+    section.className = 'section' + (c.mine ? ' mine' : '');
+
+    var header = document.createElement('h2');
+    header.innerHTML = 'U+' + c.hex + ' (decimal ' + c.cp + ')' +
+      (c.mine ? ' <span class="status-pill mine-tag">Developer suggestion</span>' : '') +
+      (tofu ? ' <span class="status-pill tofu">Possible tofu in this browser</span>' : ' <span class="status-pill ok">Renders as a real glyph here</span>');
+    section.appendChild(header);
+
+    var meta = document.createElement('p');
+    meta.className = 'meta-line';
+    meta.textContent = c.nameGuess;
+    section.appendChild(meta);
+
+    if (c.colorNote) {
+      var colorNote = document.createElement('p');
+      colorNote.className = 'meta-line';
+      colorNote.style.color = '#f0cf7f';
+      colorNote.textContent = c.colorNote;
+      section.appendChild(colorNote);
+    }
+
+    section.insertAdjacentHTML('beforeend', rowsHtml(glyph));
+    root.appendChild(section);
+  });
+</script>
+
+<p class="intro" style="margin-top:0.5rem;">
+  Tell me the codepoint you want (a mix is fine too, e.g. one of these for one of yours) and I'll
+  swap it into script.js's note-icon glyph.
+</p>
+
+</body>
+</html>
