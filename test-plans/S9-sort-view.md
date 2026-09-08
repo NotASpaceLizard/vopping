@@ -1,12 +1,9 @@
 # Test Plan — S9: Sort view (manual/alphabetical/by-aisle)
 
-**STATUS: FORMAL PASS IN PROGRESS — test cases drafted 2026-09-08 against locked AC; Developer is
-independently re-verifying their Sprint-2 implementation right now, execution against the live app
-is pending that re-verification landing (or Orchestrator sign-off to proceed against the current
-build as-is).** Derived from BACKLOG.md's locked AC plus `test-plans/README.md`'s "Known
-implementation details (Sprint 2)" section only — no `script.js` read yet. Depends on S8's aisle
-field existing (sequenced after S8 in BACKLOG.md for exactly that reason) — S8's own test plan is
-drafted alongside this one this session.
+**STATUS: DONE — formally executed 2026-09-08, PASS (154/154 combined run: 74 Sprint-1 regression
+re-confirmed + 80 new S7-S10 checks), zero defects.** Citation of record:
+`c:\tmp\pw-test\vopping-tests-tester-s7-s10-formal.js`. Full canonical transcript archived in
+`S7-notes.md`'s Commands section, cross-referenced here rather than duplicated.
 
 **Story:** As a user, I want to view my list sorted by aisle or alphabetically, in addition to my
 own manual order, so that I can shop more efficiently by store layout or find an item quickly.
@@ -71,26 +68,48 @@ re-specifying it).
 ## Results
 | Test Case | Actual | Pass/Fail |
 |-----------|--------|-----------|
-| TC9.1 | *pending execution* | |
-| TC9.2 | *pending execution* | |
-| TC9.3 | *pending execution* | |
-| TC9.4 | *pending execution* | |
-| TC9.5 | *pending execution* | |
-| TC9.6 | *pending execution* | |
-| TC9.7 | *pending execution* | |
-| TC9.8 | *pending execution* | |
-| TC9.9 | *pending execution* | |
-| TC9.10 | *pending execution* | |
-| TC9.11 | *pending execution* | |
-| TC9.12 | *pending execution* | |
-| TC9.13 | *pending execution* | |
-| TC9.14 | *pending execution* | |
-| TC9.15 | *pending execution* | |
-| TC9.16 | *pending execution* | |
-| TC9.17 | *pending execution* | |
+| TC9.1 | Manual active on load (`#sort-select` value `"manual"`) | Pass |
+| TC9.2 | Alphabetical: `["Apple","Bread","Milk","Zucchini"]` | Pass |
+| TC9.3 | By-Aisle groups: `["Dairy","Produce","Unassigned"]`; within-Produce order Apple before Zucchini | Pass (2/2 sub-checks) |
+| TC9.4 | Raw `items` array byte-identical pre-sort vs. post-Alphabetical-sort-then-reload | Pass |
+| TC9.5 | Raw `items` array byte-identical pre-sort vs. post-By-Aisle-sort-then-reload | Pass |
+| TC9.6 | Manual order identical before and after a round-trip through Alphabetical | Pass |
+| TC9.7 | `#sort-select` reads `"manual"` after reload, regardless of last-active sort | Pass |
+| TC9.8 | Zero `[data-role=up]`/`[data-role=down]` elements anywhere while Alphabetical is active | Pass |
+| TC9.9 | Up/Down elements present again once switched back to Manual | Pass |
+| TC9.10 | Cross-off toggle works correctly while Alphabetical is active | Pass |
+| TC9.11 | Delete works correctly while Alphabetical is active | Pass |
+| TC9.12 | Note editing works correctly while Alphabetical is active (`"sorted-mode note"` saved) | Pass |
+| TC9.13 | "Produce"/"produce"/"Produce " collapse into exactly ONE `.aisle-group-header` | Pass |
+| TC9.14 | Single-added "Mango" lands correctly slotted alphabetically, not appended at the end | Pass |
+| TC9.15 | Paste-ingested "Banana"/"Walnuts" both land at correct alphabetical slots immediately | Pass |
+| TC9.16 | A frequency-suggestion chip tap ("Kiwi") lands at its correct alphabetical slot immediately | Pass |
+| TC9.17 | Unassigned group renders last, alphabetized within itself, contains Bread | Pass |
 
-**Overall verdict:** PENDING — not yet executed. Planned as part of the same combined Sprint 2
-formal-pass script as S7/S8/S10 (`vopping-tests-tester-s7-s10-formal.js`).
+**Overall verdict: PASS, 0 defects in S9.** Part of the combined 154/154 run — see
+`REGRESSION_LOG.md`'s 2026-09-08 row (current canonical figure).
 
 ## Commands run and output
-Not yet run.
+Script: `c:\tmp\pw-test\vopping-tests-tester-s7-s10-formal.js`. Full raw transcript (Sprint-1
+regression + all of S7-S10) archived in `S7-notes.md`'s Commands section. S9-specific lines
+(verbatim, in execution order):
+```
+PASS - TC9.1 Manual is the default sort on load
+PASS - TC9.2 Alphabetical sort orders A-Z by name :: ["Apple","Bread","Milk","Zucchini"]
+PASS - TC9.8 Up/Down buttons are absent in Alphabetical mode
+PASS - TC9.3 By-Aisle sort groups by aisle, alphabetical within group, Unassigned last :: ["Dairy","Produce","Unassigned"]
+PASS - TC9.3b within-group order is alphabetical (Produce group: Apple before Zucchini) :: ["Milk","Apple","Zucchini","Bread"]
+PASS - TC9.17 Unassigned group is last and contains Bread
+PASS - TC9.13 normalized aisle values collapse into ONE group, not fragmented :: ["Produce"]
+PASS - TC9.4 Alphabetical sort never mutates the stored array order (reload diff)
+PASS - TC9.5 By-Aisle sort never mutates the stored array order (reload diff)
+PASS - TC9.7 reload always returns to Manual regardless of last-active sort
+PASS - TC9.6 switching back to Manual restores the exact same manual order
+PASS - TC9.9 Up/Down buttons reappear once back in Manual
+PASS - TC9.10 check/uncheck works while Alphabetical sort is active
+PASS - TC9.11 delete works while Alphabetical sort is active
+PASS - TC9.12 note editing works while Alphabetical sort is active :: got=sorted-mode note
+PASS - TC9.14 a new item added via single-add lands at its correct alphabetical position immediately :: ["A1","A2","A3","Mango"]
+PASS - TC9.15 items added via paste-ingest land at correct alphabetical positions immediately :: ["A1","A2","A3","Banana","Mango","Walnuts"]
+PASS - TC9.16 a new item added via a frequency-suggestion chip tap lands at its correct alphabetical position immediately :: ["A1","A2","A3","Banana","Kiwi","Mango","Walnuts"]
+```

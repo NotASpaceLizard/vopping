@@ -23,6 +23,10 @@ clause lacked S6's-bulk-undo-clause's sibling hedge); still not independently ve
 doesn't exist until Sprint 2 — correctly out of this pass's scope, true by construction per
 Developer's own code comment (`clearCheckedItems()` never reads/writes the not-yet-built S10
 storage key at all); deferred, tracked here, to be closed out at S10's own formal pass.**
+**Closed, 2026-09-08:** S10's formal pass (TC10.5) directly verified this — bulk clear-crossed-off
+compared the historical count before/after, unchanged (`before=3 after=3`) — see
+`S10-frequency-suggestions.md`'s Results table and `REGRESSION_LOG.md`'s 2026-09-08 row
+(154/154). No forward-reference remains open on this story.
 
 **Deliverable under test:** `index.html`/`script.js`/`style.css`, `file://` URL. Implemented
 2026-09-04, reusing S3's `{item, index}` removal/restore machinery generalized to N entries.

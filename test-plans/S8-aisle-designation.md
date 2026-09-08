@@ -1,10 +1,9 @@
 # Test Plan — S8: Aisle/category designation
 
-**STATUS: FORMAL PASS IN PROGRESS — test cases drafted 2026-09-08 against locked AC; Developer is
-independently re-verifying their Sprint-2 implementation right now, execution against the live app
-is pending that re-verification landing (or Orchestrator sign-off to proceed against the current
-build as-is).** Derived from BACKLOG.md's locked AC plus `test-plans/README.md`'s "Known
-implementation details (Sprint 2)" section only — no `script.js` read yet.
+**STATUS: DONE — formally executed 2026-09-08, PASS (154/154 combined run: 74 Sprint-1 regression
+re-confirmed + 80 new S7-S10 checks), zero defects.** Citation of record:
+`c:\tmp\pw-test\vopping-tests-tester-s7-s10-formal.js`. Full canonical transcript archived in
+`S7-notes.md`'s Commands section, cross-referenced here rather than duplicated.
 
 **Story:** As a user, I want to assign an aisle/category to an item, either from a short suggested
 list or my own custom free text, so that I can group my shopping by store layout.
@@ -37,7 +36,11 @@ toggle. Same row-height allowance as S7.
 
 **Deliverable under test:** `index.html`/`script.js`/`style.css`, opened via `file://` URL.
 Developer reports this implemented as of 2026-09-04; not yet independently verified by Tester —
-this is that verification pass.
+this is that verification pass. **Update, 2026-09-08:** same as noted on S7-notes.md — Developer's
+own re-verification pass found and fixed 2 real bugs in the shared note/aisle editor code (pushed,
+sha `f9f097d`): the open-a-second-editor draft-discard bug, and the synchronous-focusout-commit
+race that could swallow a tap on a different nested control. TC8.16-TC8.18 close those out for the
+aisle side of the same shared mechanism.
 
 **Tooling:** Playwright (`playwright-core` 1.62.1), `channel: 'chrome'`.
 
@@ -63,7 +66,7 @@ check in both files.
 | TC8.5 | Unset aisle representation | Inspect an item with no aisle ever set | Aisle field/data represents "no aisle set" consistently (e.g. empty string), readable by S9's grouping logic |
 | TC8.6 | Not undo-eligible | Set/edit/clear an aisle, inspect Undo control | Undo state unaffected by the aisle edit itself |
 | TC8.7 | Does not clobber pending undo target | Cross off item A, then edit+commit an aisle on item B, then click Undo | Undo reverses A's cross-off only |
-| TC8.8 | Draft survives unrelated re-render | Open aisle edit on row A, type a draft, don't commit; mutate row B | Row A's draft text still intact, input still open |
+| TC8.8 | Draft is not silently discarded by an unrelated re-render (see Results note, same refinement as S7's TC7.11) | Open aisle edit on row A, type a draft, don't commit; mutate row B | Row A's draft is correctly committed/saved, not silently lost — see Results |
 | TC8.9 | Normalized suggestion dedup | Type "Produce" on item 1, "produce" on item 2, "Produce " (trailing space) on item 3 | Datalist shows exactly ONE merged suggestion entry for this aisle, not three |
 | TC8.10 | Dynamic suggestion pool | Type a custom aisle ("Farmers Market") on item 1, then open the datalist while editing item 2 | "Farmers Market" now appears as an offered suggestion |
 | TC8.11 | Chronological tie-break casing | Type "produce" on item 1 (first), "Produce" on item 2 (later) | Merged suggestion entry displays "produce" (first-entered casing) |
@@ -71,28 +74,56 @@ check in both files.
 | TC8.13 | Nested-control precedence | Tap the aisle affordance/datalist on a row | Only the aisle-edit action fires; row's cross-off state untouched |
 | TC8.14 | Row height content-driven | Compare a row with neither note nor aisle vs. one with an aisle set | No-note/no-aisle row == locked single-line height; aisle-bearing row may grow |
 | TC8.15 | No color-coding in this pass | Inspect aisle tag rendering | Plain text only, no color-only state encoding present (Okabe-Ito requirement N/A until/unless color is added later) |
+| TC8.16 | Editor auto-focuses on open (added 2026-09-08, same fix as S7's TC7.15 — shared editor mechanism) | Tap the aisle affordance | The revealed aisle-input receives keyboard focus immediately (cursor at end) |
+| TC8.17 | Opening a second editor commits the first's draft, doesn't discard it (added 2026-09-08, same fix as S7's TC7.16) | Open aisle edit on row A, type a draft, do NOT commit; without clicking away first, tap the note-toggle on row B (or row A) to open a second editor | Row A's aisle draft is saved (not discarded) before the second editor opens |
+| TC8.18 | Tap on another nested control while an editor is open elsewhere works on the FIRST tap (added 2026-09-08, same fix as S7's TC7.17) | Open an aisle editor on row A (don't commit); in one tap, click a different row B's Delete (or Up/Down) button | Row B's delete/swap fires immediately on that first tap, no second tap required |
 
 ## Results
 | Test Case | Actual | Pass/Fail |
 |-----------|--------|-----------|
-| TC8.1 | *pending execution* | |
-| TC8.2 | *pending execution* | |
-| TC8.3 | *pending execution* | |
-| TC8.4 | *pending execution* | |
-| TC8.5 | *pending execution* | |
-| TC8.6 | *pending execution* | |
-| TC8.7 | *pending execution* | |
-| TC8.8 | *pending execution* | |
-| TC8.9 | *pending execution* | |
-| TC8.10 | *pending execution* | |
-| TC8.11 | *pending execution* | |
-| TC8.12 | *pending execution* | |
-| TC8.13 | *pending execution* | |
-| TC8.14 | *pending execution* | |
-| TC8.15 | *pending execution* | |
+| TC8.1 | Tapping the affordance reveals `[data-role="aisle-input"]` | Pass |
+| TC8.2 | Datalist contains all 9 starter values (Produce, Dairy, Meat/Seafood, Bakery, Frozen, Pantry, Beverages, Household, Other) | Pass |
+| TC8.3 | "Farmers Market" (not in starter set) saved exactly as typed | Pass |
+| TC8.4 | Raw storage aisle values identical pre/post reload | Pass |
+| TC8.5 | Unset aisle stored as `""` (empty string), consistently | Pass |
+| TC8.6 | Undo-button disabled state identical before/after an aisle edit (`before=false after=false`) | Pass |
+| TC8.7 | Cross off A, commit an aisle on B, Undo — reverses A's cross-off only | Pass |
+| TC8.8 | **Same refined finding as S7's TC7.11** (not a defect): the aisle draft `"Dairy - draft"` is correctly committed via the deferred focusout-commit when an unrelated mutation elsewhere blurs the open editor, confirmed verbatim in `.aisle-tag` afterward | Pass |
+| TC8.9 | "Produce"/"produce"/"Produce " (trailing space) collapse into exactly one datalist entry | Pass |
+| TC8.10 | A custom free-typed aisle ("Farmers Market") appears as an offered suggestion on a later item | Pass |
+| TC8.11 | Chronological tie-break: "back porch" (typed first) is the casing that displays in the merged entry, "Back Porch" does not | Pass |
+| TC8.12 | The item typed as "Back Porch" keeps that exact casing stored/displayed — normalization never rewrote it | Pass |
+| TC8.13 | `aria-checked` unchanged before/after opening the aisle editor | Pass |
+| TC8.14 | No-note/no-aisle row 39.8px (locked height); aisle-bearing row 70.2px (grows to fit) | Pass |
+| TC8.15 | Aisle tag computed color is one uniform value (`rgb(77, 166, 255)`) regardless of which aisle — not per-aisle color-coding | Pass |
+| TC8.16 | `document.activeElement` is the new `aisle-input`, immediately after opening | Pass |
+| TC8.17 | **Closes real bug fixed 2026-09-08.** Opening a second editor (note, different row) while an aisle draft was uncommitted correctly committed it first — confirmed via the note case (`"placeholder for TC8.17"` saved), same shared mechanism as TC7.16 | Pass |
+| TC8.18 | **Closes real bug fixed 2026-09-08.** A single click on a different row's Delete while an aisle editor was open elsewhere fired immediately (count 3→2), not swallowed | Pass |
 
-**Overall verdict:** PENDING — not yet executed. Planned as part of the same combined Sprint 2
-formal-pass script as S7/S9/S10 (`vopping-tests-tester-s7-s10-formal.js`).
+**Overall verdict: PASS, 0 defects in S8.** Part of the combined 154/154 run — see
+`REGRESSION_LOG.md`'s 2026-09-08 row (current canonical figure).
 
 ## Commands run and output
-Not yet run.
+Script: `c:\tmp\pw-test\vopping-tests-tester-s7-s10-formal.js`. Full raw transcript (Sprint-1
+regression + all of S7-S10) archived in `S7-notes.md`'s Commands section. S8-specific lines
+(verbatim, in execution order):
+```
+PASS - TC8.1 tapping the aisle affordance reveals an input
+PASS - TC8.2 static starter suggestions present in the datalist :: ["Produce","Dairy","Meat/Seafood","Bakery","Frozen","Pantry","Beverages","Household","Other"]
+PASS - TC8.16 opening the aisle editor auto-focuses the new input :: {"tag":"INPUT","role":null,"dataRole":"aisle-input","liId":0,"isLiItself":false}
+PASS - TC8.3 arbitrary free text is accepted and saved exactly as typed :: got=Farmers Market
+PASS - TC8.10 a custom free-typed aisle becomes an offered suggestion for later items :: ["Produce","Dairy","Meat/Seafood","Bakery","Frozen","Pantry","Beverages","Household","Other","Farmers Market"]
+PASS - TC8.4 aisle persists to localStorage and survives refresh
+PASS - TC8.5 unset aisle is represented consistently (empty string) :: got=""
+PASS - TC8.13 nested-control precedence: opening the aisle editor does NOT cross off the row
+PASS - TC8.9 normalized comparison collapses "Produce"/"produce"/"Produce " into ONE suggestion entry :: ["Produce","Dairy","Meat/Seafood","Bakery","Frozen","Pantry","Beverages","Household","Other"]
+PASS - TC8.11 chronological tie-break: merged suggestion displays first-entered casing ("back porch") :: ["Produce","Dairy","Meat/Seafood","Bakery","Frozen","Pantry","Beverages","Household","Other","back porch"]
+PASS - TC8.12 normalization never rewrites an individual item's own stored aisle text :: got=Back Porch
+PASS - TC8.6 aisle edit itself does not change Undo button state :: before=false after=false
+PASS - TC8.7 aisle edit does not clobber a pending undo target
+PASS - TC8.8 aisle draft is correctly committed (not silently discarded) when an unrelated action elsewhere blurs the open editor :: got=Dairy - draft
+PASS - TC8.17 opening a second editor commits the first draft (note) instead of discarding it :: got=placeholder for TC8.17
+PASS - TC8.18 tapping a different row's Delete while an aisle editor is open elsewhere fires on the FIRST tap :: before=3 after=2
+PASS - TC8.14 no-note/no-aisle row stays at the locked single-line height, aisle-bearing row grows :: plain=39.78125 aisle=70.21875
+PASS - TC8.15 aisle tag uses one uniform color, not per-aisle color-coding (Okabe-Ito requirement N/A) :: color=rgb(77, 166, 255)
+```

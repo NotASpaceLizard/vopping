@@ -301,9 +301,114 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   2026-09-04 (not a new bug) — re-flagging to Orchestrator/PO as a non-blocking
   QUESTIONS.md entry since it's now been independently surfaced twice. All
   edits grep-verified as single physical GFM lines; BACKLOG.md still 12 rows.
+- **Developer's live-verification pass landed, 2026-09-08 (same day, continued;
+  commit `f9f097d`):** Developer live-verified all of S7-S10 via Playwright
+  (not just a code trace) and disclosed 2 real bugs found/fixed in S7/S8's
+  shared inline-editor code — focus loss on opening the editor, and a
+  focusout-triggered re-render that could swallow a pending click elsewhere in
+  the list. Both are the exact risk class S7/S8's own AC already called out
+  (draft text/re-render survival, nested-control precedence) — this is
+  Developer correctly making the already-locked AC true, not new scope. S9
+  (sort) and S10 (suggestions): fully verified live, zero bugs found. Reported
+  zero regressions on Sprint 1 — **noting explicitly for citation hygiene**:
+  this is Developer's own self-verification run, disclosed for transparency
+  only; per the standing citation-of-record rule it does NOT become BACKLOG.md's
+  regression citation for any story — that role is reserved for Tester's own
+  independent formal-pass script once it lands (all 4 Sprint-2 test plans are
+  drafted and Tester has just started executing them, per Orchestrator).
+  **Scrum-master's status-column call:** moved S7, S8, S9, S10 from "Locked" to
+  "In Review" in BACKLOG.md — "Locked" no longer accurately described their
+  real state (implemented, bug-fixed, self-verified live) now that Tester's
+  formal execution is actually underway; reserving "Done" for after Tester's own
+  formal-pass citation lands, same gate every other story in this project has
+  gone through, self-verification (however thorough) has never itself been
+  sufficient for Done. S7/S8 additionally stay blocked from Done by the
+  existing Tracked follow-up #2 PO-review gate regardless of Tester's outcome —
+  Orchestrator reports the corrected density-picker.html is now pushed and the
+  PO has been asked to check it live on their phone, so that gate is now
+  actionable, not a placeholder. **Style.css gap, tracked but not gating:**
+  Developer flagged style.css has zero rules yet for S9's (`.sort-controls`,
+  `.aisle-group-header`) and S10's (`.suggestions-root`, `.suggestion-chip`) new
+  UI classes — functions correctly per live verification but renders unstyled.
+  Decided directly (no PO input needed): this does NOT gate Done the way S1/S2/
+  S5's density spec or S7/S8's R7 gate do, because neither S9 nor S10's own AC
+  locks any specific visual spec — added a short dated tracked-but-non-blocking
+  note to each row instead of a new Done-gate, so it's visible and doesn't get
+  lost without inventing an unnecessary gate. All edits grep-verified as single
+  physical GFM lines; BACKLOG.md still 12 rows.
+
+## Sprint 3 — drafted 2026-09-08, from the PO's crowded-row review
+
+- **Goal:** PO tried `density-picker.html` again (and had independently noticed
+  the row-crowding over the weekend too), confirming QA finding R7 (S7/S8's
+  5-nested-control worst-case row) is real — resolving the Tracked follow-up #2
+  gate. Gave 6 concrete decisions in one pass and explicitly asked for each to
+  become its own BACKLOG.md story "so they don't slip through the cracks."
+  Drafted all 6 directly into BACKLOG.md as S13-S17 (Sprint 3) plus S18 (parked
+  stretch goal, same treatment as S11) — quoting the PO's own words in each
+  story's AC so nothing gets lost in translation, per the Orchestrator's
+  explicit relay instruction.
+- **S13 (drag-and-drop reorder, supersedes S5's UI):** PO wants Up/Down buttons
+  gone entirely, replaced by drag-and-drop with a deliberate pickup delay so
+  scrolling/editing doesn't trigger accidental drags. **Scrum-master's call:**
+  this is cross-story supersession, not a reopening of S5 — S5 shipped and
+  passed exactly as specified for its time and stays Done; added a dated
+  technical note to S5's row instead, and a forward-reference note to S9's row
+  (whose AC currently names "S5's Up/Down buttons" in its non-Manual-sort
+  clause — left unchanged for now so Tester's just-started S9 formal pass tests
+  against what's actually implemented today, not a future state). S13's AC
+  carries forward S5's undo-eligibility and non-Manual-sort-hides-it precedents
+  unchanged, only the interaction mechanism is new.
+- **S14 (shrink remaining row-control buttons ~25%):** sequenced right after
+  S13 per the PO's own pairing of the two asks (no hard technical dependency,
+  but finalizing size once against S13's final layout avoids resizing twice).
+  Added a guardrail referencing Tester's earlier informational >=24px
+  tap-target check as the flag-back threshold, since the PO's sizing call is
+  otherwise not something Developer/Tester should re-litigate.
+- **S15 (in-place item text editing):** a real, previously-nonexistent
+  capability — the app never supported editing an item's own text, only
+  note/aisle metadata. PO explicitly flagged an unresolved pencil-icon conflict
+  with S7's existing note-toggle and asked for options twice ("i'm open to
+  ideas here"). **Scrum-master's call:** did not guess at a locked interaction
+  spec — drafted the functional core (edit persists, position/note/aisle/
+  crossed-off state preserved, blank-edit reverts) as the real AC, but left the
+  gesture/icon mechanism explicitly unlocked pending a Developer-built
+  decision-tool mockup (2-3 gesture options x 2-3 icon options, same pattern as
+  `density-picker.html`, built by Developer per the playbook's role-boundary
+  lesson, not by the Orchestrator or scrum-master directly). Status is
+  deliberately "Not Started," not "Locked." Flagged S15's undo-eligibility as a
+  new non-blocking QUESTIONS.md entry (working default: not undo-eligible, same
+  as S7/S8) since S6's undo scope predates this story existing. Sequenced after
+  S13/S14 so the mockup reflects the final row layout.
+- **S16 (suppress per-row aisle tag when sorting By Aisle) and S17 (more visual
+  distinction for aisle group headers):** both amend S9, currently "In Review"
+  with Tester's formal pass just started against S9's existing implementation
+  (which does neither of these yet). **Scrum-master's call:** drafted both as
+  follow-on stories rather than folding into S9's AC now, specifically so
+  Tester isn't asked to test a moving target mid-pass — added a forward-
+  reference note to S9's row instead. S17 needed no decision-tool pass (PO
+  explicitly said "i'm not picky" on the exact visual treatment); S16 is a
+  direct, unambiguous PO instruction, also locked-language-ready as drafted.
+- **S18 (collapsible aisle groups):** explicit PO stretch goal ("that can be a
+  stretch goal"). Parked alongside S11 rather than sequenced into Sprint 3
+  proper, same low-priority/revisit-only-if-asked treatment.
+- **Outcome:** All 6 items drafted into BACKLOG.md (S13-S18), none yet through
+  the doc pipeline (Developer sanity-check / Tester testability-check / QA
+  gate) — that's next, whenever Developer/Tester have bandwidth after Sprint
+  2's Tester formal pass and the PO's pending S7/S8 crowded-row confirmation
+  both land. Per Orchestrator's request, reporting back once drafted so the PO
+  can be notified via the console that nothing was lost. All edits
+  grep-verified as single physical GFM lines; BACKLOG.md now 18 rows (was 12).
+- **Carryover:** S13-S18 need Developer sanity-check + Tester testability-check
+  + QA gate before any can Lock; S15 additionally needs its decision-tool
+  mockup before its AC can lock at all. None of this blocks Sprint 2's
+  in-flight Tester formal pass or the PO's S7/S8 review.
 
 ## Parked / unscheduled
 
 - **S11** (recipe-paste alternate ingest mode) — explicitly not sequenced into
   either sprint. Low-priority future stretch only, per explicit PO direction not
   to build this now. Revisit only if asked.
+- **S18** (collapsible aisle groups when sorted By Aisle) — drafted 2026-09-08
+  alongside Sprint 3, explicit PO stretch goal, same treatment as S11. Revisit
+  only if asked, likely after S9/S16/S17 have been lived with for a while.

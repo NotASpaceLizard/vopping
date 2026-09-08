@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grocery List — Item-Edit Gesture &amp; Note-Icon Picker</title>
+<style>
+  * , *::before, *::after { box-sizing: border-box; }
+  :root {
+    --bg-page: #1a1a1a;
+    --bg-card: #2a2a2a;
+    --border: #555;
+    --text: #ddd;
+    --text-muted: #999;
+    --accent: #4da6ff;
+  }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg-page);
+    color: var(--text);
+    max-width: 40rem;
+    margin: 0 auto;
+    padding: 1.25rem 1rem 4rem;
+    line-height: 1.45;
+  }
+  h1 { color: var(--accent); font-size: 1.3rem; margin: 0 0 0.25rem; }
+  h2 { font-size: 1.05rem; margin: 0 0 0.15rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+  .intro, .note { color: var(--text-muted); font-size: 0.88rem; }
+  .intro { margin-bottom: 1.1rem; }
+  .callout {
+    border: 1px solid #7a5a1a;
+    background: #2a2210;
+    color: #e8c979;
+    border-radius: 8px;
+    padding: 0.6rem 0.8rem;
+    font-size: 0.85rem;
+    margin: 0.75rem 0 1.5rem;
+  }
+  .callout strong { color: #f5d98a; }
+  .section {
+    border: 1px solid #444;
+    border-radius: 10px;
+    padding: 0.9rem 1rem 1rem;
+    margin-bottom: 1.6rem;
+    background: #222;
+  }
+  .tag {
+    font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.04em;
+    background: var(--accent); color: #111; padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: 700;
+  }
+  .tag.conflict { background: #cc6b6b; }
+  .section .note { margin: 0.3rem 0 0.7rem; }
+  .icon-choice {
+    display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.5rem 0 0.9rem;
+    font-size: 0.82rem;
+  }
+  .icon-choice label {
+    display: flex; align-items: center; gap: 0.3rem;
+    border: 1px solid var(--border); border-radius: 6px; padding: 0.25rem 0.55rem;
+    cursor: pointer; background: var(--bg-page);
+  }
+  .icon-choice input { accent-color: var(--accent); }
+  .icon-choice .glyph { font-size: 1rem; }
+
+  .demo-frame {
+    border: 1px solid #444; border-radius: 8px; background: var(--bg-page);
+    padding: 0.25rem 0;
+  }
+  .items { list-style: none; margin: 0; padding: 0; }
+  .items li {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem;
+    padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--bg-card);
+    cursor: pointer; user-select: none; position: relative;
+  }
+  .items li:last-child { border-bottom: none; }
+  .items li.flash { background: #23405a; }
+  .items li.checked .item-name { text-decoration: line-through; color: var(--text-muted); }
+  .items .item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .icon-btn {
+    flex-shrink: 0; width: 26px; height: 26px; min-width: 26px;
+    border: 1px solid var(--border); border-radius: 4px; background: transparent;
+    color: var(--text-muted); font-size: 0.8rem; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center; padding: 0; cursor: pointer;
+  }
+  .icon-btn.delete-btn { color: #e08080; border-color: #6b3d3d; }
+  .icon-btn.edit-btn { color: var(--accent); border-color: #2e5a7a; }
+  .row-meta { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.15rem; }
+  .note-display, .aisle-tag {
+    flex-shrink: 1; min-width: 0; max-width: 100%; overflow-wrap: break-word;
+    border: none; background: transparent; font: inherit; font-size: 0.78rem;
+    padding: 0.1rem 0.2rem; cursor: default; text-align: left; border-bottom: 1px dashed var(--border);
+  }
+  .note-display { color: var(--text-muted); }
+  .aisle-tag { color: var(--accent); }
+  .edit-caption {
+    flex-basis: 100%; font-size: 0.74rem; color: var(--accent); margin-top: 0.2rem;
+  }
+  .edit-input {
+    flex-basis: 100%; margin-top: 0.25rem;
+    font: inherit; font-size: 0.92rem; padding: 0.3rem 0.5rem;
+    border: 1px solid var(--accent); border-radius: 5px;
+    background: var(--bg-card); color: var(--text);
+  }
+  .hint { font-size: 0.72rem; color: #666; margin-top: 0.5rem; }
+  .pairing-row { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.4rem; font-size: 0.85rem; }
+  .pairing-row label { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; }
+  .pairing-row .glyph-pair { display: inline-flex; gap: 0.3rem; font-size: 1.05rem; }
+  .recommended-pill {
+    font-size: 0.65rem; text-transform: uppercase; background: #1f4a2e; color: #7fd6a4;
+    padding: 0.05rem 0.35rem; border-radius: 4px; margin-left: 0.3rem;
+  }
+</style>
+</head>
+<body>
+
+<h1>Grocery List — Item-Edit Gesture &amp; Note-Icon Picker</h1>
+<p class="intro">
+  S15 (in-place item-text editing) needs a gesture to trigger the edit, and it needs to not collide
+  with the pencil icon already used for S7's notes. Your own words: "note that we're already using
+  the pencil icon for the notes feature, so maybe edit needs to be a double-tap or something like
+  that. i'm open to ideas here. we may also need to change that notes icon... maybe a sticky note?
+  again, open to ideas here." This page mocks up 3 gesture options crossed against note-icon choices,
+  against the real row layout (note/aisle/delete included, same as the live app) so you can judge in
+  the actual crowded context — same lesson as the original density-picker.html mistake, where a mock
+  that didn't match the real row led to a wrong-looking worst case.
+</p>
+<p class="intro">
+  <strong>What's real here:</strong> tapping a row toggles crossed-off for real. The note/aisle
+  displays and delete button are real, current markup/styling (byte-for-byte from today's
+  style.css) — not placeholders. The gesture detection (double-tap timing, long-press timing,
+  dedicated-icon tap) is real, live logic, not just a description — try it on your phone. What's
+  <em>not</em> real: actually saving an edit — "Edit triggered" just shows a pre-filled text box so
+  you can feel the gesture without needing S15's save logic built yet.
+</p>
+<p class="intro">
+  <strong>Disclosed assumption:</strong> Up/Down buttons are removed from every row below, since
+  that's already a locked PO decision on S13's row ("we just don't have the space for those
+  buttons"), not something still open. S14's exact button-shrink percentage is <em>not</em> baked in
+  here — that's still likely to bounce back to you separately (a literal 25% reduction on today's
+  26px buttons lands at ~19.5px, under the 24px reference floor S14's own AC names — flagging that
+  now, separately, not blocking this page). Icon/gesture choice doesn't depend on exact button size,
+  so today's sizing is fine for judging this specific decision.
+</p>
+
+<div class="callout">
+  <strong>One thing worth knowing before you pick long-press:</strong> S13 already claims long-press
+  (press-and-hold) to start a drag reorder. If edit <em>also</em> uses long-press, the two gestures
+  need a disambiguation rule (e.g. "hold still and release = edit, hold and then move = drag") to
+  avoid picking up the wrong one — doable, but it's an extra wrinkle double-tap and the dedicated
+  icon don't have. Long-press is still included below for a fair comparison, not removed.
+</div>
+
+<!-- Shared note-icon choice for the two gesture options that add NO new icon (double-tap,
+     long-press) - the icon question is basically independent of gesture in those two cases, so one
+     shared control avoids showing the same choice three times. -->
+<div class="icon-choice" id="shared-icon-choice">
+  <strong style="width:100%;font-size:0.82rem;color:var(--text);margin-bottom:0.1rem;">Note icon (applies to the two sections below):</strong>
+  <label><input type="radio" name="shared-note-icon" value="pencil" checked><span class="glyph">✎</span> Pencil (current)</label>
+  <label><input type="radio" name="shared-note-icon" value="sticky"><span class="glyph">🗒️</span> Sticky note</label>
+  <label><input type="radio" name="shared-note-icon" value="speech"><span class="glyph">💬</span> Speech bubble</label>
+</div>
+
+<div id="root"></div>
+
+<script>
+  // Representative item set reused per section - includes a worst-case
+  // two-field row (Greek yogurt: both note AND aisle set) per the R7 lesson
+  // that a mock which only shows the easy case misleads the decision.
+  function freshItems() {
+    return [
+      { id: 1, name: 'Milk (1 gal)', aisle: 'Dairy', note: '', checked: false },
+      { id: 2, name: 'Greek yogurt', aisle: 'Dairy', note: 'plain, full-fat', checked: false },
+      { id: 3, name: 'Bread', aisle: '', note: '', checked: false },
+      { id: 4, name: 'Eggs (dozen)', aisle: '', note: '', checked: true }
+    ];
+  }
+
+  var NOTE_ICONS = { pencil: '✎', sticky: '🗒️', speech: '💬' };
+
+  function rowHtml(it, noteIcon, showEditIcon, editIconGlyph) {
+    var noteAffordance = it.note ? '' :
+      '<button type="button" class="icon-btn" data-role="note-toggle" title="Add note">' + noteIcon + '</button>';
+    var aisleAffordance = it.aisle ? '' :
+      '<button type="button" class="icon-btn" data-role="aisle-toggle" title="Add aisle">▤</button>';
+    var editBtn = showEditIcon ?
+      '<button type="button" class="icon-btn edit-btn" data-role="edit-toggle" title="Edit item">' + editIconGlyph + '</button>' : '';
+    var deleteBtn = '<button type="button" class="icon-btn delete-btn" data-role="delete" title="Delete">✕</button>';
+
+    var secondLine = '';
+    if (it.note || it.aisle) {
+      secondLine = '<div class="row-meta">' +
+        (it.note ? '<span class="note-display">' + it.note + '</span>' : '') +
+        (it.aisle ? '<span class="aisle-tag">' + it.aisle + '</span>' : '') +
+        '</div>';
+    }
+    return '<li class="' + (it.checked ? 'checked' : '') + '" data-id="' + it.id + '">' +
+      '<span class="item-name">' + it.name + '</span>' +
+      noteAffordance + aisleAffordance + editBtn + deleteBtn +
+      secondLine +
+      '</li>';
+  }
+
+  function renderList(ul, items, noteIcon, showEditIcon, editIconGlyph) {
+    ul.innerHTML = items.map(function (it) { return rowHtml(it, noteIcon, showEditIcon, editIconGlyph); }).join('');
+  }
+
+  function triggerEdit(li, item, viaLabel) {
+    li.classList.add('flash');
+    setTimeout(function () { li.classList.remove('flash'); }, 400);
+    var existing = li.querySelector('.edit-input');
+    if (existing) return; // already open
+    var caption = document.createElement('div');
+    caption.className = 'edit-caption';
+    caption.textContent = 'Edit triggered (' + viaLabel + ') — not wired to save, this is a gesture demo only';
+    var input = document.createElement('input');
+    input.className = 'edit-input';
+    input.value = item.name;
+    li.appendChild(caption);
+    li.appendChild(input);
+    input.focus();
+    input.select();
+    var closeIt = function () {
+      caption.remove();
+      input.remove();
+    };
+    input.addEventListener('blur', closeIt);
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); closeIt(); }
+    });
+  }
+
+  function toggleChecked(li, item) {
+    item.checked = !item.checked;
+    li.classList.toggle('checked', item.checked);
+  }
+
+  function isNestedControl(target) {
+    return target.closest && target.closest('[data-role]');
+  }
+
+  // ---- Section builders --------------------------------------------------
+
+  function buildSection(container, opts) {
+    var section = document.createElement('div');
+    section.className = 'section';
+
+    var header = document.createElement('h2');
+    header.innerHTML = opts.title + (opts.tagText ? ' <span class="tag' + (opts.conflictTag ? ' conflict' : '') + '">' + opts.tagText + '</span>' : '');
+    section.appendChild(header);
+
+    var note = document.createElement('p');
+    note.className = 'note';
+    note.textContent = opts.note;
+    section.appendChild(note);
+
+    if (opts.extraControls) section.appendChild(opts.extraControls);
+
+    var frame = document.createElement('div');
+    frame.className = 'demo-frame';
+    var ul = document.createElement('ul');
+    ul.className = 'items';
+    frame.appendChild(ul);
+    section.appendChild(frame);
+
+    var hint = document.createElement('div');
+    hint.className = 'hint';
+    hint.textContent = opts.hint;
+    section.appendChild(hint);
+
+    container.appendChild(section);
+    return ul;
+  }
+
+  var items1 = freshItems();
+  var items2 = freshItems();
+  var items3 = freshItems();
+
+  var root = document.getElementById('root');
+
+  // ---- Section 1: Double-tap to edit -------------------------------------
+  var ul1 = buildSection(root, {
+    title: '1 — Double-tap to edit',
+    note: 'No new icon needed - a single tap still crosses the item off as normal; a second tap ' +
+      'landing within ~350ms of the first opens the edit box instead (and the first tap\'s cross-off ' +
+      'is held back until that window passes, so a real double-tap never flashes a wrong cross-off ' +
+      'first). Tap the note/aisle/delete controls to confirm they still only do their own thing.',
+    hint: 'Single-tap the row = cross off. Two quick taps = edit. Try tapping the delete button twice quickly - it should NOT open edit.'
+  });
+
+  function wireDoubleTap(ul, items) {
+    var lastTapTime = {};
+    var pendingTimer = {};
+    var WINDOW_MS = 350;
+    ul.addEventListener('click', function (e) {
+      var li = e.target.closest('li[data-id]');
+      if (!li) return;
+      if (isNestedControl(e.target)) return; // nested-control precedence
+      var id = li.dataset.id;
+      var item = items.find(function (it) { return String(it.id) === id; });
+      var now = Date.now();
+      var last = lastTapTime[id] || 0;
+      if (now - last < WINDOW_MS) {
+        clearTimeout(pendingTimer[id]);
+        lastTapTime[id] = 0;
+        triggerEdit(li, item, 'double-tap');
+      } else {
+        lastTapTime[id] = now;
+        pendingTimer[id] = setTimeout(function () {
+          toggleChecked(li, item);
+        }, WINDOW_MS);
+      }
+    });
+    // Nested controls: still tappable, still no-op placeholders except delete/toggles which just flash.
+    ul.addEventListener('click', function (e) {
+      var nested = e.target.closest('[data-role]');
+      if (!nested) return;
+      var li = nested.closest('li');
+      li.style.outline = '1px solid ' + getComputedStyle(document.documentElement).getPropertyValue('--accent');
+      setTimeout(function () { li.style.outline = ''; }, 300);
+    });
+  }
+
+  function applySharedIcon(ul, items) {
+    var icon = document.querySelector('input[name="shared-note-icon"]:checked').value;
+    renderList(ul, items, NOTE_ICONS[icon], false, '');
+  }
+  applySharedIcon(ul1, items1);
+  wireDoubleTap(ul1, items1);
+
+  // ---- Section 2: Long-press to edit --------------------------------------
+  var ul2 = buildSection(root, {
+    title: '2 — Long-press to edit',
+    tagText: 'Conflicts with S13 drag',
+    conflictTag: true,
+    note: 'A quick tap crosses off as normal; holding for ~500ms without moving opens the edit box ' +
+      'instead. See the callout above - S13 already wants long-press for drag-pickup, so picking ' +
+      'this for edit too means the two need a disambiguation rule.',
+    hint: 'Tap-and-release quickly = cross off. Press and hold still for half a second = edit. Moving your finger while holding cancels it (same as a scroll).'
+  });
+  applySharedIcon(ul2, items2);
+
+  function wireLongPress(ul, items) {
+    var DELAY_MS = 500;
+    var MOVE_CANCEL_PX = 8;
+    var state = {}; // per-id: { timer, triggered, startX, startY }
+
+    function getRowAndItem(target) {
+      var li = target.closest && target.closest('li[data-id]');
+      if (!li) return null;
+      var id = li.dataset.id;
+      return { li: li, item: items.find(function (it) { return String(it.id) === id; }), id: id };
+    }
+
+    ul.addEventListener('pointerdown', function (e) {
+      if (isNestedControl(e.target)) return;
+      var found = getRowAndItem(e.target);
+      if (!found) return;
+      state[found.id] = { triggered: false, startX: e.clientX, startY: e.clientY };
+      state[found.id].timer = setTimeout(function () {
+        state[found.id].triggered = true;
+        triggerEdit(found.li, found.item, 'long-press');
+      }, DELAY_MS);
+    });
+    ul.addEventListener('pointermove', function (e) {
+      var found = getRowAndItem(e.target);
+      if (!found || !state[found.id]) return;
+      var s = state[found.id];
+      if (Math.abs(e.clientX - s.startX) > MOVE_CANCEL_PX || Math.abs(e.clientY - s.startY) > MOVE_CANCEL_PX) {
+        clearTimeout(s.timer);
+        s.triggered = true; // prevent the up-handler's single-tap fallback too
+      }
+    });
+    ul.addEventListener('pointerup', function (e) {
+      if (isNestedControl(e.target)) return;
+      var found = getRowAndItem(e.target);
+      if (!found || !state[found.id]) return;
+      var s = state[found.id];
+      clearTimeout(s.timer);
+      if (!s.triggered) toggleChecked(found.li, found.item);
+      delete state[found.id];
+    });
+    ul.addEventListener('click', function (e) {
+      var nested = e.target.closest('[data-role]');
+      if (!nested) return;
+      var li = nested.closest('li');
+      li.style.outline = '1px solid var(--accent)';
+      setTimeout(function () { li.style.outline = ''; }, 300);
+    });
+  }
+  wireLongPress(ul2, items2);
+
+  document.querySelectorAll('input[name="shared-note-icon"]').forEach(function (radio) {
+    radio.addEventListener('change', function () {
+      applySharedIcon(ul1, items1);
+      applySharedIcon(ul2, items2);
+    });
+  });
+
+  // ---- Section 3: Dedicated edit icon -------------------------------------
+  var pairings = [
+    { key: 'recommended', noteIcon: 'sticky', editIcon: '✎', label: 'Note = 🗒️ sticky note, Edit = ✎ pencil', recommended: true },
+    { key: 'alt1', noteIcon: 'pencil', editIcon: '✏️', label: 'Note = ✎ pencil (unchanged), Edit = ✏️ alternate pencil' },
+    { key: 'alt2', noteIcon: 'speech', editIcon: '✎', label: 'Note = 💬 speech bubble, Edit = ✎ pencil' }
+  ];
+  var pairingControls = document.createElement('div');
+  pairingControls.style.marginBottom = '0.5rem';
+  pairings.forEach(function (p, i) {
+    var row = document.createElement('div');
+    row.className = 'pairing-row';
+    row.innerHTML = '<label><input type="radio" name="pairing" value="' + p.key + '"' + (i === 0 ? ' checked' : '') + '>' +
+      '<span class="glyph-pair">' + NOTE_ICONS[p.noteIcon] + ' ' + p.editIcon + '</span> ' + p.label + '</label>' +
+      (p.recommended ? '<span class="recommended-pill">PO suggested this swap</span>' : '');
+    pairingControls.appendChild(row);
+  });
+
+  var ul3 = buildSection(root, {
+    title: '3 — Dedicated edit icon/button',
+    note: 'A new small icon appears on the row specifically for edit, alongside the existing note ' +
+      'icon - so both icons are visible together here, which is exactly where the "pencil means two ' +
+      'things" conflict would actually show up. Pick a pairing below to compare.',
+    extraControls: pairingControls,
+    hint: 'Single-tap the row = cross off (unchanged). Tap the new accent-colored icon = edit. Tap note/aisle/delete = their own action only.'
+  });
+
+  function applyPairing(ul, items) {
+    var key = document.querySelector('input[name="pairing"]:checked').value;
+    var p = pairings.find(function (x) { return x.key === key; });
+    renderList(ul, items, NOTE_ICONS[p.noteIcon], true, p.editIcon);
+  }
+  applyPairing(ul3, items3);
+
+  function wireDedicatedIcon(ul, items) {
+    ul.addEventListener('click', function (e) {
+      var li = e.target.closest('li[data-id]');
+      if (!li) return;
+      var nested = e.target.closest('[data-role]');
+      if (nested) {
+        var id = li.dataset.id;
+        var item = items.find(function (it) { return String(it.id) === id; });
+        if (nested.dataset.role === 'edit-toggle') {
+          triggerEdit(li, item, 'dedicated icon');
+        } else {
+          li.style.outline = '1px solid var(--accent)';
+          setTimeout(function () { li.style.outline = ''; }, 300);
+        }
+        return;
+      }
+      var id2 = li.dataset.id;
+      var item2 = items.find(function (it) { return String(it.id) === id2; });
+      toggleChecked(li, item2);
+    });
+  }
+  wireDedicatedIcon(ul3, items3);
+  document.querySelectorAll('input[name="pairing"]').forEach(function (radio) {
+    radio.addEventListener('change', function () { applyPairing(ul3, items3); });
+  });
+</script>
+
+<p class="intro" style="margin-top:0.5rem;">
+  Tell me the section number (and, for section 3, which pairing) you want - or a mix - and I'll fold
+  it into S15's AC as the locked gesture/icon mechanism.
+</p>
+
+</body>
+</html>
