@@ -5,10 +5,11 @@
 `c:\tmp\pw-test\vopping-tests-tester-s1-s6-s12-formal.js`.
 
 **Story:** As a user, I want to permanently remove an item from the list, so that I can get rid
-of something added by mistake or no longer needed, distinct from just checking it off.
+of something added by mistake or no longer needed, distinct from just crossing it off.
 
-**Acceptance criteria (verbatim, BACKLOG.md, locked 2026-09-04):** delete control visually/
-functionally separate from checkbox; removes item entirely from data model and localStorage
+**Acceptance criteria (verbatim, BACKLOG.md, locked 2026-09-04):** delete control is a distinct, separately-tappable element within the row, captured before it
+reaches the row's whole-row cross-off tap target (per the locked density spec — no checkbox
+glyph exists); removes item entirely from data model and localStorage
 immediately, no reload; no confirmation dialog on individual delete (re-justified 2026-09-04 on
 undo-based-mitigation grounds after S12 added a bulk case); deleting is one of the four S6
 undo-eligible types, retaining enough state (name, checked state, original position/index) to

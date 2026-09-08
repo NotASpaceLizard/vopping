@@ -214,6 +214,82 @@ button:disabled {
   border-color: #6b3d3d;
 }
 
+/* S7/S8: second-line note/aisle content - LOCKED AC (see script.js's
+   renderRow()/openEditor() comments). A row with a non-empty note and/or
+   aisle (or either editor currently open) may grow to a second line to fit
+   it; `flex-basis: 100%` is what forces this div onto its own new line
+   within the already-flex-wrapping `.items li` above, rather than sitting
+   beside the primary-line controls. A row with neither note nor aisle never
+   renders this div at all, so it stays exactly as tall as the locked
+   single-line spec. Structure validated against a real worst-case two-field
+   mock in density-picker.html (QA finding R7, 2026-09-08) before landing
+   here - this is that same structure, reusing the project's own CSS
+   variables instead of density-picker.html's necessarily-standalone raw
+   hex values (that file has no shared style.css to pull from). */
+.row-meta {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.15rem;
+}
+
+/* The open note/aisle editor's own text input - a smaller, secondary-field
+   treatment (compare .add-form input[type="text"] above, the primary-field
+   styling) since this always lives on a row's supplementary second line,
+   never the main add flow. */
+.row-meta-input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 0.15rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-page);
+  color: var(--text);
+}
+
+/* Saved note/aisle display buttons (tap to re-open the editor) - a dashed
+   underline signals "tap to edit" without needing a dedicated icon once a
+   value is set (the icon-btn "add" affordance only shows while that field
+   is still empty - see script.js's renderRow()). No hard character limit is
+   enforced (S7's locked AC) - `min-width: 0` + `overflow-wrap: break-word`
+   on a flex-shrink-only child (no flex-grow) is what lets a long value
+   actually wrap within the row's available width instead of overflowing or
+   clipping unreadably. */
+.note-display,
+.aisle-tag {
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 0.1rem 0.2rem;
+  cursor: pointer;
+  text-align: left;
+  border-bottom: 1px dashed var(--border);
+}
+
+.note-display {
+  color: var(--text-muted);
+}
+
+/* Distinct color from a plain note, NOT per-aisle color-coding - every
+   aisle tag gets this SAME accent color regardless of which aisle it is, so
+   this doesn't distinguish one aisle from another and doesn't trigger the
+   Okabe-Ito colorblind-safe-palette requirement (that only applies once/if
+   different aisles are given different colors to visually group them,
+   which this deliberately does not do - see BACKLOG.md's S8 accessibility
+   note; plain text with one uniform accent color already fully satisfies
+   S8's AC as written). */
+.aisle-tag {
+  color: var(--accent);
+}
+
 /* S3: brief delete-moment toast (QA finding R2, PO Option A) - reuses the
    same fixed-bottom-center pattern as vacking's own .toast, no new colors. */
 .toast {

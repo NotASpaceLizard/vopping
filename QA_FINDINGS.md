@@ -280,3 +280,169 @@ directly relevant here: R1's corrupted-localStorage concern and R4's crowded-row
 are exactly the two failure shapes vacking's own two sweeps found live, so those two are the
 highest-value things to re-test adversarially the moment there's a running app, not just re-read as
 docs.
+
+---
+
+## Sweep 2 — 2026-09-08 (Sprint 2 AC-locked pass, first-ever review of S7-S10; docs + shipped code)
+
+**Scope:** BACKLOG.md's locked S7 (notes), S8 (aisle designation), S9 (sort view), S10 (frequency
+suggestions) AC text — first QA pass over any of these four, not a re-check. Also cross-referenced
+against Developer's already-written implementation (`script.js`, `index.html`, `style.css`) since,
+unlike sweep 1, Sprint 2's code already exists (Developer is mid self-verification after the
+multi-day pause) — several findings below were confirmed or *downgraded* by actually reading the
+code rather than reasoning about the AC text alone. `style.css` has not yet been touched for
+S7-S10's new elements (`.row-meta`, `.note-display`, `.aisle-tag`, `.suggestion-chip`, etc. are all
+unstyled) — expected per this sweep's own brief, not itself a finding.
+
+**Pre-check requested by Orchestrator: is sweep 1 (above) internally consistent / stale?** Reviewed
+in full. It is internally consistent (6 Real / 6 Minor / 4 Nitpick as expected, no contradictions
+within the sweep itself) and **not stale in any way that matters** — it's an append-only historical
+log by design (per this file's own header and the playbook's §2 doc-ownership split: QA logs
+findings here, *resolutions* live in BACKLOG.md/SPRINT_LOG.md, not back-edited into this file).
+Cross-verified every sweep-1 Real/Minor finding against BACKLOG.md and SPRINT_LOG.md's "Update,
+2026-09-04" entries: **R1, R2, R3, R5, R6 and all six Minors (M1-M6) are explicitly resolved** with
+inline citations in BACKLOG.md's S1/S3/S4/S6/S7/S8/S9/S10/S12 rows. **R4 is the one sweep-1 finding
+still genuinely open** — SPRINT_LOG.md says so explicitly ("QA's sweep 1 is now fully closed out
+except R4... a tooling concern for the Orchestrator/Developer, not a BACKLOG.md AC item"). That's
+accurate and not a gap in sweep 1's own log — but see **R7 below**, which is this sweep's finding
+that R4's un-closed status has now stopped being a hypothetical tooling nitpick and become a live,
+code-confirmed product-sense question now that S7/S8 are actually implemented.
+
+**Trigger:** per-story-adjacent gate, folded into the periodic-sweep trigger — S7-S10's AC just
+locked and Developer's implementation already exists; this is the cheapest remaining point to
+catch a design smell before Tester's formal pass starts writing test-plans against this AC.
+
+---
+
+### REAL
+
+**R7. Sweep-1's R4 (density-picker.html's mockups omit delete/up-down/note/aisle controls) was left
+open as "a tooling concern," but S7/S8's now-real implementation confirms the underlying crowding
+concern is materially worse than R4 even described, and it directly undercuts the PO's own density
+sign-off.**
+
+Confirmed directly in `script.js`'s `renderRow()` (lines ~633-676): every row's primary line, in
+its default empty-note/empty-aisle state, renders **five** nested interactive controls alongside
+the item name — a note-toggle icon (✎), an aisle-toggle icon (▤), Up, Down, and Delete — none of
+which existed in any of density-picker.html's four candidate mockups (R4's own point: those showed
+only a checkbox/glyph + name + static aisle-tag span). The PO's locked pick (whole-row tap, Option
+C/D, no checkbox/dot glyph) was made looking at a row with effectively zero of these five controls
+present. Developer has already applied a defensive mitigation — `style.css`'s `.items li` carries
+`flex-wrap: wrap` with a self-aware comment ("multi-child rows need `flex-wrap: wrap` once a row
+gets crowded... more once S7/S8 land") — which should prevent literal overflow/clipping (the exact
+failure shape vacking's own MV-3 finding hit). But that closes the *technical* overflow risk, not
+the *product* one: whether a row with up to 5 icon buttons crammed beside the name, on a phone,
+still "feels right" for fast in-store scanning is exactly the category of subjective call the
+playbook (§7) says shouldn't be eyeballed/guessed on the PO's behalf — it's the same shape of
+decision density-picker.html itself existed to settle properly rather than guess. Recommend: before
+Tester's Sprint 2 formal pass closes S7/S8, get real or emulated-mobile-viewport eyes (PO
+preferred, Tester as fallback) on a worst-case row — both note and aisle populated (forces the
+second line too) on an item that's neither first nor last (so both Up and Down are enabled,
+maximizing primary-line control count) — and confirm it still reads as usable, not merely
+non-overflowing. This is R4 actually landing, not a new tooling nitpick.
+
+**R8. S8's dynamic aisle-suggestion pool has two real interpretation choices, already disclosed
+candidly by Developer in `script.js` code comments, but never folded back into BACKLOG.md's locked
+S8 AC text — so the locked spec and the shipped behavior currently say different things.**
+
+`script.js` lines ~488-500 (Developer's own comment, dated 2026-09-04) explicitly discloses: (1)
+"used elsewhere in the list" is implemented as a **live-derived scan** of `state.items`' current
+aisle values, not a separately persisted permanent history like S10's frequency counter — a custom
+aisle name stops being suggested the moment no current item uses it anymore (delete the last item
+with aisle "Wine," and "Wine" vanishes from every other row's datalist, with no code path to bring
+it back except retyping it from scratch); and (2) the AC's own term "chronologically first" (for
+which casing wins when "Produce" and "produce" merge into one suggestion entry) is actually
+implemented as **first-occurrence-in-current-array-order**, not a true edit timestamp — confirmed
+via `getAislePool()`'s straight linear scan of `state.items` in stored order. Developer explicitly
+flags this as "a rare reordering-perturbs-the-tie-break edge case" with "no functional
+consequence" — and that self-assessment is correct (it's cosmetic-only, never rewrites any
+individual item's own stored aisle text). Concretely reproducible today with S5's existing Up/Down
+buttons alone, no new code needed: type "Produce" on item A, "produce" on item B, confirm the
+suggestion pool shows "Produce"; then use Up/Down to move B above A (no aisle retyped on either)
+— the pool now shows "produce," despite "chronologically first" reading as if it should still favor
+whichever was *typed* first, not whichever currently sits first in the array. Both disclosures are
+good practice (exactly the kind of thing the playbook wants surfaced, not hidden) and low-stakes on
+their own — but S8's locked AC text still just says "chronologically first" and "already used
+elsewhere in the list" with neither caveat, and Tester hasn't started S8's test-plan yet. Recommend
+folding both disclosed choices back into S8's AC (or a dated technical note, same pattern S7 used
+for its own Developer sanity-check finding) before that happens, so Tester tests against what was
+actually built rather than either missing this edge case or mis-flagging the array-order tie-break
+as a defect against the literal word "chronologically."
+
+---
+
+### MINOR
+
+**M7. S7 and S8 each separately describe a row growing to fit "a" second line, but neither
+addresses what happens when an item has both a non-empty note AND a non-empty aisle at the same
+time.** Confirmed via `script.js` (lines 656-670): the actual implementation puts both into one
+shared `.row-meta` second line (note-display button, then aisle-tag button, side by side) rather
+than two stacked lines — a reasonable choice, but it's a Developer-level default nobody actually
+locked. Worth stating explicitly before Tester writes S7/S8's test-plans, same shape as sweep 1's
+M6 (two independently-stated rules whose *combination* was never addressed by either story).
+
+**M8. S9's own "resolving QA finding M2" text explicitly names only three add paths (S1 single-add,
+S4 paste-ingest, S10 suggestion-tap) as guaranteed to render at their correct position under an
+active non-Manual sort — but this undersells what's actually true and shipped.** Traced the
+render pipeline end to end: `performUndo()` (restoring a deleted item or a swap), `clearCheckedItems()` /
+S12's bulk restore-on-undo, and `saveAisle()` (committing an aisle edit, which can move an item into
+a different aisle group) all end in the same general `render()` → full `renderList()` rebuild that
+every add path also uses — meaning undo-restore-under-sort and aisle-edit-triggered regrouping
+already work correctly today, automatically, as a structural consequence of "always rebuild the
+whole list from live state on every render," not because anyone special-cased them the way M2's
+text implies was needed for add. Not a functional bug (verified by reading the actual code paths,
+not just the AC) — but the locked AC's stated guarantee is narrower than reality, which risks
+Tester's S9 test-plan being scoped only to the three explicitly-named paths and never exercising
+undo-restore-under-sort or aisle-regroup-under-sort as their own cases, purely because the AC text
+never invites it. Recommend broadening M2's resolution language to the general principle already
+true in code ("every render, regardless of which mutation triggered it, re-derives sort position
+fresh from live state") so Tester's coverage is written from an accurate general statement instead
+of an enumerated list that quietly undersells what was built.
+
+---
+
+### NITPICK
+
+**N5. S9 never states that By-Aisle grouping, for a row with an in-progress/uncommitted aisle
+edit, uses the item's last-*saved* aisle value rather than the live-typed draft.** Confirmed
+already correct in code — `renderList()`'s grouping key reads `item.aisle` (committed state), while
+the in-progress text lives in a separate `editingField.draft` that only becomes `item.aisle` on
+`commitEditor()` (blur/Enter) — so a row never visually jumps groups mid-keystroke. No risk of this
+being wrong (it's a natural consequence of how the two pieces of state are kept separate), just
+worth a one-line AC mention for Tester's own coverage notes rather than leaving it entirely
+inferred from code.
+
+---
+
+### Confirmed sound (reviewed, no gap found — S7-S10 specific)
+
+- **Nested-control precedence for S7/S8's note-toggle/aisle-toggle affordances** is correctly
+  implemented and matches S2/S3/S5's existing precedent exactly — confirmed in `script.js`'s
+  delegated click handler (role-based dispatch for `up`/`down`/`delete`/`note-toggle`/
+  `aisle-toggle`, explicit `return` before the row's own `toggleChecked` branch can fire).
+- **In-progress note/aisle draft survival across an unrelated re-render** (Developer's own
+  self-flagged landmine on both S7 and S8) is correctly built — `updateDraft()` deliberately avoids
+  a render-per-keystroke, and `renderList()`'s existing focus-capture/restore logic (already proven
+  for S1/S2/S5) is reused unchanged, not reimplemented.
+- **S10's suggestion-chip list correctly disappears a tapped suggestion on its very next render** —
+  `renderSuggestions()` is called from the same general `render()` pipeline every mutation goes
+  through, and its filter (`getLiveNameSet()`) is re-evaluated live each time, so no stale/dismissed
+  chip can linger after being tapped. Not explicitly stated in S10's AC, but correctly built and
+  low enough stakes not to warrant its own finding above Nitpick.
+- **Terminology consistency ("crossed off," not "checked")** — checked specifically for S7-S10:
+  no user-facing string in either the locked AC text or the shipped `index.html`/`script.js`
+  violates this. "Check/uncheck" persists only as internal story-shorthand (S2's own story title,
+  S9's AC prose) exactly as it already did pre-Sprint-2 — consistent, not a regression.
+
+---
+
+### Scope note
+
+Unlike sweep 1, Sprint 2 already has real code to check against, which changed this sweep's
+shape: two candidate concerns I went in expecting to flag as Real (undo-restore positioning under
+an active sort; aisle-edit-triggered regrouping under an active sort) turned out, on tracing the
+actual render pipeline, to already work correctly — downgraded to M8 (a documentation-completeness
+gap, not a functional one) rather than reported as live risks. Recommend Tester's upcoming S7-S10
+formal pass specifically exercise R7's worst-case row (note + aisle both populated, mid-list item)
+on a real or emulated narrow phone viewport, and R8's reorder-flips-tie-break-casing scenario,
+since both are now concretely reproducible rather than theoretical.

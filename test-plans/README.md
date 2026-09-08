@@ -143,7 +143,12 @@ formal-test-plan time rather than relying on chat memory:
   that AC item's real assertion point is: after S6 exists, delete → Undo →
   item reappears at its exact original index, not appended at the end),
   `reorder` (the two swapped ids). Useful for writing S6's own test cases
-  concretely per action type once implementation lands.
+  concretely per action type once implementation lands. **Confirmed as actually
+  implemented (2026-09-04 formal pass):** `delete`'s shape generalized to
+  `entries:[{item,index}]` — an array, not a single `{item,index}` object —
+  specifically so S12's bulk clear-crossed-off could reuse the exact same
+  undo-buffer shape for N items at once; a single S3 delete is just `entries`
+  with length 1. Assert against this array shape, not a bare single object.
 - **S4 paste-split:** `\r?\n`-aware — handles Windows-style CRLF line
   endings from pasted text, not just `\n`. Worth a dedicated test case
   (paste text containing `\r\n` line endings, confirm correct per-line
@@ -166,7 +171,12 @@ Orchestrator 2026-09-04) — build these into S7-S10 assertions once AC locks an
   detail — check whether that clause landed before writing S7/S8's test
   cases; if so, this needs its own test (open note edit on row A, type a
   draft, don't commit, trigger a mutation on row B, confirm row A's draft
-  text is still exactly what was typed, not reverted/lost).
+  text is still exactly what was typed, not reverted/lost). **Confirmed
+  landed (re-checked against BACKLOG.md, 2026-09-08):** yes — both S7's and
+  S8's own AC now carry this clause near-verbatim ("an in-progress note/aisle
+  edit must survive a re-render triggered by an unrelated action ... with its
+  draft text intact, not silently discarded"). Both S7-note.md and S8-aisle.md
+  need the dedicated draft-survives-re-render test case described above.
 - **S8 aisle input:** plain `<input list="aisle-options">` + `<datalist>` —
   no custom dropdown widget. Free-text entry is just typing into the input
   normally (datalist never restricts input, only offers suggestions), so

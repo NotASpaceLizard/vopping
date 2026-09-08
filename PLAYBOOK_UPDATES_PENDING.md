@@ -20,6 +20,7 @@ Running log of process lessons learned on **vopping** that should get folded int
 ## Role boundaries
 
 - **The Orchestrator writing a decision-tool artifact directly (not through Developer) is a real mistake, not a shortcut.** Caught on vopping when the Orchestrator wrote the first density-picker.html draft itself instead of delegating to Developer — PO corrected it immediately ("you are my orchestrator, not my developer"). The console itself remains the sole Orchestrator-owned exception; everything else, including one-off decision-tool mockups, goes through Developer.
+- **Track agentId-to-role mapping explicitly; don't rely on remembering spawn order.** When Scrum Master, Developer, Tester, and QA are spawned in one parallel batch, the tool results come back in call order but nothing else labels which raw agentId belongs to which role. On vopping (after a multi-day pause forced a full re-spawn), the Orchestrator misremembered the mapping and sent a Developer-owned-file task (updating density-picker.html for a QA finding) to the Tester agent instead. Tester complied and did competent work, but it's still a role-boundary breach the Orchestrator caused, not Tester overreaching — same failure family as the Orchestrator writing density-picker.html itself. Fix: write down the role→agentId mapping as soon as the spawn batch returns (a scratch note is enough), and double-check it before every SendMessage, especially right after a re-spawn.
 
 ## Sibling-project review pays off
 

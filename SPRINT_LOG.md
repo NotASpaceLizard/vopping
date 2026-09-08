@@ -247,6 +247,60 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   self-verification once wired up, then Tester's formal pass, same pipeline as Sprint 1.
 - **Carryover:** None — Sprint 2 implementation continues next session; already
   recorded above, not a dangling loose end.
+- **Resume, 2026-09-08 (scrum-master's own end-to-end doc re-read, per standing
+  wind-down/resume habit):** Full re-read of BACKLOG.md, SPRINT_LOG.md, and
+  QUESTIONS.md end to end, not a diff-only skim. Found and fixed one real
+  staleness item: S3, S6, and S12's own "Done" citations in BACKLOG.md were still
+  quoting the 67/67 first-formal-pass figure, which REGRESSION_LOG.md explicitly
+  marks superseded ("do not cite this row going forward") — the same
+  citation-drift bug already caught and fixed on S1/S2/S5 on 2026-09-04 was
+  missed on these three rows at the time. Corrected all three to cite
+  REGRESSION_LOG.md's current canonical 74/74 row (script
+  `vopping-tests-tester-s1-s2-s5-density-formal.js`), whose full functional
+  regression re-run explicitly covered delete/undo/clear-crossed-off-items with
+  zero regressions — no new testing needed, this was a citation-text fix only,
+  not a retest. No other contradictions, duplicate sections, or stale headers
+  found; BACKLOG.md's top-of-file Priority Queue summary, Sprint 2's Locked
+  statuses, and the Sprint 2 implementation-status note above all still
+  accurately reflect real state (Developer's S7-S10 implementation exists but is
+  only self-verified for basic add; style.css untouched for new UI; no formal
+  Tester pass yet). All edits grep-verified as single physical GFM table lines;
+  BACKLOG.md still 12 rows.
+- **Outcome:** Docs confirmed consistent (one citation fix applied). Sprint 2
+  implementation still awaiting Developer's own full self-verification across
+  note/aisle/sort/suggestions before Tester's testability work on S7-S10 formal
+  test-plan files should start — no test-plan files exist yet for S7-S10 (only
+  S1-S6/S12 have files under `test-plans/`), which tracks the doc pipeline
+  correctly (testability-check already happened pre-lock; the *formal* pass is
+  what's pending, and per the playbook that follows implementation, it isn't
+  blocked on anything doc-side).
+- **QA/Tester findings triaged, 2026-09-08 (same day, continued):** Three items
+  landed from QA's and Tester's own passes on Developer's in-progress Sprint 2
+  implementation. **QA R7 (Real, crowded worst-case row):** S7's note-toggle and
+  S8's aisle-toggle affordances bring a real row up to 5 nested controls
+  (note/aisle/up/down/delete) — a density the PO's original density-picker.html
+  pick never showed, since S7/S8 didn't exist yet when that pick was made.
+  Decided this rises to a fresh PO-facing look, not a scrum-master call to close
+  alone — same "guess twice on a subjective visual call" trap the playbook
+  explicitly warns against (§7), and the same mockup-fidelity failure class QA
+  already caught once on this project (R4). Added a new top-of-file **Tracked
+  follow-up #2** gate in BACKLOG.md blocking S7/S8's Done status on PO
+  confirmation, cross-referenced from both rows; routed to Orchestrator as a
+  console-worthy PO item, non-blocking to Developer's/Tester's ongoing work in
+  the meantime. **QA R8 (Real, AC/implementation mismatch on S8):** folded both
+  disclosed behaviors directly into S8's AC (no PO input needed, narrow and
+  well-understood) — the aisle-suggestion pool is derived live each render, not
+  a persisted record like S10's counter; and the merged-entry casing tie-break
+  is actually array-position-based, not chronological-typing-order as originally
+  written, meaning a plain Up/Down reorder (no retyping) can flip which casing
+  displays. Documents actual behavior for Tester's test plan; not a behavior
+  change. **Tester-flagged terminology mix:** found and fixed one real leftover
+  — S12's AC still read "if zero items are currently checked" instead of
+  "crossed off"; corrected. S2's Story-cell title ("check an item off") was
+  confirmed to be the already-documented, deliberate rename-scope boundary from
+  2026-09-04 (not a new bug) — re-flagging to Orchestrator/PO as a non-blocking
+  QUESTIONS.md entry since it's now been independently surfaced twice. All
+  edits grep-verified as single physical GFM lines; BACKLOG.md still 12 rows.
 
 ## Parked / unscheduled
 

@@ -80,17 +80,59 @@
   .icon-btn:active { background: #333; }
   .icon-btn:disabled { opacity: 0.35; cursor: default; }
   .icon-btn.delete-btn { color: #e08080; border-color: #6b3d3d; }
-  .aisle-tag-btn {
-    flex-shrink: 0;
+  /* Revision (2026-09-08, QA finding R7): .aisle-tag-btn (always-inline,
+     first-line aisle text) removed - the real app never shows aisle text
+     inline on the first line, only as a second-line tag once set (see
+     .aisle-tag below). Replaced with the real second-line classes.
+
+     UPDATE (2026-09-08, Developer): style.css now has real rules for
+     .row-meta / .row-meta-input / .note-display / .aisle-tag (Tester's
+     placeholder above was written before that landed, flagged provisional
+     at the time). The values below are now a byte-for-byte match of
+     style.css's real rules, just with each `var(--x)` swapped for its
+     literal hex value since this file is intentionally standalone (no
+     shared style.css include) - #555=var(--border), #1a1a1a=var(--bg-page),
+     #ddd=var(--text), #999=var(--text-muted), #4da6ff=var(--accent). No
+     longer provisional - this is now a pixel-accurate preview of what
+     actually ships, safe to treat as final for the PO's phone review. */
+  .row-meta {
+    flex-basis: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.15rem;
+  }
+  .row-meta-input {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    font-size: 0.82rem;
+    padding: 0.15rem 0.4rem;
+    border: 1px solid #555;
+    border-radius: 4px;
+    background: #1a1a1a;
+    color: #ddd;
+  }
+  .note-display, .aisle-tag {
+    flex-shrink: 1;
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: break-word;
     border: none;
     background: transparent;
     font: inherit;
-    font-size: 0.72rem;
-    color: #888;
-    border-bottom: 1px dashed #666;
-    padding: 0.1rem 0.15rem;
+    font-size: 0.78rem;
+    color: #999;
+    border-bottom: 1px dashed #555;
+    padding: 0.1rem 0.2rem;
     cursor: pointer;
+    text-align: left;
   }
+  /* Not per-aisle color-coding - every aisle tag gets this SAME accent
+     color regardless of which aisle it is, so this doesn't trigger the
+     Okabe-Ito colorblind-safe-palette requirement (see BACKLOG.md's S8
+     accessibility note). */
+  .aisle-tag { color: #4da6ff; }
 
   /* ---------- Option A: vacking baseline (reference only) ---------- */
   /* flex-wrap added in this revision - a crowded row (checkbox+name+note+
@@ -149,21 +191,41 @@
   determines whether a given density survives once every real control lands on the row, not just how
   it looks with checkbox+name+aisle alone.
 </p>
+<p class="intro">
+  <strong>Revised again 2026-09-08 (QA finding R7):</strong> the 2026-09-04 revision above showed
+  every row with an aisle tag AND a note icon inline, all the time — that turned out not to match
+  how S7/S8 actually got built. In the real app, the note/aisle "add" icon only shows while that
+  field is empty; once it has a value, the icon disappears and the actual text wraps onto a second
+  line below the item name instead. So the real worst case isn't 5 icons crammed onto one line —
+  it's a row that can grow to TWO lines (name+controls on line 1, note text + aisle tag on line 2).
+  The 5th and 8th items below now carry both a note and an aisle (one with a long name too) so you
+  can see that true worst case live, in every option, not an approximation of it.
+</p>
 
 <div id="root"></div>
 
 <script>
+  // Revision (2026-09-08, QA finding R7): items now carry a `note` field
+  // too (previously every item had an aisle but none had a note, so the
+  // note-toggle icon was never actually exercised in its "empty" state
+  // alongside a set aisle, and the true worst case - BOTH a note AND an
+  // aisle set on the same row, per S7/S8's real conditional markup - was
+  // never shown at all). Deliberately mixed: some items have neither
+  // (baseline single-line), some have only one field, and two have BOTH
+  // (the actual worst case) - one with a short note+aisle, one with a
+  // long name AND a long note AND an aisle, to stress-test wrapping at
+  // the same time as control crowding, not just one or the other.
   var items = [
-    { name: 'Milk (1 gal)', aisle: 'Dairy', checked: false },
-    { name: 'Eggs (dozen)', aisle: 'Dairy', checked: true },
-    { name: 'Bread', aisle: 'Bakery', checked: false },
-    { name: 'Bananas (6 ct)', aisle: 'Produce', checked: false },
-    { name: 'Chicken breast (2 lbs)', aisle: 'Meat', checked: false },
-    { name: 'Rice (1 bag)', aisle: 'Pantry', checked: true },
-    { name: 'Paper towels', aisle: 'Household', checked: false },
-    { name: 'Greek yogurt', aisle: 'Dairy', checked: false },
-    { name: 'Frozen peas', aisle: 'Frozen', checked: false },
-    { name: 'Coffee', aisle: 'Pantry', checked: false }
+    { name: 'Milk (1 gal)', aisle: 'Dairy', note: '', checked: false },
+    { name: 'Eggs (dozen)', aisle: '', note: '', checked: true },
+    { name: 'Bread', aisle: 'Bakery', note: '', checked: false },
+    { name: 'Bananas (6 ct)', aisle: '', note: '', checked: false },
+    { name: 'Chicken breast, boneless skinless thighs (family pack)', aisle: 'Meat', note: 'the Perdue brand, not store brand - check sell-by date', checked: false },
+    { name: 'Rice (1 bag)', aisle: 'Pantry', note: '', checked: true },
+    { name: 'Paper towels', aisle: '', note: 'the quilted kind, not the cheap single-ply', checked: false },
+    { name: 'Greek yogurt', aisle: 'Dairy', note: 'plain, full-fat', checked: false },
+    { name: 'Frozen peas', aisle: 'Frozen', note: '', checked: false },
+    { name: 'Coffee', aisle: '', note: '', checked: false }
   ];
 
   // Revision (2026-09-04, QA finding R4): the delete (S3)/up-down (S5)/
@@ -172,12 +234,41 @@
   // built once here and appended by every renderRow rather than duplicated
   // 4 times. `data-role` lets the row-building loop below find them to wire
   // up disabled state (first/last row) and stopPropagation.
+  //
+  // Rewritten (2026-09-08, QA finding R7) to match the REAL renderRow()
+  // logic in script.js exactly (verified against script.js lines ~643-701,
+  // 2026-09-08), not the original 2026-09-04 draft's simplified
+  // always-show-everything approximation. The real app does NOT show a
+  // note icon and an aisle icon and the aisle text all on one line
+  // together - the note/aisle "add" icon only appears when that field is
+  // EMPTY; once it has a value, the icon disappears and the actual text
+  // moves to a wrapped SECOND LINE below the name instead (real classes:
+  // .row-meta / .note-display / .aisle-tag). So the true worst case is a
+  // two-line row - line 1: name + up + down + delete; line 2: note text +
+  // aisle text, each its own tap target - not five controls jammed onto
+  // one line as originally mocked. `data-role` values match script.js's
+  // own exactly (note-toggle/aisle-toggle/up/down/delete) so this stays a
+  // faithful mirror if script.js changes again.
   function extraControlsHtml(it) {
-    return '<button type="button" class="aisle-tag-btn" data-role="aisle" title="Edit aisle">' + it.aisle + '</button>' +
-      '<button type="button" class="icon-btn" data-role="note" title="Note">✎</button>' +
-      '<button type="button" class="icon-btn" data-role="up" title="Move up">▲</button>' +
-      '<button type="button" class="icon-btn" data-role="down" title="Move down">▼</button>' +
-      '<button type="button" class="icon-btn delete-btn" data-role="delete" title="Delete">✕</button>';
+    var noteAffordance = it.note
+      ? ''
+      : '<button type="button" class="icon-btn" data-role="note-toggle" title="Add note">✎</button>';
+    var aisleAffordance = it.aisle
+      ? ''
+      : '<button type="button" class="icon-btn" data-role="aisle-toggle" title="Add aisle">▤</button>';
+    var upBtn = '<button type="button" class="icon-btn" data-role="up" title="Move up">▲</button>';
+    var downBtn = '<button type="button" class="icon-btn" data-role="down" title="Move down">▼</button>';
+    var deleteBtn = '<button type="button" class="icon-btn delete-btn" data-role="delete" title="Delete">✕</button>';
+
+    var secondLine = '';
+    if (it.note || it.aisle) {
+      secondLine = '<div class="row-meta">' +
+        (it.note ? '<button type="button" class="note-display" data-role="note-toggle" title="Edit note">' + it.note + '</button>' : '') +
+        (it.aisle ? '<button type="button" class="aisle-tag" data-role="aisle-toggle" title="Edit aisle">' + it.aisle + '</button>' : '') +
+        '</div>';
+    }
+
+    return noteAffordance + aisleAffordance + upBtn + downBtn + deleteBtn + secondLine;
   }
 
   var options = [
@@ -328,10 +419,17 @@
 
     requestAnimationFrame(function () {
       var rows = ul.querySelectorAll('li');
-      var rowHeight = rows[0].getBoundingClientRect().height;
+      // Revision (2026-09-08, QA finding R7): a single averaged row height
+      // is misleading now that rows can be 1-line OR 2-line depending on
+      // note/aisle content - report both ends explicitly. items[1] (Eggs)
+      // has neither field set (plain baseline); items[4] (Chicken breast...)
+      // has a long name + long note + aisle (the true worst case).
+      var plainRowHeight = rows[1].getBoundingClientRect().height;
+      var worstRowHeight = rows[4].getBoundingClientRect().height;
       var frameHeight = frame.getBoundingClientRect().height;
-      var visible = Math.floor(frameHeight / rowHeight);
-      metrics.textContent = 'row height: ' + rowHeight.toFixed(0) + 'px  |  items visible without scrolling (240px frame): ' + visible;
+      var visiblePlain = Math.floor(frameHeight / plainRowHeight);
+      var visibleWorst = Math.floor(frameHeight / worstRowHeight);
+      metrics.textContent = 'row height (plain, 1-line): ' + plainRowHeight.toFixed(0) + 'px  |  row height (worst case, note+aisle, 2-line): ' + worstRowHeight.toFixed(0) + 'px  |  items visible without scrolling: ' + visiblePlain + ' if every row were plain, ' + visibleWorst + ' if every row were worst-case';
     });
   });
 </script>

@@ -421,9 +421,56 @@
   function openEditor(id, field) {
     var idx = findIndexById(id);
     if (idx === -1) return;
+    if (editingField && editingField.id === id && editingField.field === field) {
+      return; // already open for this exact field - don't reset the in-progress draft
+    }
+    // Bug fix (2026-09-08, caught by Playwright verification pass): if a
+    // DIFFERENT editor was already open (same row's other field, or a
+    // different row entirely) and never got a chance to blur/commit
+    // naturally, simply overwriting `editingField` below would silently
+    // discard its in-progress draft - exactly the "not silently discarded"
+    // requirement the locked AC already states for S7/S8, just reachable via
+    // a path (opening a second editor) beyond the one already handled
+    // (an unrelated re-render). Worse, deferring that commit to whenever the
+    // old input's element eventually gets removed from the DOM (which does
+    // fire a native blur/focusout, since it's still attached at removal
+    // time) creates a real reentrancy hazard: that stale focusout's delegated
+    // handler would call commitEditor() using whatever `editingField` is
+    // CURRENT at that moment - which by then already points at the NEW
+    // field - so it would wrongly save the new field's (empty) draft under
+    // the old field's save function, then null out the very `editingField`
+    // this function is about to set up, leaving the newly-opened editor
+    // dead on arrival. Committing explicitly, synchronously, right here -
+    // before `editingField` changes at all - avoids both problems in one
+    // stroke.
+    if (editingField) {
+      commitEditor();
+    }
     var current = state.items[idx][field] || '';
     editingField = { id: id, field: field, draft: current };
     render();
+    // Bug fix (2026-09-08, caught by Playwright verification pass): render()'s
+    // generic focus-restore logic (see renderList()) only re-targets an
+    // element sharing the SAME data-role as whatever was focused before the
+    // rebuild. Opening the editor changes the focused control's role (the
+    // clicked 'note-toggle'/'aisle-toggle' affordance is replaced by a
+    // 'note-input'/'aisle-input' in the new render), so that generic path
+    // never finds a match and falls back to focusing the <li> itself,
+    // leaving the freshly-shown text input completely unfocused - the user's
+    // keystrokes went nowhere, and since no real <input> ever had focus, no
+    // `focusout` ever fired to commit/close it either, so the editor could
+    // get stuck open indefinitely once another action elsewhere re-rendered
+    // the list. Handle this one specific transition directly: explicitly
+    // focus the new editor input (and place the cursor at the end, matching
+    // the same convention renderList() already uses elsewhere).
+    var input = listRoot.querySelector('li[data-id="' + id + '"] [data-role="' + field + '-input"]');
+    if (input) {
+      input.focus();
+      if (typeof input.setSelectionRange === 'function') {
+        var len = input.value.length;
+        input.setSelectionRange(len, len);
+      }
+    }
   }
 
   function updateDraft(value) {
@@ -872,10 +919,39 @@
   // S7/S8: confirm-on-blur. Delegated listeners must use `focusout`, not
   // `blur` - `blur` does not bubble, so a listener on an ancestor (this
   // app's established event-delegation pattern) would never see it fire.
+  //
+  // Bug fix (2026-09-08, caught by Playwright verification pass): committing
+  // SYNCHRONOUSLY here is a real hazard, not just a style choice. This
+  // `focusout` can itself be a side effect of the SAME mousedown/click
+  // gesture that's about to activate a DIFFERENT nested control elsewhere in
+  // the list (tapping another row's note/aisle-toggle, or its Up/Down/
+  // Delete) - browsers process the focus change (and therefore fire this
+  // `focusout`) BEFORE dispatching the resulting `click`. Calling
+  // commitEditor() synchronously here runs render(), which rebuilds
+  // listRoot's ENTIRE innerHTML - destroying the very element the
+  // not-yet-dispatched click is targeting, before that click event ever
+  // reaches it (a detached node can't bubble to listRoot). Net effect: the
+  // user's tap on that other control silently does nothing and needs a
+  // second tap to register - confirmed live via Playwright (a tap on one
+  // row's aisle-edit affordance while a different field's editor was still
+  // open never opened the new editor at all on the first tap).
+  //
+  // Deferring the commit to a fresh task (a plain setTimeout) lets the
+  // CURRENT click finish dispatching first, against the still-intact
+  // original DOM, before anything gets rebuilt. The `pending === editingField`
+  // guard handles the other ordering: if that same click's own handler
+  // already opened/committed a different editor in the meantime (see
+  // openEditor()'s own explicit commit-existing-editor-first logic),
+  // `editingField` will have moved on by the time this fires, and this
+  // deferred call correctly no-ops rather than wrongly re-committing (or
+  // prematurely closing) whatever is open now.
   listRoot.addEventListener('focusout', function (e) {
     var role = e.target.dataset && e.target.dataset.role;
     if (role === 'note-input' || role === 'aisle-input') {
-      commitEditor();
+      var pending = editingField;
+      setTimeout(function () {
+        if (editingField === pending) commitEditor();
+      }, 0);
     }
   });
 

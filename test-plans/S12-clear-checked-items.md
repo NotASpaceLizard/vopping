@@ -7,13 +7,14 @@ which also newly verifies the toast text/pluralization that the original pass di
 Citation of record: `c:\tmp\pw-test\vopping-tests-tester-s1-s6-s12-formal.js` (original),
 `vopping-tests-tester-s1-s2-s5-density-formal.js` (re-confirmation).
 
-**Story:** As a user, I want to clear all checked items off my list in one tap, so that I can
-quickly reset for a new shopping trip without deleting each checked item one at a time.
+**Story:** As a user, I want to clear all crossed-off items off my list in one tap, so that I can
+quickly reset for a new shopping trip without deleting each crossed-off item one at a time.
 
-**Acceptance criteria (verbatim, BACKLOG.md, locked 2026-09-04):** page-level "Clear checked
-items" control removes every currently-checked item in one action; unchecked items completely
-unaffected (content and position); zero-checked is a no-op (disabled or silent no-op, either
-acceptable); no confirmation dialog (undo is the safety net, mirrors S3's precedent); undo-eligible
+**Acceptance criteria (verbatim, BACKLOG.md, locked 2026-09-04):** page-level "Clear crossed-off
+items" control removes every currently-crossed-off item in one action; items that aren't crossed
+off are completely unaffected (content and position); zero-crossed-off is a no-op (disabled or
+silent no-op, either acceptable); no confirmation dialog (undo is the safety net, mirrors S3's
+precedent); undo-eligible
 as ONE atomic action — clearing N and pressing Undo restores all N at once to exact prior position
 AND checked state — **flagged at testability-check time as not independently verifiable until S6
 shipped; S6 now exists, verified directly below**; does NOT change S10's historical frequency
