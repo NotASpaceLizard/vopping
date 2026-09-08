@@ -721,6 +721,21 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   Review" — now that S13/S14 are both Locked, the Tracked follow-up #2 gate
   is waiting on implementation + Tester-verification next, not any further
   doc-side decisions.
+- **Disclosed implementation side-effect, 2026-09-08 (Developer, not hidden;
+  for the record, not urgent):** while implementing S14, Developer found S5's
+  Up/Down buttons share S14's targeted `.icon-btn` CSS class and weren't
+  named in S14's AC (drafted assuming S13 — which removes Up/Down entirely —
+  would land first; the two shipped in the other order in practice). Rather
+  than splitting a separate CSS class just to hold Up/Down at the old size
+  for what's expected to be only a few days until S13 ships and deletes them
+  outright, Developer let them shrink too as a side effect, flagged via an
+  inline CSS comment. **Scrum-master's call: document, don't gate** — purely
+  cosmetic, purely temporary, zero functional change, moot the moment S13
+  ships; added a short cross-referenced note on both S5's (Done) and S14's
+  (Locked) rows rather than treating it as an AC gap or reopening either
+  story — textbook disclosed-scope-creep handling per the playbook's
+  Developer-role guidance, not a case that needed a new gate. All edits
+  grep-verified as single physical GFM lines; BACKLOG.md still 18 rows.
 
 ## Parked / unscheduled
 
