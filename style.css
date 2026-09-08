@@ -235,6 +235,20 @@ button:disabled {
   border-color: #6b3d3d;
 }
 
+/* S16 (Locked, 2026-09-08): PO's icon pick (U+2691 ⚑) was specifically
+   because it's a plain monochrome, text-colorable dingbat, so it can
+   inherit the aisle-tag's own accent color rather than looking like a
+   mismatched colored sticker sitting next to it. Scoped to the
+   `aisle-sort-icon` class only - applied in script.js's renderRow() ONLY
+   while sorted By Aisle (see `aisleSortCompact`) - deliberately NOT
+   touching S8's separate, still-neutral "Add aisle" empty-state icon shown
+   in Manual/Alphabetical mode, which keeps its ordinary muted-gray
+   .icon-btn color unchanged. */
+.items .icon-btn.aisle-sort-icon {
+  color: var(--accent);
+  border-color: #2e5a7a;
+}
+
 /* S7/S8: second-line note/aisle content - LOCKED AC (see script.js's
    renderRow()/openEditor() comments). A row with a non-empty note and/or
    aisle (or either editor currently open) may grow to a second line to fit

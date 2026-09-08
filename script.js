@@ -526,16 +526,18 @@
   var AISLE_STARTER_LIST = ['Produce', 'Dairy', 'Meat/Seafood', 'Bakery', 'Frozen', 'Pantry', 'Beverages', 'Household', 'Other'];
 
   // S16 (Locked, 2026-09-08): glyph for the new icon-only "edit aisle"
-  // affordance shown while sorted By Aisle (see renderRow()). PLACEHOLDER,
-  // NOT FINAL - the PO wants to hand-pick this glyph themselves ("we
-  // probably need to make a change to the aisle button too. i'll try to
-  // find an icon to use," 2026-09-08), same as S15's still-open edit-icon
-  // pick. Reusing S8's existing empty-state aisle glyph here since it's the
-  // closest already-in-use option, per Orchestrator's direct instruction -
-  // deliberately centralized to this ONE constant (rather than inlined at
-  // each of renderRow()'s two use sites below) so swapping in the PO's real
-  // choice later is a one-line change, not a find-and-replace.
-  var AISLE_EDIT_ICON_GLYPH = '▤';
+  // affordance shown while sorted By Aisle (see renderRow()). FINAL, PO's
+  // pick from s16-aisle-icon-picker.html's candidate comparison, 2026-09-08:
+  // U+2691 BLACK FLAG - chosen specifically because it's a plain monochrome,
+  // text-colorable dingbat (not a colored emoji), so it can inherit the
+  // aisle-tag's own accent color instead of looking like a mismatched
+  // colored sticker (see the `.aisle-sort-icon` color rule in style.css,
+  // scoped narrowly to this icon's aisle-sort-mode rendering specifically -
+  // deliberately NOT applied to S8's separate, still-neutral "Add aisle"
+  // empty-state icon in Manual/Alphabetical mode, to avoid an unintended
+  // side effect there). Still centralized to this one constant so any
+  // future swap stays a one-line change.
+  var AISLE_EDIT_ICON_GLYPH = '⚑';
 
   // Locked AC, 2026-09-04 (Scrum Master, resolving Tester's testability-check
   // question): the datalist pool is NOT just the static starter list - it
@@ -707,8 +709,18 @@
     // empty if Unassigned), via the exact same 'aisle-toggle' role/handler
     // S8 already wires up - no new click-handling code needed.
     var aisleSortCompact = sortMode === 'aisle' && !isEditingAisle;
+    // Disclosed addition beyond the literal glyph swap (2026-09-08): the PO's
+    // own reasoning for picking this glyph was specifically about color -
+    // "it can inherit the aisle-tag's existing text color instead of
+    // looking like a mismatched colored sticker." That's only true if this
+    // icon actually GETS that color treatment, which nothing did before this
+    // - `aisle-sort-icon` is a class added ONLY in the aisleSortCompact
+    // branch (not S8's separate, still-neutral empty-state "Add aisle" icon
+    // in Manual/Alphabetical mode below), so the accent-color rule in
+    // style.css stays scoped to exactly the context the PO was reasoning
+    // about, without recoloring the unrelated pre-existing icon.
     var aisleAffordance = (!isEditingAisle && (aisleSortCompact || !aisleVal))
-      ? '<button type="button" class="icon-btn" data-role="aisle-toggle" title="' + (aisleVal ? 'Edit aisle' : 'Add aisle') + '">' + AISLE_EDIT_ICON_GLYPH + '</button>'
+      ? '<button type="button" class="icon-btn' + (aisleSortCompact ? ' aisle-sort-icon' : '') + '" data-role="aisle-toggle" title="' + (aisleVal ? 'Edit aisle' : 'Add aisle') + '">' + AISLE_EDIT_ICON_GLYPH + '</button>'
       : '';
 
     var upBtn = '';
