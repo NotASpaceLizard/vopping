@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grocery List — S16 Aisle-Edit Icon Picker</title>
+<style>
+  * , *::before, *::after { box-sizing: border-box; }
+  :root {
+    --bg-page: #1a1a1a;
+    --bg-card: #2a2a2a;
+    --border: #555;
+    --text: #ddd;
+    --text-muted: #999;
+    --accent: #4da6ff;
+  }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg-page);
+    color: var(--text);
+    max-width: 40rem;
+    margin: 0 auto;
+    padding: 1.25rem 1rem 4rem;
+    line-height: 1.45;
+  }
+  h1 { color: var(--accent); font-size: 1.3rem; margin: 0 0 0.25rem; }
+  h2 { font-size: 1rem; margin: 0; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+  .intro, .note { color: var(--text-muted); font-size: 0.88rem; }
+  .intro { margin-bottom: 1.1rem; }
+  code { background: var(--bg-card); padding: 0.05rem 0.3rem; border-radius: 4px; font-size: 0.85em; }
+  .section {
+    border: 1px solid #444; border-radius: 10px; padding: 0.9rem 1rem 1rem;
+    margin-bottom: 1.4rem; background: #222;
+  }
+  .section.mine { border-color: #3a6b4a; }
+  .meta-line { font-size: 0.8rem; color: var(--text-muted); margin: 0.2rem 0 0.7rem; }
+  .status-pill {
+    font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.03em;
+    padding: 0.12rem 0.45rem; border-radius: 4px; font-weight: 700;
+  }
+  .status-pill.ok { background: #1f4a2e; color: #7fd6a4; }
+  .status-pill.tofu { background: #5a1f1f; color: #f0a0a0; }
+  .status-pill.mine-tag { background: #1f3a4a; color: #7fc4e6; }
+  .status-pill.caveat { background: #4a3a1f; color: #f0cf7f; }
+
+  /* ---- Real row markup/styling, byte-for-byte from style.css - not an
+     approximation. Only the aisle-edit icon's glyph/rotation varies per
+     section below; everything else (row structure, note-toggle, delete,
+     the worst-case two-field row) is the real thing. ---- */
+  .items { list-style: none; margin: 0; padding: 0; }
+  .items li {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem;
+    padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--bg-card);
+    cursor: pointer; user-select: none;
+  }
+  .items li:last-child { border-bottom: none; }
+  .items .item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .icon-btn {
+    flex-shrink: 0; width: 19.5px; height: 19.5px; min-width: 19.5px;
+    border: 1px solid var(--border); border-radius: 4px; background: transparent;
+    color: var(--text-muted); font-size: 0.6rem; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center; padding: 0; cursor: pointer;
+  }
+  .icon-btn.delete-btn { color: #e08080; border-color: #6b3d3d; }
+  .icon-btn.aisle-edit-candidate { color: var(--accent); border-color: #2e5a7a; font-size: 0.75rem; }
+  .row-meta { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.15rem; }
+  .note-display { flex-shrink: 1; min-width: 0; max-width: 100%; overflow-wrap: break-word;
+    border: none; background: transparent; font: inherit; font-size: 0.78rem; color: var(--text-muted);
+    padding: 0.1rem 0.2rem; cursor: default; text-align: left; border-bottom: 1px dashed var(--border); }
+</style>
+</head>
+<body>
+
+<h1>Grocery List — S16 Aisle-Edit Icon Picker</h1>
+<p class="intro">
+  S16's icon-only "edit aisle" affordance (shown per row while sorted By Aisle) currently uses a
+  placeholder glyph (▤, reused from S8's empty-state icon). You gave 6 candidates by Unicode
+  codepoint - each one below is rendered via <code>String.fromCodePoint(N)</code> directly in the
+  ACTUAL row context S16 places it in (real markup/CSS from style.css, including S14's shrunk icon
+  size and a worst-case note+aisle row) - not floating on a blank background, since size/legibility
+  at real scale is what actually matters for a small icon-btn.
+</p>
+<p class="intro">
+  Each section also reports an automated check: every candidate character is rendered to an
+  offscreen canvas and compared, pixel-for-pixel, against a guaranteed-unassigned codepoint
+  (U+10FFFD - a Private-Use-Area code point no real font maps to anything) rendered the same way. A
+  match means <em>this test browser</em> is very likely showing a "tofu" placeholder box instead of
+  a real glyph for that candidate - not a guess, an actual rendered-pixel comparison. This is about
+  THIS machine's installed fonts specifically though - flagged results are exactly the ones most
+  worth double-checking directly on your phone, since obscure codepoints can be font-dependent.
+</p>
+
+<div id="root"></div>
+
+<script>
+  var candidates = [
+    { cp: 10204, hex: '27DC', nameGuess: 'LEFT MULTIMAP (best-effort name, verify codepoint itself as the authoritative id)', rotate: 90, poNote: 'PO: "rotated 90°, should then read as an upright pin"', mine: false },
+    { cp: 10207, hex: '27DF', nameGuess: 'UP TACK WITH CIRCLE ABOVE (best-effort name)', rotate: 0, poNote: 'PO: "similar vibe to the above, no rotation needed"', mine: false },
+    { cp: 9784, hex: '2638', nameGuess: 'WHEEL OF DHARMA (best-effort name)', rotate: 0, poNote: 'PO: "looks like a ship\'s helm, implies steering/navigation"', mine: false },
+    { cp: 11216, hex: '2BD0', nameGuess: 'UNCERTAINTY SIGN (best-effort name)', rotate: 0, poNote: 'PO: "looks like a targeting/reticle symbol"', mine: false },
+    { cp: 119228, hex: '1D1BC', nameGuess: 'MUSICAL SYMBOL COMBINING FLAG-2 (best-effort name)', rotate: 180, poNote: 'PO: "rotated 180°, looks like a location pin"', mine: false, combiningCaveat: true },
+    { cp: 127988, hex: '1F3F4', nameGuess: 'WAVING BLACK FLAG (best-effort name)', rotate: 0, poNote: 'PO: "a flag, implying location"', mine: false },
+    { cp: 128205, hex: '1F4CD', nameGuess: 'ROUND PUSHPIN (best-effort name)', rotate: 0, poNote: 'Developer suggestion: the single most universally-recognized "location" glyph, extremely well-supported everywhere.', mine: true },
+    { cp: 9873, hex: '2691', nameGuess: 'BLACK FLAG (best-effort name)', rotate: 0, poNote: 'Developer suggestion: a plain monochrome dingbat (not a colored emoji) - matches the app\'s existing icon weight (✎ ✕ ▲ ▼) better than an emoji flag would.', mine: true }
+  ];
+
+  function isLikelyTofu(ch) {
+    var referenceChar = String.fromCodePoint(0x10FFFD); // guaranteed-unassigned Private Use Area codepoint
+    var fonts = ['system-ui', 'sans-serif', 'monospace'];
+    function render(c, font) {
+      var canvas = document.createElement('canvas');
+      canvas.width = 48; canvas.height = 48;
+      var ctx = canvas.getContext('2d');
+      ctx.font = '32px ' + font;
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = '#000';
+      ctx.clearRect(0, 0, 48, 48);
+      ctx.fillText(c, 2, 2);
+      return canvas.toDataURL();
+    }
+    for (var i = 0; i < fonts.length; i++) {
+      if (render(ch, fonts[i]) === render(referenceChar, fonts[i])) return true;
+    }
+    return false;
+  }
+
+  function rowsHtml(glyph, rotateDeg) {
+    var iconStyle = rotateDeg ? ' style="transform: rotate(' + rotateDeg + 'deg);"' : '';
+    var icon = '<button type="button" class="icon-btn aisle-edit-candidate" title="Edit aisle"' + iconStyle + '>' + glyph + '</button>';
+    return '<ul class="items">' +
+      '<li><span class="item-name">Milk (1 gal)</span>' + icon + '<button type="button" class="icon-btn delete-btn">✕</button></li>' +
+      '<li><span class="item-name">Bread</span>' + icon + '<button type="button" class="icon-btn delete-btn">✕</button></li>' +
+      '<li><span class="item-name">Greek yogurt</span>' + icon + '<button type="button" class="icon-btn delete-btn">✕</button>' +
+        '<div class="row-meta"><button type="button" class="note-display">plain, full-fat</button></div></li>' +
+      '</ul>';
+  }
+
+  var root = document.getElementById('root');
+  candidates.forEach(function (c) {
+    var glyph = String.fromCodePoint(c.cp);
+    var tofu = isLikelyTofu(glyph);
+
+    var section = document.createElement('div');
+    section.className = 'section' + (c.mine ? ' mine' : '');
+
+    var header = document.createElement('h2');
+    header.innerHTML = 'U+' + c.hex + ' (decimal ' + c.cp + ')' +
+      (c.mine ? ' <span class="status-pill mine-tag">Developer suggestion</span>' : '') +
+      (tofu ? ' <span class="status-pill tofu">Possible tofu in this browser</span>' : ' <span class="status-pill ok">Renders as a real glyph here</span>') +
+      (c.combiningCaveat ? ' <span class="status-pill caveat">Combining character - see note</span>' : '');
+    section.appendChild(header);
+
+    var meta = document.createElement('p');
+    meta.className = 'meta-line';
+    meta.innerHTML = c.nameGuess + (c.rotate ? ' — rotated ' + c.rotate + '° via CSS transform' : ' — no rotation') + '<br>' + c.poNote;
+    section.appendChild(meta);
+
+    if (c.combiningCaveat) {
+      var caveat = document.createElement('p');
+      caveat.className = 'meta-line';
+      caveat.style.color = '#f0cf7f';
+      caveat.textContent = 'Separate from the tofu check above: U+1D1BC is a Unicode COMBINING character (a musical "flag" mark meant to attach to a preceding note stem), not designed to stand alone. Whatever shape you see rendered here is this browser\'s fallback treatment of an isolated combining mark, not necessarily what a font intends it to look like standalone - worth extra scrutiny on the actual phone even beyond the tofu check.';
+      section.appendChild(caveat);
+    }
+
+    section.insertAdjacentHTML('beforeend', rowsHtml(glyph, c.rotate));
+    root.appendChild(section);
+  });
+</script>
+
+<p class="intro" style="margin-top:0.5rem;">
+  Tell me the codepoint (and rotation, if any) you want and I'll swap it into S16's
+  <code>AISLE_EDIT_ICON_GLYPH</code> constant as the real, final glyph.
+</p>
+
+</body>
+</html>
