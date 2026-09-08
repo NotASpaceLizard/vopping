@@ -186,16 +186,37 @@ button:disabled {
   white-space: nowrap;
 }
 
+/* S14 (Locked, 2026-09-08): uniform ~25% size reduction on the row's
+   nested icon/button controls (note-toggle, aisle-toggle, delete, and any
+   future icon-btn-classed control - S16's new aisle-edit icon and S13's
+   eventual drag-handle both automatically inherit this via the shared
+   class, satisfying S16's own cross-reference note (M14) for free). Does
+   NOT touch item-name/note-display/aisle-tag text sizing - those are
+   separate rules, untouched here, per the AC's own scope limit.
+   26px * 0.75 = 19.5px, deliberately exact rather than rounded - this is
+   BELOW the 24px WCAG-AA-informational reference floor Tester's earlier
+   check used, which the PO explicitly accepted as a known tradeoff ("if
+   it's a problem, we can adjust again later") rather than a violation to
+   keep re-flagging - see S14's own BACKLOG.md row.
+   Disclosed judgment call: S5's Up/Down buttons share this exact class with
+   no separate size rule of their own, and S14's locked AC doesn't name them
+   (drafted assuming S13 - which removes them entirely - would land first;
+   it hasn't yet). Splitting them into a separate class just to hold them at
+   26px for the few days until S13 ships and deletes them outright would be
+   throwaway scaffolding solely to satisfy a technicality, so they shrink
+   too as a side effect of this shared-class change - consistent with this
+   story's own "avoid resizing twice" rationale for its S13 sequencing,
+   just reached via the reverse implementation order. */
 .items .icon-btn {
   flex-shrink: 0;
-  width: 26px;
-  height: 26px;
-  min-width: 26px;
+  width: 19.5px;
+  height: 19.5px;
+  min-width: 19.5px;
   border: 1px solid var(--border);
   border-radius: 4px;
   background: transparent;
   color: var(--text-muted);
-  font-size: 0.8rem;
+  font-size: 0.6rem;
   line-height: 1;
   display: inline-flex;
   align-items: center;
@@ -288,6 +309,48 @@ button:disabled {
    S8's AC as written). */
 .aisle-tag {
   color: var(--accent);
+}
+
+/* S17 (Locked, 2026-09-08): more visual distinction for By-Aisle sort's
+   group-header rows (script.js's renderList(), `.aisle-group-header`),
+   versus item rows. Plain spacing/weight/size/letter-spacing treatment,
+   deliberately no color-coding PER AISLE (every header gets this same
+   single accent color regardless of which aisle it is, same reasoning
+   already applied to .aisle-tag above) - the AC explicitly allows a
+   non-color treatment to fully satisfy this story, so this doesn't need an
+   Okabe-Ito pass. Uppercase + letter-spacing + bold + a background band +
+   an accent underline are the distinguishing cues; `:first-child` zeroes
+   the top margin so the very first group in the list doesn't open with an
+   odd gap above it. */
+.items li.aisle-group-header {
+  margin-top: 0.6rem;
+  padding: 0.4rem 0.5rem 0.3rem;
+  background: var(--bg-card);
+  border-bottom: 2px solid var(--accent);
+  font-weight: 700;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+
+.items li.aisle-group-header:first-child {
+  margin-top: 0;
+}
+
+/* Developer sanity-check finding, folded into S17 (2026-09-08): a group
+   header is not itself a clickable/tappable row (script.js's click handler
+   already no-ops on it - it carries no `data-id`), but it inherits
+   `.items li`'s row-tap `cursor: pointer` and `:active` tap-highlight above
+   just by being an `<li>` in the same list, which visually implies it's
+   interactive when it isn't. Explicit override, decoupled from whatever the
+   resting background happens to be (rather than relying on it coincidentally
+   matching `:active`'s background, which would silently break if either
+   value changes later). */
+.items li.aisle-group-header,
+.items li.aisle-group-header:active {
+  cursor: default;
+  background: var(--bg-card);
 }
 
 /* S3: brief delete-moment toast (QA finding R2, PO Option A) - reuses the

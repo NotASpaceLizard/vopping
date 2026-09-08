@@ -403,6 +403,324 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   + QA gate before any can Lock; S15 additionally needs its decision-tool
   mockup before its AC can lock at all. None of this blocks Sprint 2's
   in-flight Tester formal pass or the PO's S7/S8 review.
+- **Sprint 2 Tester formal pass landed, 2026-09-08 (same day, continued):**
+  154/154 assertions passed (74 Sprint-1 regression re-confirmed + 80 new: 23
+  for S7, 18 for S8, 18 for S9, 21 for S10), zero defects, zero console errors
+  — see REGRESSION_LOG.md's new canonical row, script
+  `vopping-tests-tester-s7-s10-formal.js`. All 4 Sprint-2 test-plan files now
+  STATUS: DONE. This also closed two standing forward-reference hedges that
+  predated this pass: S8's "Unassigned for S9's grouping" clause (verified via
+  TC9.1-17) and S12's "does not touch S10's counter" clause (verified via
+  TC10.5, which also satisfies S12's own deferred cross-reference to S10) —
+  both updated directly in BACKLOG.md rather than left dangling now that the
+  dependency they were hedging against actually exists and passed.
+  **S9, S10 → Done** — this is exactly the independent-formal-pass citation I
+  said last session I was waiting for before flipping their Status past "In
+  Review"; it's now landed, so both flip. **S7, S8 stay "In Review," not
+  Done — scrum-master's call on the crowded-row gate:** their own functional
+  AC is equally fully verified by this same 154/154 pass (23+18 of the total),
+  so the gate isn't about outstanding bugs. The question was whether the PO's
+  response to the crowded-row review (confirmed real, gave 6 remediation
+  stories — S13-S18) counts as *resolving* Tracked follow-up #2, or whether the
+  gate stays open until the remediation (S13/S14) actually ships. Decided the
+  latter, on the gate's own precedent: M3 (this project's near-identical
+  earlier density gate) explicitly held that "the pick landing... is not by
+  itself sufficient closure... must actually happen and be Tester-verified" —
+  a remediation *decision* is the PO-review half of this gate, not the
+  fix-shipped half, and the PO's actual answer was "no, doesn't hold up,
+  here's the fix," not "yes, fine as-is." Retargeted Tracked follow-up #2's
+  closure condition directly in BACKLOG.md (S13/S14 ship + Tester re-verifies)
+  rather than leaving the old "PO reviews" language sitting there answered but
+  still gating nothing clearly. Also folded Developer's `f9f097d` two-bug fix
+  detail into S7/S8's own citations for the permanent record.
+- **Developer's S13-S17 sanity-check landed, 2026-09-08 (same day, continued):**
+  Five real findings, split cleanly by who owns the resolution. **Not mine —
+  routed to the PO directly via console by the Orchestrator, tracked here in
+  BACKLOG.md/QUESTIONS.md for the paper trail only:** S13's auto-scroll-on-drag
+  question (does dragging off-screen scroll the list); S14's certainty (not a
+  maybe) that a 25% button shrink breaches the story's own 24px tap-target
+  floor (26px × 0.75 ≈ 19.5px) — PO needs to say whether that's acceptable or
+  wants a smaller number. Added a Blocking-table row in QUESTIONS.md for each,
+  matching this project's established pattern of always logging a PO-facing
+  question there even when the Orchestrator routes it directly. **Mine —
+  resolved directly, no PO input needed:** S15 had two real gaps — (a) item-
+  text edits now explicitly do NOT touch S10's frequency counter in either
+  direction (same arm's-length treatment as note/aisle edits, extended
+  symmetrically from S12's existing never-decrements rule, closes the exact
+  "zucchini"/"2 zucchini" fragmentation risk Developer flagged); (b) editing an
+  item's text while a non-Manual sort is active now explicitly re-renders it at
+  its newly-correct position immediately, same M2 precedent S9 already needed
+  for adds. S16 needed a line distinguishing the passive aisle-tag suppression
+  from S8's active editor, which must keep working in every sort mode per S9's
+  existing guarantee — folded in directly. S17 had no AC gap but got a free
+  related fix folded in as an explicit requirement: group headers must not
+  inherit item-rows' tap-cursor/active-state styling since headers aren't
+  themselves clickable. Declined to fold in Developer's recommended
+  implementation approach for S15 (reusing the existing `editingField`/
+  `openEditor`/`commitEditor` note/aisle-editor infrastructure rather than a
+  parallel build) — that's an implementation-plan choice, not an AC matter,
+  same treatment this project has always given Developer's technical-approach
+  findings. Noted Developer's `s15-edit-gesture-picker.html` (pushed, live on
+  Pages, sent to the PO by the Orchestrator) directly on S15's own row so the
+  artifact is traceable from BACKLOG.md, not just from chat. All edits
+  grep-verified as single physical GFM lines; BACKLOG.md still 18 rows.
+- **Carryover:** S13/S14 blocked on PO answers (QUESTIONS.md Blocking table);
+  S15 blocked on the PO's edit-gesture/icon pick from
+  `s15-edit-gesture-picker.html`; S16/S17 have nothing outstanding and are
+  ready for Tester's testability-check whenever there's bandwidth; S7/S8 stay
+  "In Review" until S13/S14 ship and are Tester-verified to have resolved the
+  crowding.
+- **PO answered all three, 2026-09-08 (same day, continued):** folded directly
+  into BACKLOG.md, closed the corresponding QUESTIONS.md Blocking rows.
+  **S13:** auto-scroll during drag is required, not optional — PO's own words,
+  "the grocery lists can sometimes be quite long, so that level of complexity
+  is unfortunately important." Added as a real AC requirement (auto-scroll
+  near a viewport edge while dragging, continues while held there; exact
+  trigger-zone/speed left as Developer-level tuning). **S14:** PO is fine with
+  sub-24px controls — "if it's a problem, we can adjust again later or figure
+  out a different strategy." Reframed the AC's guardrail language from a
+  flag-back-if-breached check to an explicitly accepted tradeoff with a
+  stated escape hatch (revisit only if it's a real problem in practice), per
+  the coordinator's recommendation and the PO's own framing — not silently
+  dropping the floor-check language, reframing it. **S15:** PO picked the
+  dedicated-edit-icon gesture (the decision tool's "Option 3") over
+  double-tap/long-press, reasoning it's consistent with already using a
+  button for delete, and confirmed ~20 characters of row space remain even
+  pre-S14-shrink with 4 buttons present ("longer text is what notes are for").
+  Locked the GESTURE mechanism into S15's AC. **Did not lock the specific icon
+  pairing** — Option 3 offered 3 icon pairings and the PO didn't name one
+  explicitly; the Orchestrator inferred the tool's "recommended" pairing as
+  the implicit pick and asked me to flag back if I saw real ambiguity here.
+  Decided yes: this project's own established rule is to never guess twice on
+  a subjective visual pick the PO hasn't explicitly confirmed (playbook §7) —
+  "recommended by the tool" isn't the same as "PO confirmed," unlike S17's
+  explicit "I'm not picky." Flagged directly on S15's own row recommending one
+  quick explicit confirm-or-correct on the icon pairing specifically before
+  treating it as final; the gesture decision itself is not held up by this.
+  **Process pushback (mine, not silently complying):** the coordinator's
+  message framed these three as "once locked, clear for Developer to
+  implement," but per this project's own doc pipeline (every other story,
+  zero exceptions so far) locking still requires Tester's testability-check
+  and QA's per-story gate, neither of which have run yet on S13/S14/S15 — PO
+  answering the open content questions closes the AC-content gap, it doesn't
+  substitute for those two steps. Left Status as "Not Started" on all three
+  (consistent with this project's own precedent — the Status column has never
+  flipped to "Locked" before Tester+QA both clear a story, going all the way
+  back to Sprint 1's S1-S6). Recommending Tester's testability-check next, not
+  a straight handoff to Developer. **Also preserved a new, explicitly
+  not-yet-scoped PO idea** (auto-detect notes vs. list items during
+  paste-to-ingest) as a dated note on S11's parked row — S4/S11 territory,
+  no AC, no priority, just retrievable for whenever ingestion work resumes.
+  All edits grep-verified as single physical GFM lines; BACKLOG.md still 18
+  rows.
+- **Carryover:** S13/S14 AC-content-complete, need Tester testability-check +
+  QA gate before Lock. S15 AC-content-complete on the gesture mechanism, needs
+  the icon-pairing confirm-or-correct plus the same Tester/QA steps before
+  Lock. S16/S17 unchanged, still ready for Tester's testability-check. S7/S8
+  still "In Review" pending S13/S14 shipping.
+- **Tester's testability-check on S13-S17 landed, 2026-09-08 (same day,
+  continued):** **S14, S17 clean** — sent straight to QA's per-story gate,
+  noted directly on both rows. **S13, S15, S16 had real gaps, all resolved
+  directly here (no PO input needed for any of them — narrow technical-shape
+  decisions, same category as e.g. S1's storage-shape or S6's buffer-shape
+  calls):** **S13** — three gaps: (1) locked a deterministic drop-position
+  rule (live placeholder tracks hover position relative to the hovered row's
+  midpoint; release commits wherever the placeholder sits); (2) locked a
+  jitter-tolerance rule distinguishing an ordinary scroll from a real pickup
+  attempt during the delay window (movement beyond a small tolerance cancels
+  the pickup, timer doesn't resume, restarts fresh); (3) locked a
+  drop-outside-bounds rule (clamps to the nearest valid boundary position,
+  never a silent no-op, still undo-recoverable). Also folded in Tester's two
+  non-blocking items as real requirements: Pointer-Events-based (not
+  touch-only, so Playwright can test it), and drag-pickup on one row commits
+  an in-progress note/aisle draft open on another row (same guarantee S7/S8
+  already needed two bugfixes for, now explicitly extended to cover this
+  story's gesture too). **S15** — three gaps: (1) left implementation
+  approach (reuse S7/S8's shared editor infrastructure vs. a separate build)
+  as Developer's choice, but explicitly locked the two testable behavioral
+  guarantees that must hold either way (draft survives an unrelated re-render;
+  opening any other editor or a drag-pickup elsewhere commits it) so Tester
+  has a real target regardless of which approach Developer takes; (2) locked
+  the same already-tested mutual-exclusivity rule from S7/S8 (only one editor
+  open per row at a time) to now include the new name editor as a third type;
+  (3) locked that post-edit rendering stays single-line/ellipsis-truncated per
+  the existing locked density spec, unchanged by this story — only the
+  live-editing input itself shows full text. Tester also independently
+  re-flagged the icon-pairing-needs-PO-confirm point from my last pass — not
+  new, just confirms it's real, noted as such on the row. **S16** — a genuine
+  self-contradiction, not just a gap: the per-row aisle tag is currently the
+  ONLY tap-to-edit affordance once an aisle is set (no separate icon exists,
+  unlike S7's note field), so suppressing it in By-Aisle mode would remove the
+  only way back into its own editor — directly contradicting the "editor
+  keeps working in every sort mode" guarantee already on this row. **Adopted
+  Tester's own candidate fix, scoped narrowly to By-Aisle mode only:** render
+  a minimal icon-only "edit aisle" affordance in place of the suppressed text
+  tag, opening the same editor pre-filled with the real value; every other
+  sort mode is completely unchanged. Noted that being icon-only rather than
+  full text, this should also reinforce the story's own space-saving goal
+  rather than just patch the contradiction. All edits grep-verified as single
+  physical GFM lines; BACKLOG.md still 18 rows.
+- **Carryover:** S13/S15/S16 go back to Tester to confirm the gaps above are
+  now resolved and finish the testability pass, per the coordinator's
+  instruction; S15 additionally still needs the PO's icon-pairing
+  confirm-or-correct before it can fully lock. S14/S17 are at QA's gate now.
+  S7/S8 still "In Review" pending S13/S14 shipping and Tester-verifying the
+  crowding is resolved.
+- **QA gate landed clean on S14/S17, 2026-09-08 (same day, continued) — both
+  → Locked:** zero Real/Minor findings on either. One cheap Nitpick on S14
+  (clarify note/aisle tag chrome — background/border/padding, distinct from
+  text size which was already excluded — is likewise out of scope for the
+  button shrink; moot today since neither tag has fixed chrome yet, but worth
+  stating explicitly before a future styling pass could get misread as in
+  scope) — folded in directly, no PO input needed. S17 had nothing further.
+  Both have now cleared the full pre-implementation pipeline (scrum-master
+  sanity-check → Developer sanity-check → Tester testability-check → QA gate)
+  with zero remaining open findings — **locked both in BACKLOG.md**, clear for
+  Developer to implement. QA also independently verified `density-picker.html`
+  already covers both worst-case row axes (empty-field icon-crowding AND
+  populated-field second-line growth) — confirming the PO's original
+  crowded-row review wasn't working from an incomplete mockup; recorded on the
+  top-of-file Tracked follow-up #2 note as supporting evidence, no action
+  needed. **S13/S15/S16 are with QA's gate now, separately** — Tester's
+  re-check already confirmed all three of my testability-check fixes hold up
+  to deterministic testing (per the coordinator), so those three are one step
+  further along the same pipeline, just not through QA yet. Updated the
+  top-of-file Priority Queue summary to reflect current per-story pipeline
+  position. All edits grep-verified as single physical GFM lines; BACKLOG.md
+  still 18 rows.
+- **Carryover:** S14/S17 Locked, ready for Developer implementation whenever
+  picked up. S13/S15/S16 awaiting QA's gate; S15 also still needs the PO's
+  icon-pairing pick. S7/S8 still "In Review" pending S13/S14 shipping.
+- **QA gate on S13/S15/S16 landed, 2026-09-08 (same day, continued):** **S16
+  clean** — two cheap Minors, both folded in directly (no PO input needed):
+  M13 (Unassigned items in By-Aisle mode use the SAME new icon-only "edit
+  aisle" affordance as populated items, not S8's separate empty-state icon —
+  one consistent icon for the column, not two different ones depending on
+  row state) and M14 (S16's new icon is itself a nested control, so it's in
+  scope for S14's shrink — added as a dated cross-reference note on S14's
+  already-Locked row, additive clarification not a reopening). **S16 →
+  Locked.** **S13** — one Real finding (R9): Pointer Events' `pointercancel`
+  (drag interrupted by something outside the user's control) had zero stated
+  behavior. Accepted QA's own recommendation directly — same technical-
+  edge-case category as the drop-position/jitter/out-of-bounds rules already
+  resolved this session, not a product question: cancel aborts the drag,
+  item returns to its original position, nothing committed, no undo entry —
+  consistent with the no-surprise-mutations guardrail. Folded in; ready for
+  QA to re-confirm. **S15** — one Real finding (R10), and this one IS a
+  genuine product question, not decided directly: the story's own headline
+  example (renaming "zucchini" to "2 zucchini") can make the old name
+  resurface as a stale S10 suggestion chip — not a bug in either story
+  individually, an interaction between two independently-correct pieces of
+  logic. Declined to resolve this myself — the "fix it properly" option
+  reopens the exact counter-identity/fragmentation complexity I already
+  deliberately kept out of S15's scope, and how much a low-stakes but
+  real-world-visible quirk like this matters is a judgment call the PO has
+  weighed in on before for comparable questions (S2's auto-move-on-check,
+  S10's original signal/threshold). Added a QUESTIONS.md Blocking entry with
+  two concrete options (accept as low-stakes/self-correcting, my own lean
+  given the cost/benefit; or invest in real counter-identity tracking across
+  a rename) rather than an open-ended ask. Noted directly on S15's row.
+  Neither R9 nor R10 blocks Developer's already-locked S14/S16/S17 work. All
+  edits grep-verified as single physical GFM lines; BACKLOG.md still 18 rows.
+- **Carryover:** S14/S16/S17 Locked, ready for Developer. S13 needs QA to
+  re-confirm R9's fix. S15 needs the PO on both the icon-pairing pick and
+  R10's resolution, plus Tester/QA re-passes once those land. S7/S8 still
+  "In Review" pending S13/S14 shipping.
+- **PO answered R10 + volunteered a new icon-pick task, 2026-09-08 (same day,
+  continued):** **R10 (S15):** PO picked Option A outright — "i like the
+  first option." Accepted the rename/stale-suggestion quirk as-is, no extra
+  logic. Closed the QUESTIONS.md row and folded "known, accepted, low-stakes
+  behavior, not a bug to flag later" directly into S15's AC — this is exactly
+  the paper-trail discipline this project has always used for a PO-confirmed
+  working behavior, so nobody rediscovers this as a "bug" months from now.
+  Caught and fixed a duplicate sentence my own edit introduced on S15's row
+  (an existing "Tester re-flagged the icon-pairing point" note got restated a
+  second time) — removed the redundant copy immediately, single canonical
+  occurrence now. **New, unprompted PO item:** the PO also said, unprompted,
+  "we probably need to make a change to the aisle button too. i'll try to
+  find an icon to use" — they want to hand-pick S16's new icon-only
+  edit-aisle glyph themselves, same as they're doing for S15's edit icon.
+  Orchestrator has already told Developer to implement S16 functionally now
+  with a placeholder glyph and swap later — not a Lock- or implementation
+  blocker. Added a tracked, non-blocking note directly on S16's
+  already-Locked row (same "don't let a real commitment silently evaporate"
+  pattern used throughout this project) so the provisional icon isn't a
+  surprise and the swap doesn't get forgotten.
+- **QA re-confirmed S13's R9 fix, plus 4 more Minors surfaced, 2026-09-08
+  (same day, continued):** R9 (`pointercancel`) confirmed fully resolved —
+  aborts cleanly, no partial commit, no undo entry, exactly as specced. Same
+  gate pass flagged 4 previously-unaddressed Minors from earlier passes
+  (M9: same-row drag-vs-open-editor conflict never addressed; M10: ambiguous
+  whether the jitter/delay rule still applies if Developer uses a dedicated
+  drag-handle instead of whole-row press; M11: no no-op rule for a drop back
+  at the exact original position; M12: no scroll-suppression rule during an
+  *active* drag, only during pickup-arming) — QA explicitly left it as my
+  conscious call whether to fold these in now or track as non-blocking
+  follow-ups. **Decided: fold all four in now**, not defer — same technical-
+  shape category as R9 and the earlier testability-check gaps, each cheap
+  (one or two sentences), and this project's playbook explicitly warns that
+  deferred items risk silently evaporating rather than actually getting
+  picked up later. Resolved directly: (M9) an already-open editor on a row
+  captures a press-and-hold as ordinary text-input interaction, not a drag
+  attempt — the editor must be committed/closed first via the existing
+  auto-commit rule. (M10) the jitter/delay gate applies identically to
+  whichever drag-surface Developer picks (whole-row or a dedicated handle) —
+  no instant-pickup shortcut for a handle. (M11) a same-position drop is a
+  no-op, no undo entry created. (M12) normal touch-scrolling is suppressed
+  for the duration of an active drag (distinct from the arming-delay window,
+  where jitter-triggered scroll-cancel already applies) — only the
+  already-specified auto-scroll-near-edge mechanic scrolls the list while a
+  drag is live, avoiding a fight between the two. All four folded directly
+  into S13's AC; now needs QA to re-confirm before Lock. All edits
+  grep-verified as single physical GFM lines; BACKLOG.md still 18 rows.
+- **Carryover:** S13 needs QA's re-confirmation of M9-M12 before Lock. S15
+  needs the PO's icon-pairing pick, then Tester/QA re-passes, before Lock.
+  S16 (Locked) has a non-blocking tracked icon-swap pending from the PO.
+  S14/S17 unchanged, ready for Developer. S7/S8 still "In Review" pending
+  S13/S14 shipping.
+- **QA re-confirmed M9/M10/M12, surfaced one more finding (M15), 2026-09-08
+  (same day, continued):** M9/M10/M12 confirmed clean. M11 (same-position
+  drop is a no-op) is correct in isolation but a real, reachable case
+  collides with it: nudging the top item just above the list and releasing
+  lands at the nearest boundary (position 0) — which is also that item's own
+  original spot — so M11's "no-op" and the drop-outside-bounds rule's
+  "commits, never a no-op" both apply at once with nothing saying which
+  wins. Low-stakes (list order is identical either way; only affects whether
+  a bookkeeping undo entry gets created), but QA correctly flagged it needed
+  one tie-break sentence before Lock rather than being left ambiguous. **QA's
+  recommendation: M11's no-op wins. Agreed and folded in directly** — the
+  reasoning holds up on inspection, not just deference to QA: letting the
+  boundary rule "commit" in this exact-same-position case would create a
+  spurious undo-buffer entry for a net-zero move, which would silently
+  clobber whatever undo-eligible action was already pending before the drag
+  — precisely the surprise-mutation class this project's own guardrail
+  exists to prevent. The boundary rule's original "never a silent no-op"
+  intent is unaffected by this tie-break: that rule was about not silently
+  ignoring an out-of-bounds drag attempt, not about forcing an undo entry
+  when the visible outcome is provably unchanged either way. Folded the
+  tie-break directly into S13's AC next to M11; still needs QA to re-confirm
+  M15 specifically before this AC can Lock. All edits grep-verified as
+  single physical GFM lines; BACKLOG.md still 18 rows.
+- **Carryover:** S13 needs QA's re-confirmation of M15's tie-break before
+  Lock (M9/M10/M12 already clean). Everything else unchanged from the prior
+  entry's Carryover.
+- **S13 → Locked, 2026-09-08 (same day, continued):** QA's final Lock-gate
+  re-read found zero new contradictions across all 6 iterative rounds of
+  fixes this story went through (drop-position/jitter/out-of-bounds rules,
+  the auto-scroll requirement, `pointercancel` (R9), M9-M12, and M15's
+  tie-break) — no objection to Locking. **S13 → Locked.** This closes out
+  Sprint 3's doc pipeline for S13/S14/S16/S17 — all four are now Locked and
+  clear for Developer implementation; **S15 is the only Sprint 3 story not
+  yet Locked**, blocked solely on the PO's still-outstanding icon-pairing
+  pick (R10 already resolved). Updated the top-of-file Priority Queue
+  summary to reflect this. All edits grep-verified as single physical GFM
+  lines; BACKLOG.md still 18 rows.
+- **Carryover:** S13/S14/S16/S17 Locked, ready for Developer (S16 carries a
+  non-blocking tracked icon-swap pending from the PO). S15 blocked only on
+  the PO's icon-pairing pick, then Tester/QA re-passes. S7/S8 still "In
+  Review" — now that S13/S14 are both Locked, the Tracked follow-up #2 gate
+  is waiting on implementation + Tester-verification next, not any further
+  doc-side decisions.
 
 ## Parked / unscheduled
 

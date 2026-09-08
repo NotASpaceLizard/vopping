@@ -446,3 +446,422 @@ gap, not a functional one) rather than reported as live risks. Recommend Tester'
 formal pass specifically exercise R7's worst-case row (note + aisle both populated, mid-list item)
 on a real or emulated narrow phone viewport, and R8's reorder-flips-tie-break-casing scenario,
 since both are now concretely reproducible rather than theoretical.
+
+---
+
+## Per-story gate — 2026-09-08 (S13-S17 remediation batch, gating S14 and S17 specifically)
+
+**Trigger:** per-story gate, per Orchestrator's request — S14 (shrink row-control buttons ~25%,
+sub-24px accepted as a tradeoff) and S17 (more visually distinct aisle-group headers + fix the
+cursor-styling bug on non-clickable header rows) both cleared Tester's testability-check clean,
+about to go to Scrum Master for AC lock. First review of either story's AC. (S13/S15/S16 excluded
+from this pass per Orchestrator's explicit instruction — still being resolved with Scrum Master,
+will come separately.)
+
+**Scope:** BACKLOG.md's S14 and S17 rows, cross-checked against the current live implementation
+(`script.js`, `style.css`, `density-picker.html`) the same way Sweep 2 did, not read in isolation —
+both stories touch elements sweep 2's R7 already put under a magnifying glass, so the working code
+and the already-revised decision-tool artifact were directly relevant evidence, not just the AC
+prose.
+
+**Good news up front:** while checking S14, I went in suspecting a real gap — that the PO's
+crowded-row review (which produced S13-S18) might have been shown only the "note+aisle both
+populated" two-line row as the demonstrated "worst case," when the row with *neither* field set is
+actually worse for primary-line icon crowding (the note-toggle/aisle-toggle icons only render while
+that field is empty — `!noteVal`/`!aisleVal` in `renderRow()` — so they *vanish* once populated,
+meaning an empty-fields row can show 5 primary-line icon-btns where a both-populated row only shows
+3 plus a second line). Checked `density-picker.html` directly rather than assuming: it was already
+revised 2026-09-08 (tied to sweep 2's own R7) to include sample rows with *both* fields empty
+(Eggs/Bananas/Coffee) alongside rows with one field and rows with both — so the PO's actual review
+already covered both worst-case axes (horizontal crowding AND vertical height), not just one. No
+finding needed here — flagging only so nobody re-derives this same worry from scratch later.
+
+---
+
+### REAL
+
+None for either story.
+
+---
+
+### MINOR
+
+None for either story.
+
+---
+
+### NITPICK
+
+**N6 (S14).** The AC's exclusion clause ("does NOT affect item-name/note/aisle-tag text size")
+protects font-size specifically, but S14's inclusion list (note-toggle, aisle-toggle, delete,
+S13's drag-handle) names the *empty-state* icon affordances by their `data-role` — it never
+explicitly says whether the *populated-state* `.note-display`/`.aisle-tag` buttons' own chrome
+(padding, dashed-underline border) is in scope for the 25% reduction too, since those are a
+different element from the toggle icons and aren't literally named either way. Checked
+`style.css` directly: `.note-display`/`.aisle-tag` already have no fixed width/height, no
+border, no background (`border: none; background: transparent`) — just a small padding tied to
+font size and a dashed underline — so there isn't really comparable "chrome" there to shrink, and
+the ambiguity is close to moot in practice given the current design. Worth one explicit sentence
+in the AC anyway (e.g. "does not apply to `.note-display`/`.aisle-tag`'s own padding/underline,
+which aren't chrome-sized controls in the same sense") purely so Tester's S14 test-plan has
+something explicit to check off rather than inferring it from CSS that could change.
+
+---
+
+### Confirmed sound (reviewed, no gap found)
+
+- **S14's scope list maps cleanly 1:1 onto the current `.icon-btn` class** (note-toggle,
+  aisle-toggle-as-empty-affordance, delete-btn, future drag-handle) — no other per-row element
+  needs guessing about.
+- **S14's sub-24px tap-target tradeoff is a clean, explicit, PO-owned, revisit-only-if-real-problem
+  decision** — already fully closed in QUESTIONS.md's Blocking table, nothing left ambiguous.
+  Confirmed this doesn't contradict the *whole-row* tap target's own 24px+ guarantee (S1/S2) —
+  that's a separate, unaffected element; only the nested icon-btns shrink.
+- **S17's self-flagged cursor/active-state bug is real and accurately scoped.** Confirmed directly
+  in code: the `aisle-group-header` `<li>` (script.js, `renderList()`) is a plain sibling `<li>`
+  inside the same `<ul class="items">` as item rows, with no `data-id` attribute — so it already
+  correctly falls through the click handler's `closest('li[data-id]')` guard (no functional
+  cross-off risk, purely visual) but *does* inherit `.items li`'s `cursor: pointer` and
+  `.items li:active` background from the existing item-row CSS, since nothing distinguishes it
+  today. The proposed fix (exclude the header class from those two rules) is exactly right and
+  fully closes the bug with no collateral effect on real item rows.
+- **S17's empty-state paragraph (`<p class="empty-state">`) was checked for the same
+  cursor-inheritance risk** — it's not affected; it renders outside `.items` entirely, not as a
+  sibling `<li>`, so none of `.items li`'s rules apply to it regardless of what S17 does.
+- **S17's "PO explicitly not picky, no decision-tool needed" carve-out is consistent** with the
+  playbook's §7 rule (never guess twice on a *color* accessibility complaint) — this is a
+  typography/spacing delegation, not a colorblind-palette guess, and the AC still correctly
+  requires Okabe-Ito *if* color-coding is added, so the one case where guessing would be
+  inappropriate is still gated properly.
+
+---
+
+### Verdict
+
+Both S14 and S17 clear this gate — **no Real, no Minor findings for either.** Recommend Scrum
+Master proceed to lock both as drafted. N6 (S14) is a one-sentence clarity suggestion, cheap to
+fold in before lock but not a blocker if Scrum Master judges the current CSS already makes it
+moot.
+
+---
+
+## Per-story gate — 2026-09-08 (S13, S15, S16)
+
+**Trigger:** per-story gate, per Orchestrator's request — Tester's testability-check on S13
+(drag-and-drop reorder), S15 (in-place item-text editing), and S16 (suppress per-row aisle tag
+under By-Aisle sort) is done and clean; all three of Scrum Master's fixes (S13's drop-position/
+jitter/out-of-bounds rules; S15's implementation-agnostic editor guarantees; S16's icon-only
+By-Aisle edit affordance) hold up to deterministic testing. First review of any of the three.
+(S14/S17 already gated separately, above.)
+
+**Scope:** BACKLOG.md's S13/S15/S16 rows as currently written, including every fix folded in from
+Developer's sanity-check and Tester's testability-check. None of the three has shipped code yet
+(all "Not Started"), so unlike the S7-S10/S14/S17 gates this is a pure AC-text review, same
+methodology as sweep 1 — hunting for cross-story interactions and edge cases that a
+single-story-at-a-time testability-check pass isn't necessarily scoped to catch.
+
+---
+
+### REAL
+
+**R9 (S13). Pointer Events' `pointercancel` — a gesture interrupted by something other than a
+normal release (OS-level gesture takeover, app backgrounding, an incoming call, browser chrome
+stealing the touch) — has no stated behavior anywhere in S13's AC.** Tester's testability-check
+already nailed down deterministic rules for three release-path scenarios (drop-position rule,
+jitter-cancels-during-pickup, drop-outside-scrollable-bounds) — all of which assume the gesture
+ends in an ordinary `pointerup`. `pointercancel` is a distinct, first-class Pointer Events case
+(exactly why the AC mandates Pointer Events over touch-only listeners in the first place, partly
+*for* deterministic testability) that any real implementation must handle *somehow*, and nothing
+says whether a cancelled gesture aborts the drag (safe default: item stays at its pre-drag
+position, nothing committed) or falls through to whatever the drop-position rule computed at the
+moment of cancellation. Given this project's explicit, repeatedly-invoked "no surprise mutations"
+guardrail (S2's no-auto-move decision, S9's non-destructive-sort guarantee), an interrupted drag
+silently committing a partial reposition would be exactly that kind of surprise. Recommend Scrum
+Master add one line: `pointercancel` aborts the drag, item returns to its original position,
+nothing is written to localStorage or the undo buffer — before lock, so Tester has something
+deterministic to assert (`fire pointercancel mid-drag, confirm order is unchanged`).
+
+**R10 (S15). Editing an item's name can make a still-relevant item invisible to S10's
+"currently present" suggestion filter, causing the PRE-edit name to resurface as a suggestion chip
+even though the user still has that exact item on their list — reproducible using the story's own
+headline example.** S15's AC is explicit and correct that editing text must NOT touch S10's
+counter in either direction (avoiding the fragmentation risk of "zucchini"/"2 zucchini" becoming
+two counter entries) — but it never considers the *other* place S10 reads live-list membership:
+the "not currently present anywhere in the live list" filter that suppresses a suggestion chip for
+a name already on the list (case-insensitive/trimmed exact-ish match). Walk the story's own
+example: user has "Zucchini" on the list (historical count already at/above threshold from past
+trips), edits it in place to "2 Zucchini" per this story's exact intended use case. The item is
+still functionally the same grocery item, still on the list — but it no longer matches the string
+"Zucchini," so S10's presence-filter no longer suppresses that suggestion, and "Zucchini" can pop
+up as a "what am I missing?" chip while the user is looking straight at "2 Zucchini" already
+checked into their cart. Not a data-corruption bug — nothing breaks — but it's a real, non-obvious,
+concretely-reachable "no human wants this" moment, exactly the class of gap this role exists to
+catch before it ships (playbook's own quantity-rows example is the same shape: two independently
+correct pieces of logic combining into user-visible nonsense). Flagging as a product question, not
+prescribing the fix — plausible options range from "accept it, S10 already has no dismiss/snooze
+mechanic and this is a rare/low-stakes annoyance" to "suppress a suggestion whenever ANY edit
+history links it to a still-present item," the latter being real added complexity for a corner
+case. Recommend routing to the PO via Orchestrator rather than deciding directly, given it touches
+S10's already-PO-reviewed suggestion semantics.
+
+---
+
+### MINOR
+
+**M9 (S13 + S15, same underlying gap, both stories' text).** Both stories carefully state what
+happens when a conflicting action starts on a *different* row (S13: "starting a drag-pickup on one
+row must commit... an in-progress note/aisle draft still open on a different row"; S15: mutual
+exclusivity is stated for "same-row or cross-row") — but neither explicitly covers initiating a
+drag-pickup (S13) on the very row whose own note/aisle/name editor is *already open on that same
+row*. Is a press-and-hold on the row's non-editor area (e.g. the item name, while that row's own
+aisle editor is open below it) even a valid drag-pickup surface while an editor is open on the same
+row? If so, does starting that drag implicitly commit the same row's own in-progress editor first
+(consistent with the cross-row guarantee), or could a row end up being dragged around the list with
+an uncommitted draft that then needs to survive the drag's own re-renders — the same
+draft-survives-re-render guarantee already required elsewhere, just never connected to this
+specific combination? Cheap to state explicitly before either story locks.
+
+**M10 (S13).** The AC's press-and-hold/delay/jitter-tolerance language reads as if the whole row
+is the drag-pickup surface (the delay is measured against "tapping the row's other nested
+controls," and a quick tap below threshold "still performs the existing whole-row cross-off
+toggle") — but a separate sentence frames "whole row vs. a dedicated handle icon" as an open
+Developer-level choice. If Developer picks the handle-icon route, does the delay/jitter mechanism
+move to apply only to presses starting on that handle (meaning presses elsewhere on the row, no
+matter how long held, never arm a drag), and what — if anything — does a quick tap directly on the
+handle icon do? The AC's stated guarantees are written for one branch of this choice and never
+re-stated for the other.
+
+**M11 (S13).** No stated behavior for a drag dropped back at its exact original position (zero net
+order change). This project has an established, repeated precedent for genuine no-ops not touching
+the undo buffer or triggering a write (S1's empty/whitespace add, S12's zero-crossed-off clear) —
+worth one line confirming a same-position drop follows the same precedent rather than pushing a
+trivial no-op reorder onto S6's single undo slot (which would then clobber whatever *real* action
+was previously undoable, for a drag that changed nothing).
+
+**M12 (S13).** The AC carefully specifies that touch movement beyond the jitter tolerance *during*
+the pickup delay cancels the pickup and falls through to ordinary scrolling — but says nothing
+about suppressing native/passive scrolling once a drag is already armed and active, so it doesn't
+fight the separately-mandated auto-scroll-near-edge mechanic. Same class of drag-vs-scroll conflict
+the AC already reasoned through carefully for the arming phase, left unaddressed for the
+active-drag phase — worth a one-line explicit statement (e.g. native scroll is suppressed for the
+duration of an active drag; only the controlled auto-scroll mechanic moves the list) so this isn't
+left to accidental implementation.
+
+**M13 (S16).** The resolution text ("tapping it opens the same aisle editor, pre-filled with the
+item's real current value (or empty, if Unassigned), exactly as if the full tag had been tapped")
+reads as if the new icon-only affordance applies uniformly to every item under By-Aisle sort,
+including Unassigned ones — but Unassigned items never had the "full text tag" this story is
+suppressing/replacing in the first place; they already show S8's pre-existing empty-state
+aisle-toggle icon, untouched by this story's stated scope (suppressing the *populated* tag).
+Probably functionally equivalent either way (tapping opens the editor correctly regardless), but
+it's genuinely ambiguous whether Unassigned rows under By-Aisle sort keep using S8's existing icon
+unchanged, or get folded into this story's new element as if they were the same thing — worth
+picking one reading explicitly so Tester's test-plan has a single unambiguous target.
+
+**M14 (S14 × S16 cross-reference).** S16 introduces a brand-new per-row icon (the By-Aisle-mode
+replacement for the suppressed aisle tag, per M13 above) *after* S14 already locked its own
+enumerated shrink-target list (note-toggle, aisle-toggle, delete, S13's drag-handle) — S14's list
+predates this icon's existence and doesn't mention it. Since S14 is already gated (see above) and
+awaiting lock, worth a one-line cross-reference in either story stating whether this new icon
+should ship at S14's already-shrunk size or the original size, so it doesn't quietly fall through
+the crack between two stories that were drafted in sequence but not re-synced against each other.
+
+---
+
+### NITPICK
+
+None beyond what M9-M14 already cover at Minor severity — no additional trivial findings surfaced
+for this batch.
+
+---
+
+### Confirmed sound (reviewed, no gap found)
+
+- **S13's supersession of S5 is clean** — data model unchanged, only the UI/interaction mechanism
+  swaps, consistent with S9's own forward-reference note already anticipating this.
+- **S13's three Tester-resolved gaps (drop-position rule, jitter tolerance, out-of-bounds drop) are
+  each genuinely deterministic as written** — no ambiguity found in any of the three beyond the
+  `pointercancel` gap (R9) which sits outside all three's scope, not a flaw in any of them.
+- **S15's frequency-counter arm's-length treatment (does not touch S10's counter in either
+  direction) is correctly reasoned and consistent** with S12's existing "counter never decrements on
+  removal" precedent — the gap found (R10) is a *different* S10 interaction (live-presence
+  filtering), not a flaw in this specific guarantee.
+- **S15's truncation/ellipsis clause is unambiguous and consistent** with S1/S2's locked
+  single-line row spec — no tension found with S7's note-wrapping precedent, since S15 explicitly
+  and correctly distinguishes the two.
+- **S16's "note unaffected, row height still content-driven" clause is consistent** with S7/S8's
+  existing row-growth rules — no interaction found between this story's aisle-tag suppression and
+  note-driven row growth.
+- **All three stories' undo-eligibility/non-eligibility calls are consistent** with the top-of-file
+  Undo scope note's 2026-09-08 extension (S13 reorder remains undo-eligible; S15 working default
+  NOT undo-eligible; S16 has no data mutation of its own) — no drift found between that note and
+  each story's own row.
+- **S15's icon-pairing-needs-PO-confirmation gap and its undo-eligibility open question are already
+  flagged, tracked, and correctly marked as pre-lock blockers by Scrum Master/Tester** — not
+  re-flagging either as a new QA finding, just confirming both are real and already caught, so the
+  Orchestrator doesn't read their absence above as something I missed.
+
+---
+
+### Verdict
+
+**S13 and S15 each carry one Real finding (R9, R10) worth PO/Orchestrator attention before final
+lock** — neither blocks Developer's/Tester's other work in the meantime, same non-blocking carve-out
+this project has used for every prior PO-input-needed finding. **S16 has no Real findings**, only
+two Minor documentation-clarity items (M13, M14) cheap to fold in before lock. M9-M12 apply to
+S13/S15 and are all cheap, narrow AC clarifications, not blockers. Recommend Scrum Master fold in
+M9-M14 directly (no PO input needed for any of them), and route R9 and R10 to the PO via
+Orchestrator alongside S13's/S15's other already-pending confirmations.
+
+---
+
+## Re-confirmation — 2026-09-08 (S13, R9 fix)
+
+**Trigger:** Orchestrator relayed that Scrum Master accepted R9's recommendation directly and
+folded it into S13's AC; asked me to re-confirm S13 against the updated AC so it can move to
+Locked.
+
+**R9 — confirmed fully resolved.** BACKLOG.md's S13 row now reads: "a Pointer Events
+`pointercancel` (the drag interrupted by something outside the user's control — OS-level gesture
+takeover, app backgrounding, etc. — not a normal release) aborts the drag entirely: the item
+returns to its original position, nothing is committed, no undo entry is created... a
+`pointercancel` is never treated as an implicit drop." This is exactly the deterministic rule R9
+asked for — safe default (abort, not partial-commit), explicit about both the position and the
+undo-buffer side, and directly Tester-testable as written (fire `pointercancel` mid-drag, assert
+order unchanged and no new undo entry). No residual gap in this specific fix.
+
+**Scope check on the rest of the row, since "ready to Lock" is a whole-AC question, not just an
+R9 question:** only R9 was folded in. My own **M9-M12** (same per-story gate, same dated section
+above) are all still exactly as they were — none have been folded into S13's current text:
+- **M9** (same-row drag-pickup vs. that row's own open editor — never addressed, only cross-row is)
+- **M10** (whole-row-press vs. dedicated-handle-icon ambiguity in the delay/jitter language)
+- **M11** (no stated no-op rule for a drop back at the exact original position)
+- **M12** (no stated native-scroll suppression during an *active* drag, only during pickup-arming)
+
+None of these are blockers on their own merits — consistent with my original verdict, they're all
+cheap, narrow, no-PO-input-needed clarifications, the same category R9 itself was before Scrum
+Master resolved it directly. **Not withholding a recommendation to Lock over them** — that decision
+is Scrum Master's, not mine to make unilaterally (per this role's own charter, advisory only) — but
+flagging plainly so Locking-with-M9-M12-still-open is a conscious choice, not a silent gap: either
+fold them in now (fastest, matches how R9 itself just got handled), or Lock now and track them as
+explicit non-blocking follow-ups the way this project already does for several other stories'
+open items (e.g. QUESTIONS.md's non-blocking table). Recommend the latter only if Scrum Master
+judges the Sprint 3 timeline benefits from not re-looping; either path is defensible.
+
+**Verdict:** R9 — the specific ask — is fully and correctly resolved. Whether S13 as a *whole* is
+ready for Lock now depends on whether Scrum Master wants M9-M12 folded in first or tracked as
+open follow-ups; no new Real findings surfaced in this re-check.
+
+---
+
+## Re-confirmation — 2026-09-08 (S13, M9-M12 folded in)
+
+**Trigger:** Orchestrator relayed that Scrum Master decided to fold all four Minors (M9-M12) in
+now rather than defer, and asked me to re-confirm against the updated AC so S13 can move to
+Locked.
+
+**M10 — fully resolved, clean.** "Whichever Developer-level surface choice is made... the same
+press-and-hold-with-jitter-tolerance gate applies to that specific surface before a pickup
+begins — a dedicated handle does not get an instant-pickup-on-first-touch shortcut." Directly
+closes the ambiguity; no surface-dependent special-casing left. (One trivial loose end: what a
+quick tap *on* a dedicated handle does, if Developer adds one, is still unstated — but the
+obvious/only sensible answer given everything else already specified is "nothing," since a handle
+has no other defined action and nested controls already only ever perform their own action. Not
+worth blocking Lock over — flagging only so it's a documented non-issue, not a silent one.)
+
+**M11 — fully resolved on its own terms, clean rule, but see below for an interaction it exposes.**
+"if a drag ends with the item released back at its exact original position (no net change), this
+is a no-op — no undo-buffer entry is created." Correct, consistent with the project's established
+no-op precedent (S1 empty add, S12 empty clear).
+
+**M12 — fully resolved, clean, and correctly cross-referenced.** "the only scrolling that happens
+during an active drag is the auto-scroll-near-viewport-edge mechanic... suppression ends the
+instant the drag ends (drop, cancel, or `pointercancel`)" — explicitly ties back to R9's
+`pointercancel` fix by name, good internal consistency between the two.
+
+**M9 — substantively resolved; the rule itself is clear, though its stated justification is
+narrower than the rule.** The operative sentence is unconditional and testable: "a row with its
+own note/aisle/name editor currently open cannot be drag-picked-up... its editor must first be
+committed/closed." That's the real rule and it's fine. The parenthetical reasoning offered
+("captured by the open editor's input field as ordinary text-input interaction") only literally
+holds for a press landing exactly on the editor's `<input>` — it doesn't, as literally worded,
+explain a press-and-hold elsewhere on that same row (e.g. the item name, while a *different*
+element on that row has the open editor) the way the rule's own unconditional framing implies it
+should cover. Read as a whole, I'm confident the *rule* (row-with-open-editor is fully
+drag-ineligible, not just its input field) is the intended and stated policy — this is a wording
+precision nitpick on the justification clause, not a gap in the rule. Not blocking.
+
+**New finding surfaced by M11's addition — genuine tension with the pre-existing drop-outside-
+bounds rule, worth a one-line tie-break before Lock.**
+
+**M15.** M11 ("dropped back at the exact original position = no-op, no undo entry") and the
+earlier, already-locked rule (3) ("Drop released outside the list's own scrollable bounds...
+commits to the nearest valid boundary position... **never a silent no-op or cancel**") now
+directly overlap for one easily-reachable case: pick up the *first* item, drag the pointer slightly
+upward past the list's top boundary (e.g. over the header — rule (3)'s own example), and release.
+Nearest valid boundary = top of list = position 0 = that item's own original position. Rule (3)
+says this must commit and is "never a silent no-op." M11 says a same-position result *is* a no-op.
+Both conditions are true simultaneously here, and the AC doesn't say which rule wins. Not contrived
+— "pick up the first/last item, nudge toward the edge, let go" is an entirely ordinary gesture, not
+an edge case a shopper would rarely hit. Low-stakes either way (the visible list order is identical
+under both readings — this is purely a question of whether a bookkeeping undo-buffer entry gets
+created for an action that changed nothing, which only matters for whatever the *next* undo press
+would otherwise have reversed), but it is a real, now-textual self-contradiction in the locked-
+pending AC, the same "genuine self-contradiction, not just a gap" category Tester's own S16 finding
+was treated as needing a real fix, not just a note. Recommend: M11's no-op rule takes precedence
+whenever the two conditions coincide (i.e., "never a silent no-op" in rule (3) is about not
+*ignoring* an out-of-bounds release — making sure it still resolves to a real, deliberate boundary
+position rather than being treated as a cancel — not about forcing an undo-entry when that
+resolved position happens to match the original) — but this is Scrum Master's call to make
+explicit, not mine to resolve unilaterally.
+
+**Verdict:** M9, M10, M12 confirmed fully resolved and clean (M9/M10 each carry one non-blocking
+wording nitpick, noted above for completeness, not as a reason to hold Lock). M11 is correct and
+well-specified in isolation but its addition surfaces a genuine, previously-latent conflict with
+the pre-existing out-of-bounds rule (M15, new) that should get one explicit tie-break sentence
+before this AC locks — otherwise Tester has no way to know which of two contradictory stated rules
+to assert for the boundary-item-released-near-edge case. Recommend Scrum Master add that one line
+(no PO input needed, same category as everything else folded in on this pass), then S13 should be
+clean for Lock.
+
+---
+
+## Final re-confirmation — 2026-09-08 (S13, M15 tie-break folded in — Lock check)
+
+**Trigger:** Orchestrator relayed that Scrum Master adopted the M15 recommendation as-is (M11's
+no-op explicitly wins over the boundary-commit rule when both coincide) and asked for one final
+pass so S13 can move to Locked.
+
+**M15 — confirmed fully resolved, and well-justified.** The folded-in text doesn't just declare a
+winner, it correctly reconciles *why* there's no real conflict of intent: "the boundary rule's own
+'never a silent no-op' intent is unaffected, since it was about not silently ignoring an
+out-of-bounds drag attempt, not about forcing an undo entry when the visible outcome is provably
+unchanged." That's the right read, and it closes the loop cleanly — Tester now has one unambiguous
+rule to assert for the boundary-item-near-edge case instead of two contradictory ones.
+
+**Whole-AC coherence check, since this is the Lock gate, not just a single-finding re-check:**
+re-read S13 top to bottom with all five rounds of fixes now layered in (original draft → Tester's
+3 testability gaps → R9 → M9-M12 → M15) and traced every rule against every other rule for new
+interactions, not just the two most recently touched:
+- `pointercancel` (R9) vs. the boundary-commit rule: no conflict — R9's "never treated as an
+  implicit drop" already unconditionally preempts the boundary rule for cancelled gestures; no
+  M15-style tie-break was needed there, and re-checking confirms it still isn't.
+- M9 (row-with-open-editor not drag-eligible) vs. the cross-row commit rule: compatible, operate
+  at different layers (eligibility-to-attempt vs. what happens on a *different* row) — no overlap.
+- M12 (scroll suppression) vs. auto-scroll-near-edge, and vs. M15's boundary/no-op tie-break: "drop"
+  (which ends suppression) covers both outcomes of the M15 branch uniformly — no gap.
+- M15 itself only had one real overlap to resolve (rule (3), out-of-bounds) — confirmed the
+  *ordinary* in-bounds same-position drop (drag it around, put it back exactly where it started,
+  release normally) was never actually in tension with anything, since rule (3)'s competing
+  "never a silent no-op" language only ever applied to the out-of-bounds case. M15's scope is
+  exactly as narrow as it needs to be, nothing left dangling.
+
+**Outstanding items, for the record, not for blocking:** the two wording-only nitpicks noted in
+the previous re-confirmation (M9's justification text being narrower than its own rule; M10's
+unstated-but-obvious "quick tap on a dedicated handle does nothing" case) remain exactly as
+described — neither is a functional gap, both were already explicitly called non-blocking, and
+re-reading them fresh in light of everything since folded in doesn't change that assessment.
+
+**Verdict: S13 is clean.** R9, M9, M10, M11, M12, and M15 are all correctly and fully resolved,
+no new contradictions found on this full re-read, and the two remaining nitpicks are cosmetic only.
+No objection to moving S13 to Locked.

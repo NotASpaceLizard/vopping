@@ -525,6 +525,18 @@
   // AC - exact wording freely adjustable, not a product requirement).
   var AISLE_STARTER_LIST = ['Produce', 'Dairy', 'Meat/Seafood', 'Bakery', 'Frozen', 'Pantry', 'Beverages', 'Household', 'Other'];
 
+  // S16 (Locked, 2026-09-08): glyph for the new icon-only "edit aisle"
+  // affordance shown while sorted By Aisle (see renderRow()). PLACEHOLDER,
+  // NOT FINAL - the PO wants to hand-pick this glyph themselves ("we
+  // probably need to make a change to the aisle button too. i'll try to
+  // find an icon to use," 2026-09-08), same as S15's still-open edit-icon
+  // pick. Reusing S8's existing empty-state aisle glyph here since it's the
+  // closest already-in-use option, per Orchestrator's direct instruction -
+  // deliberately centralized to this ONE constant (rather than inlined at
+  // each of renderRow()'s two use sites below) so swapping in the PO's real
+  // choice later is a one-line change, not a find-and-replace.
+  var AISLE_EDIT_ICON_GLYPH = '▤';
+
   // Locked AC, 2026-09-04 (Scrum Master, resolving Tester's testability-check
   // question): the datalist pool is NOT just the static starter list - it
   // also includes every distinct free-typed aisle value currently used
@@ -680,8 +692,23 @@
     var noteAffordance = (!noteVal && !isEditingNote)
       ? '<button type="button" class="icon-btn" data-role="note-toggle" title="Add note">✎</button>'
       : '';
-    var aisleAffordance = (!aisleVal && !isEditingAisle)
-      ? '<button type="button" class="icon-btn" data-role="aisle-toggle" title="Add aisle">▤</button>'
+
+    // S16 (Locked, 2026-09-08): while sorted By Aisle specifically, the
+    // passive full-text aisle tag on the second line is suppressed (the
+    // group header already conveys the aisle - see renderList()) and
+    // replaced by this SAME icon-only affordance regardless of whether the
+    // item already has a value or is Unassigned (QA finding M13 - one
+    // consistent icon for the whole column in this mode, not two different
+    // icons depending on each row's state). Scoped to non-editing display
+    // only (Developer sanity-check finding) - `isEditingAisle` always wins
+    // below and renders the real editor input exactly as in every other
+    // sort mode, completely unaffected by sortMode; tapping this icon opens
+    // that same editor pre-filled with the item's real current value (or
+    // empty if Unassigned), via the exact same 'aisle-toggle' role/handler
+    // S8 already wires up - no new click-handling code needed.
+    var aisleSortCompact = sortMode === 'aisle' && !isEditingAisle;
+    var aisleAffordance = (!isEditingAisle && (aisleSortCompact || !aisleVal))
+      ? '<button type="button" class="icon-btn" data-role="aisle-toggle" title="' + (aisleVal ? 'Edit aisle' : 'Add aisle') + '">' + AISLE_EDIT_ICON_GLYPH + '</button>'
       : '';
 
     var upBtn = '';
@@ -700,8 +727,20 @@
     // within the wrapping flex row rather than sitting beside the controls.
     // A row with neither stays exactly as tall as S1/S2's locked single-
     // line spec - this div simply isn't rendered at all in that case.
+    //
+    // S16: the aisle tag specifically is suppressed here while
+    // `aisleSortCompact` (sorted By Aisle, not currently editing) - it moved
+    // to the icon-only affordance on the primary line above instead. The
+    // outer "does this row need a second line at all" check below must
+    // account for that suppression too, not just check the raw `aisleVal`
+    // flag - otherwise a row with an aisle but no note would still open an
+    // empty `<div class="row-meta">` while sorted By Aisle (content-less but
+    // still occupying a sliver of vertical space via its own margin),
+    // exactly the second-line growth this story exists to avoid.
+    var showsNoteLine = isEditingNote || noteVal;
+    var showsAisleLine = isEditingAisle || (aisleVal && !aisleSortCompact);
     var secondLine = '';
-    if (isEditingNote || noteVal || isEditingAisle || aisleVal) {
+    if (showsNoteLine || showsAisleLine) {
       secondLine += '<div class="row-meta">';
       if (isEditingNote) {
         secondLine += '<input type="text" class="row-meta-input" data-role="note-input" placeholder="Note…" value="' + escapeHtml(editingField.draft) + '">';
@@ -710,7 +749,7 @@
       }
       if (isEditingAisle) {
         secondLine += '<input type="text" class="row-meta-input" list="aisle-options" data-role="aisle-input" placeholder="Aisle…" value="' + escapeHtml(editingField.draft) + '">';
-      } else if (aisleVal) {
+      } else if (aisleVal && !aisleSortCompact) {
         secondLine += '<button type="button" class="aisle-tag" data-role="aisle-toggle" title="Edit aisle">' + escapeHtml(aisleVal) + '</button>';
       }
       secondLine += '</div>';
