@@ -1331,6 +1331,68 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   the live file before being re-raised — cheaper than propagating a stale
   concern through several updates. The console-sync flag (S15 → Done, S19/S20 →
   Locked) stands, still the Orchestrator's.
+- **S19 + S20 → Done; SPRINT 3 COMPLETE (milestone), 2026-09-09 (same day,
+  relayed by Orchestrator):** Tester's independent formal pass on both landed —
+  **222/222, zero defects**, the new canonical regression baseline. **The
+  246→222 count drop is BY DESIGN, not a regression:** the drag-era `s1-s13`
+  suite was retired (its removed-drag test cases no longer apply once drag is
+  gone) and S9's TC9.8/TC9.9 were rewritten back to gate on Up/Down button
+  visibility — the mirror image of the retrofit that happened S5→S13, expected
+  and pre-noted. **The authoritative 6-icon worst-case row (both fields empty:
+  note-toggle + aisle-toggle + S15 edit + Up + Down + delete) FITS CLEANLY at
+  all four target widths (320/360/375/390px) — zero overflow, no wrapping** —
+  which both satisfies S19 finding (a)'s verification requirement AND discharges
+  the deferred S7/S8 crowded-row closure re-measurement I'd softened earlier.
+  That loop is now fully closed against real shipped code, not inference —
+  updated the top-of-file Gate CLOSED addendum and both S7/S8 row tags to mark
+  it discharged.
+  - **QA post-implementation adversarial review — considered, deliberately NOT
+    made a Done gate (my judgment, coordinator concurred):** S13 got a mandatory
+    post-impl code trace because it was a novel, complex drag interaction (and
+    that trace earned its keep — it caught C1). S19 is the opposite: a revert to
+    S5's already-proven synchronous Up/Down mechanism, which QA already confirmed
+    pre-lock structurally ELIMINATES the C1/R13 class (no cross-render DOM
+    reference; cross-row commit inherited via `focusout`); and S14/S15/S16/S17
+    all reached Done on Tester's formal pass alone with no mandatory post-impl QA.
+    So Done is not gated on QA here. **But** — because S19's AC uniquely carries
+    several "remove-or-it-orphans" completeness clauses (finding (b) / M19 / M20
+    / N9) that a *functional* formal pass structurally cannot verify (dead code
+    doesn't show in behavior tests), and one (the document-level M18 fallback
+    listeners) has a mild latent-bug angle if left in, I requested a
+    NON-BLOCKING QA code-hygiene spot-check as a fast follow-up: confirm those
+    removals were actually honored. Any leftover is a cleanup task, NOT a
+    Done-reversion, unless it proves a genuine latent bug — asked the
+    Orchestrator to route that quick look. Recorded the same on S19's/S20's rows.
+  - **Milestone:** with S19/S20 Done, the entire active Sprint 3 set is complete —
+    **S13, S14, S15, S16, S17, S19, S20 all Done**; S18 (collapsible aisle
+    groups) and S11 (recipe-paste alt-ingest) remain the only two parked stretch
+    stories. In fact the whole backlog is now Done except those two parked items.
+    Noted on the top-of-file Priority Queue summary too.
+  - **Accessibility latent item recorded (Tester-flagged, non-blocking, NOT a
+    current gap):** the `--accent` token is `#4DA6FF` (dark-theme blue), not
+    playbook §7's colorblind-safe `#0072B2`. Pre-existing (shipped with S16's
+    accent icon, passed that pass; S20 only preserved the binding). Does NOT
+    trigger the PO's colorblind requirement, which is scoped to "color used to
+    convey state" — the app uses a single uniform accent, not per-category/state
+    color-coding (S17 chose no per-aisle colors). Tracked in the top-of-file
+    Accessibility-scope note (its natural home — a scoped conditional, not an
+    open PO question, so NOT a QUESTIONS.md entry) as "reconcile `--accent`
+    against Okabe-Ito IF per-category/state color-coding is ever introduced."
+    PO already told it's noted-for-later, nothing to act on now.
+  - All edits grep-verified as single physical GFM table lines: 20 story rows,
+    zero malformed, S19/S20 now Done; the only non-Done rows are S11/S18 (both
+    parked).
+- **Carryover:** Sprint 3 complete — S13/S14/S15/S16/S17/S19/S20 all Done; whole
+  backlog Done except parked S11/S18. Open threads, all owned by others:
+  (1) a requested NON-BLOCKING QA code-hygiene spot-check of S19/S20's
+  removal-completeness clauses (Orchestrator to route; findings = cleanup, not a
+  Done-reversion, unless a genuine latent bug); (2) console sync (S15 → Done,
+  S19/S20 → Done) — Orchestrator; (3) the `--accent`-vs-Okabe-Ito reconciliation,
+  dormant unless per-category color-coding is ever introduced. Nothing owed by
+  me — this is a natural lull / potential wind-down or QA-periodic-sweep
+  checkpoint (playbook §1: surface backlog/queue state unprompted at a lull —
+  flagged to the Orchestrator that the active queue has now emptied to
+  parked-only).
 
 ## Parked / unscheduled
 
