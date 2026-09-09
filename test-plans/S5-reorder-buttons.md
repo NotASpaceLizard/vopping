@@ -3,6 +3,32 @@
 **STATUS: DONE — density-picker.html CSS/markup follow-up pass re-verified 2026-09-04, PASS
 (74/74 combined re-run), zero defects.** BACKLOG.md's Tracked follow-up gate (QA finding M3) is
 now closed. Citation of record: `c:\tmp\pw-test\vopping-tests-tester-s1-s2-s5-density-formal.js`.
+This DONE verdict is historical and unchanged — see the RETIRED note immediately below for what
+happened to this story's own test cases once S13 shipped.
+
+**RETIRED, 2026-09-09 (cross-story supersession, NOT a reopening — same treatment BACKLOG.md's own
+S5 row already documents for the underlying feature):** S13 (drag-and-drop reorder) shipped and
+physically removed the `[data-role="up"/"down"]` buttons this story's test cases were written
+against. All 7 of this file's own test cases (TC5.1-TC5.6, including both the click and keyboard
+nested-control-precedence variants, plus the button-triggered "undo reverses a reorder swap" check)
+are retired — they test controls that no longer exist in the shipped app, full stop. This is not a
+regression: S5 shipped and passed exactly as specified for its time (see the DONE verdict above,
+left intact per this project's transparency convention — nothing here is being silently rewritten).
+The underlying guarantees these test cases stood for are NOT dropped, just re-mechanized:
+- Manual reordering itself, undo-eligibility, and immediate persistence → re-verified via S13's own
+  drag mechanic, see `S13-drag-drop-reorder.md`'s TC13.5/TC13.6/TC13.14/TC13.24.
+- Nested-control precedence (a reorder gesture must not also cross the row off, and vice versa) →
+  re-verified via S13's TC13.2/TC13.5's own trailing-click-suppression checks and TC13.25's
+  press-and-hold-on-Delete check.
+- Top/bottom boundary behavior (S5's disabled Up/Down at the list's edges) → re-mechanized as S13's
+  out-of-bounds clamp-to-boundary rule, see `S13-drag-drop-reorder.md`'s TC13.7/TC13.8/TC13.19.
+
+The combined regression script's own Part 1 (formerly a verbatim 74-check port of this file's
+density-era suite) is retrofitted to 67 checks accordingly — see
+`c:\tmp\pw-test\vopping-tests-tester-s1-s13-formal.js` (citation of record for the current
+regression baseline, `REGRESSION_LOG.md`'s 2026-09-09 row) — the 7 checks removed are exactly the 7
+being retired here. Full accounting cross-referenced in `S13-drag-drop-reorder.md`'s own STATUS
+banner.
 
 **Accessibility-scope note (PO decision relayed 2026-09-04):** the keyboard nested-control-
 precedence check below (TC5.6) is kept as informational sanity-check coverage per the PO's

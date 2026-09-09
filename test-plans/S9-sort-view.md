@@ -1,9 +1,26 @@
 # Test Plan — S9: Sort view (manual/alphabetical/by-aisle)
 
 **STATUS: DONE — formally executed 2026-09-08, PASS (154/154 combined run: 74 Sprint-1 regression
-re-confirmed + 80 new S7-S10 checks), zero defects.** Citation of record:
+re-confirmed + 80 new S7-S10 checks), zero defects.** Citation of record (as of that pass):
 `c:\tmp\pw-test\vopping-tests-tester-s7-s10-formal.js`. Full canonical transcript archived in
-`S7-notes.md`'s Commands section, cross-referenced here rather than duplicated.
+`S7-notes.md`'s Commands section, cross-referenced here rather than duplicated. This DONE verdict
+stands unchanged — see the dated note immediately below for TC9.8/TC9.9's own later rewrite.
+
+**Dated update, 2026-09-09 (S13 shipped — TC9.8/TC9.9 rewritten, not retired):** S13's drag-and-drop
+reorder physically removed S5's `[data-role="up"/"down"]` buttons, which TC9.8 ("Up/Down hidden in
+non-Manual") and TC9.9 ("Up/Down reappear in Manual") directly probed. Unlike S5's own test cases
+(fully retired — see `S5-reorder-buttons.md`'s dated note), this story's underlying guarantee — that
+manual-order-only reordering is gated by sort mode — is still a real, live requirement (BACKLOG.md's
+S9 AC still states it, now pointed at S13's drag mechanic instead of S5's buttons; see S9's own
+forward-reference note anticipating exactly this update). So TC9.8/TC9.9 are REWRITTEN in place,
+not dropped: both now assert drag-pickup's own arm/no-arm behavior via a real
+pointerdown-then-wait-past-the-450ms-delay probe, gated on `sortMode`, instead of checking button
+visibility. Re-verified clean as part of the same combined pass that formally verified S13 itself —
+citation of record for the current regression baseline is now
+`c:\tmp\pw-test\vopping-tests-tester-s1-s13-formal.js` (`REGRESSION_LOG.md`'s 2026-09-09 row),
+superseding the 2026-09-08 `…s7-s10-formal.js` citation above for TC9.8/TC9.9 specifically (every
+other TC9.x assertion is unchanged and re-confirmed clean in the same run). Full transcript:
+`S13-drag-drop-reorder.md`'s Commands section.
 
 **Story:** As a user, I want to view my list sorted by aisle or alphabetically, in addition to my
 own manual order, so that I can shop more efficiently by store layout or find an item quickly.
@@ -54,8 +71,8 @@ re-specifying it).
 | TC9.5 | View-only proof — By Aisle | Sort By Aisle, reload, diff raw `items` array against pre-sort content | Byte-identical — zero mutation |
 | TC9.6 | Manual order preserved after a non-Manual sort | Sort Alphabetical, then switch back to Manual | Exact same manual order as before sorting, no reordering artifact |
 | TC9.7 | Sort selection doesn't persist | Select a non-Manual sort, reload | View returns to Manual regardless of what was last active |
-| TC9.8 | Up/Down hidden/disabled in non-Manual modes | Switch to Alphabetical or By Aisle | Every row's Up/Down buttons are hidden or disabled |
-| TC9.9 | Up/Down reappear in Manual | Switch back to Manual from a non-Manual sort | Up/Down buttons visible/enabled again (respecting top/bottom disabled-edge rule) |
+| TC9.8 | (Rewritten 2026-09-09 for S13 — see note below) Manual-order-only reorder is unavailable while a non-Manual sort is active | Switch to Alphabetical or By Aisle; attempt a real press-and-hold-past-the-pickup-delay on a row | Zero `[data-role=up]`/`[data-role=down]` elements exist (now unconditionally true in every mode, not just non-Manual); drag-pickup never arms (no `dragging` class appears) |
+| TC9.9 | (Rewritten 2026-09-09 for S13 — see note below) Manual-order-only reorder becomes available again in Manual | Switch back to Manual from a non-Manual sort; attempt the same press-and-hold probe | Drag-pickup successfully arms (`dragging` class appears) once back in Manual |
 | TC9.10 | Check/uncheck available in every mode | Cross off an item while in Alphabetical, then in By Aisle | Toggle works identically in both modes |
 | TC9.11 | Delete available in every mode | Delete an item while in Alphabetical, then in By Aisle | Delete works identically in both modes |
 | TC9.12 | Note/aisle editing available in every mode | Edit a note and an aisle while in a non-Manual sort | Both edits work identically to Manual mode |
@@ -75,8 +92,8 @@ re-specifying it).
 | TC9.5 | Raw `items` array byte-identical pre-sort vs. post-By-Aisle-sort-then-reload | Pass |
 | TC9.6 | Manual order identical before and after a round-trip through Alphabetical | Pass |
 | TC9.7 | `#sort-select` reads `"manual"` after reload, regardless of last-active sort | Pass |
-| TC9.8 | Zero `[data-role=up]`/`[data-role=down]` elements anywhere while Alphabetical is active | Pass |
-| TC9.9 | Up/Down elements present again once switched back to Manual | Pass |
+| TC9.8 | (Rewritten 2026-09-09) Zero `[data-role=up]`/`[data-role=down]` elements anywhere while Alphabetical is active (now trivially true in every mode, S13 removed them entirely — re-confirmed, not assumed); a real pointerdown+wait-past-450ms probe on a row never produces the `dragging` class while Alphabetical is active | Pass (2/2 sub-checks) |
+| TC9.9 | (Rewritten 2026-09-09) A real pointerdown+wait-past-450ms probe on a row DOES produce the `dragging` class once switched back to Manual — drag-pickup successfully arms again | Pass |
 | TC9.10 | Cross-off toggle works correctly while Alphabetical is active | Pass |
 | TC9.11 | Delete works correctly while Alphabetical is active | Pass |
 | TC9.12 | Note editing works correctly while Alphabetical is active (`"sorted-mode note"` saved) | Pass |
