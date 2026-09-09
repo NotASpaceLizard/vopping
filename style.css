@@ -178,6 +178,55 @@ button:disabled {
   color: var(--text-muted);
 }
 
+/* S13 (Locked, 2026-09-08): drag-and-drop reorder, built on raw Pointer
+   Events (script.js). No dedicated drag-handle icon - the whole row is the
+   drag surface in Manual sort, so `grab` is the cursor hint that a row is
+   draggable at all (a plain `pointer` cursor already covers "tappable" via
+   the base `.items li` rule above, in every sort mode; `sort-manual` narrows
+   this specifically to when dragging is actually possible - S9 locked AC,
+   dragging is a manual-order-only operation, same restriction S5's Up/Down
+   buttons had). */
+#list-root.sort-manual .items li {
+  cursor: grab;
+}
+
+/* The row actively being held mid-drag - dimmed in place (not moved in the
+   DOM; only the placeholder below moves) so it's clearly "picked up" while
+   the placeholder shows where it'll land. */
+.items li.dragging {
+  opacity: 0.35;
+  cursor: grabbing;
+}
+
+/* Live insertion-point indicator - a slim accent-colored bar rather than a
+   full ghost row, deliberately lightweight since it's repositioned via a
+   raw `insertBefore` on every pointermove (script.js's updateDragPosition),
+   not a full render(). The extra class beats the generic `.items li` rule's
+   padding/border/flex-wrap on specificity, so this doesn't inherit the
+   ordinary row chrome (padding/border/cursor) at all. */
+.items li.drag-placeholder {
+  padding: 0;
+  margin: 3px 0;
+  border: none;
+  border-radius: 2px;
+  background: var(--accent);
+  height: 4px;
+  min-height: 4px;
+  cursor: default;
+  flex-wrap: nowrap;
+}
+
+/* QA finding M12: once a drag is actively underway, ordinary touch-scroll
+   of the page is suppressed for the drag's duration - the auto-scroll-near-
+   viewport-edge mechanic (script.js) is the only scrolling that happens
+   while this class is present. Applied to the list container (not just the
+   dragged row) since the whole list must stop panning underneath an active
+   drag, not only the one row. */
+#list-root.drag-active {
+  touch-action: none;
+  user-select: none;
+}
+
 .items .item-name {
   flex: 1;
   min-width: 0;
