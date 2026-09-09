@@ -1271,6 +1271,66 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   (a)). Standing flags for others: REGRESSION_LOG.md missing both the 219 and
   246 dated rows (Tester); console sync now covers S15 → Done as well as the
   S19/S20 rows (Orchestrator).
+- **QA per-story gate cleared on S19/S20; both → Locked, 2026-09-09 (same day,
+  relayed by Orchestrator):** QA verified both against the real
+  `script.js`/`style.css` (not just AC prose) — **zero Real findings on either.**
+  Notable positive confirmation folded onto S19's row: the revert structurally
+  ELIMINATES the C1/R13 stale-DOM-reference bug class rather than reintroducing
+  it (Up/Down is a synchronous click→swap→`render()`, no DOM reference carried
+  across a render), and the cross-row editor-commit-on-reorder guarantee is
+  inherited automatically via the existing `focusout` path — so the very bug
+  that reverted S13 to In Review cannot recur in S19's mechanism. Folded in two
+  cheap Minors (both removal-completeness, no PO input needed, same category as
+  everything else resolved directly this sprint):
+  - **M19 (S19):** the `sort-manual` class-toggle in `script.js` (~line 1229)
+    becomes orphaned dead code once removal finding (b)'s `cursor: grab` rule is
+    deleted (QA's project-wide grep confirmed that rule is the class's ONLY
+    consumer). Named the decision without over-locking implementation: remove
+    the toggle if Up/Down visibility is JS-gated in `renderRow`, or keep +
+    repurpose it if Developer CSS-gates that visibility — either way no orphan
+    survives.
+  - **M20 (S20):** corrected finding (d)'s slightly-off premise — the inherited
+    base `button:hover { background }` (`style.css` ~69-71) still matches
+    `.icon-btn` after the restyle, so the hover background is NOT auto-removed
+    and must be EXPLICITLY overridden or a grey box reappears on hover
+    (contradicting "remove the square outline"). Low stakes (hover is
+    desktop-only; the PO's phone has none) but a real completeness item; finding
+    (d)'s touch press-feedback concern still stands, served by `:active`.
+  - **N9 (S20) folded** (dead `border-radius: 4px` tidy, same as finding (c));
+    **N10 (S20) consciously skipped** as a confirmed non-issue (recorded on the
+    row): `.icon-btn` is a shared class, so S19/S20 implementation order isn't
+    load-bearing, and the existing "pairs with S19" language already covers it.
+  - **Both S19 and S20 → Locked** — full doc pipeline cleared (scrum-master
+    sanity-check → Developer sanity-check → Tester testability-check → QA
+    per-story gate, zero open findings on either), clear for Developer
+    implementation. Updated both rows and the top-of-file Priority Queue summary
+    (which had them as "Not Started, entering the pipeline"). All edits
+    grep-verified as single physical GFM table lines: 20 story rows, zero
+    malformed, S19/S20 now Locked.
+- **Carryover:** S19/S20 Locked — both clear for Developer implementation (S19
+  first per reorder-then-restyle, though shared-class means order isn't
+  load-bearing). S15 Done, S13 Done, S7/S8 Done. Sprint 3's full story set
+  (S13-S17 + the S19/S20 remediation pair) is now either Done or Locked-ready
+  for implementation; S18 remains parked. Standing flags unchanged for other
+  owners: REGRESSION_LOG.md still missing the 219 and 246 dated rows (Tester);
+  console sync for S15 → Done and S19/S20 (now Locked) (Orchestrator).
+- **Standing flag RESOLVED — REGRESSION_LOG.md's 219/246 rows are present,
+  2026-09-09 (Orchestrator read the file directly):** the "missing 219 and 246
+  ledger rows" flag I re-raised across the last few entries was a false alarm
+  from a STALE read — Tester had already added both rows while I was working
+  concurrently. Confirmed present: line 28 = the 219/219 S13-C1-fix row (marked
+  superseded), line 29 = the 246/246 S15 row marked current canonical ("cite
+  this row"), inline arithmetic 67+81+26+45+27=246, superseded-chain intact back
+  through 216/154/74. Nothing is owed to Tester there — dropping the flag.
+  Corrected my own now-stale notes accordingly: the "ledger row not yet
+  appended" citations on BACKLOG.md's S13 and S15 rows are rewritten to cite
+  REGRESSION_LOG.md's canonical 219/246 rows directly (this earlier carryover
+  and the S13-reinstatement entry's line are left as append-only history, this
+  bullet supersedes them). Lesson worth carrying: a flag raised off a
+  concurrently-edited file owned by another agent should be reconfirmed against
+  the live file before being re-raised — cheaper than propagating a stale
+  concern through several updates. The console-sync flag (S15 → Done, S19/S20 →
+  Locked) stands, still the Orchestrator's.
 
 ## Parked / unscheduled
 
