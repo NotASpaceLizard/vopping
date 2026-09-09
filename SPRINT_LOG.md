@@ -1109,6 +1109,101 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   S14/S15/S16. Two Tester/Orchestrator flags still standing from the prior
   entry: (1) the missing 219/219 REGRESSION_LOG.md ledger row (Tester);
   (2) console sync for S13's Done + the two new S19/S20 rows (Orchestrator).
+- **S15 implemented → In Review + a real staleness item handled, 2026-09-09
+  (same day, relayed by Orchestrator):** two updates for my files.
+  **(1) S15 implemented (Developer, pushed sha `10c804e`):** built by reusing
+  S7/S8's shared editor infrastructure (`editingField`/`openEditor`/
+  `commitEditor`) rather than a parallel build — one of the two approaches
+  Tester's testability-check explicitly left to Developer's choice, with both
+  behavioral guarantees required either way (draft survives an unrelated
+  re-render; opening any other editor or a drag-pickup elsewhere commits it).
+  Self-verified 33/33 new checks + the full 219/219 regression re-confirmed
+  clean. **Moved S15 Locked → In Review**, not straight to Done — the same
+  convention S7/S8/S9/S10 used for "implemented + self-verified, Tester's
+  formal pass now underway," reserving Done for Tester's own independent
+  formal-pass citation, per this project's standing rule that self-verification
+  (however thorough) is never itself sufficient for Done. This is the original
+  S7-S10 sense of "In Review" (awaiting Tester), distinct from S13's C1-era
+  reuse of the same label (which meant "confirmed defect in shipped code") —
+  flagging the sense explicitly so a future reader doesn't conflate them, same
+  discipline S13's own row already established for the label's dual use.
+  Tester's formal pass is running now; Done flips when that citation lands.
+  Updated the top-of-file Priority Queue summary's S15 clause (and its now-stale
+  "S15, which Developer is finishing first" wording in the S19/S20 sub-note)
+  accordingly.
+  **(2) Staleness in S7/S8's crowded-row closure evidence — handled by
+  softening, not re-counting (my call on timing, per the Orchestrator's
+  options):** Developer flagged that S15's edit-icon, being always visible
+  (item names are never empty, so unlike the note/aisle toggles it always
+  renders), adds one icon to every row — shifting the specific icon counts
+  cited in the S7/S8 Done-gate closure evidence (Axis A 1→2, Axis B 3→4). Row
+  height/overflow still pass clean and the PO has accepted the crowding, so
+  this is NOT a regression and does NOT reopen the gate or R7 — only the exact
+  numbers in the closure note are stale. **Chose option (a): soften the closure
+  note's wording now so it no longer hangs on a frozen icon count, and defer one
+  definitive re-measurement until S19/S20 land** — rather than re-stating a
+  fresh exact count now, which would just go stale a third time the moment S19
+  (+2 icons) and S20 (frameless restyle) change the row again. That repeated
+  drift-at-one-seam is exactly what the playbook §6 says to fix structurally
+  (soften the dependency) rather than by re-stating and re-promising accuracy.
+  Added a dated softening addendum to the top-of-file "Gate CLOSED" note and a
+  concise point-in-time tag to S7's and S8's own rows: all three now explicitly
+  say the gate's conclusion rests on the still-passing overflow/row-height check
+  plus the PO's own accepted-crowding decision, not on any specific icon tally.
+  Tester owns the closure script itself (`vopping-worst-case-row-s13-s14-
+  closure.js`) — the Orchestrator flagged the same to them for the eventual
+  definitive re-measure; I only touched the note wording in my own files.
+  All edits grep-verified as single physical GFM table lines (S7/S8/S15 rows
+  each still one well-formed 7-segment line; 20 story rows total, 279 lines).
+- **Carryover:** S15 In Review — Tester's formal pass running; flips to Done on
+  that citation. S19/S20 Not Started, awaiting Developer's sanity-check (which
+  comes after Developer diagnoses the scroll-collision for the Orchestrator),
+  then the rest of the pipeline before Lock. S13 Done. S7/S8 Done — closure note
+  softened, one definitive icon re-measure deferred to Tester once S19/S20 land.
+  Standing flags unchanged: missing 219/219 REGRESSION_LOG.md row (Tester);
+  console sync for S13 Done / S15 In Review / new S19/S20 rows (Orchestrator).
+- **PO's final call on the reorder revert — escape hatch CLOSED, drag abandoned
+  for good, 2026-09-09 (same day, relayed by Orchestrator):** with Developer's
+  full root-cause diagnosis in hand, the PO chose to proceed with the S19 revert
+  to Up/Down and explicitly declined the one drag-preserving alternative.
+  **Developer's diagnosis — preserved here deliberately as the rationale for why
+  a 219/219-passing feature got pulled, so a future reader doesn't wonder:** the
+  real-device drag failure is an iOS `touch-action`-latched-at-`touchstart`
+  conflict — Mobile Safari commits to native scrolling at the moment of
+  `touchstart`, before the drag's JS pickup-delay timer can claim the gesture,
+  so a press-and-hold drag can never out-compete scroll on that engine. Desktop
+  Chromium does not latch touch-action this way, which is exactly why S13 passed
+  219/219 in our test environment yet failed on the PO's actual phone — the
+  concrete instance of this project's own "real hardware is the real acceptance
+  signal, emulation only approximates it" principle overriding a green test
+  suite. The Orchestrator laid out the drag-handle alternative to the PO (a
+  dedicated handle would be one icon fewer than restoring Up/Down — 5 vs 6 — and
+  would keep drag); the PO declined it, choosing the proven, familiar Up/Down
+  mechanism after being burned by drag twice (first the iOS text-select
+  collision, then this scroll-latch). **Resolution:** the escape hatch on S13
+  and S19 is CLOSED — drag-and-drop is out for good, the handle-based-drag
+  alternative is explicitly declined, and S19's revert proceeds unconditionally
+  (no longer "revert unless trivially fixable / PO reconsiders"). Resolved the
+  conditional directly on both S13's and S19's rows, and in the top-of-file
+  Priority Queue summary's escape-hatch clause. **S13 stays Done** as the
+  historical record of the shipped-and-verified drag feature — the diagnosis is
+  a platform-level touch-action behavior and the resolution is supersession
+  (S19), not a fix-in-progress, so it does NOT trigger the C1-style "In Review"
+  branch that was earlier flagged as a possibility. **Pipeline:** S19/S20 are
+  clear to continue — Developer's sanity-check is done, Tester's
+  testability-check is being routed next; both stay Not Started until Tester +
+  QA both clear them, per this project's standard rule. All edits grep-verified
+  as single physical GFM table lines; BACKLOG.md still 20 story rows.
+- **Carryover:** S19/S20 Not Started, escape hatch closed — proceeding
+  unconditionally through the pipeline (Developer sanity-check done; Tester
+  testability-check next, then QA gate, before Lock). If Developer's S19/S20
+  sanity-check surfaced any AC findings to fold in, I have not received them yet
+  — flagged to the Orchestrator so it isn't assumed silently handled. S13 Done
+  (drag superseded by S19, decision final). S15 In Review (Tester's formal pass
+  running). S7/S8 Done (closure note softened; icon re-measure deferred to
+  Tester after S19/S20 land). Standing flags: missing 219/219 REGRESSION_LOG.md
+  row (Tester); console sync for S13 Done / S15 In Review / S19+S20 new rows
+  (Orchestrator).
 
 ## Parked / unscheduled
 
