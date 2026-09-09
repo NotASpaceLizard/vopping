@@ -1017,6 +1017,98 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   re-test (sha `50c57c8`) still pending the PO, tracked non-blocking. Flagged
   for Tester (not a scrum-master action item): add the missing 219/219 dated
   row to REGRESSION_LOG.md's ledger.
+- **Big PO direction change drafted as S19 + S20, 2026-09-09 (same day, relayed
+  by Orchestrator):** the PO gave two distinct decisions from a fresh review,
+  driven by a SECOND real-device drag failure — this time the drag gesture
+  loses to the phone's native scroll ("when i try to drag the item, it scrolls
+  the screen instead of moving the item"), the first having been the iOS
+  text-select collision (sha `50c57c8`, still never confirmed fixed on-device).
+  Drag-and-drop passed 219/219 in our desktop Chromium test environment but has
+  now failed twice on the PO's actual hardware — an environment we structurally
+  cannot reproduce. Drafted both into BACKLOG.md; doc-structure call was left to
+  me.
+  - **Decision 1 → S19 (restore Up/Down reorder buttons, remove drag-and-drop).**
+    PO's words: "i think we need to go back to the up/down arrows. i know it
+    will result in the buttons being a bit crowded, but i'll take crowded over
+    not working. from some testing, it looks like i'll still have about 20
+    characters even with two up/down buttons and the edit button." **Structure
+    call — new story, NOT a reopening of S13, NOT a re-drafting of S5:** this
+    project's strongest, repeatedly-invoked convention is cross-story
+    supersession over reopening — when the PO went the *other* direction
+    (S5's Up/Down → S13's drag), the scrum-master explicitly kept S5 Done and
+    made S13 a new story ("shipped and passed exactly as specified for its
+    time"). Reversing direction uses the identical shape: **S13 stays Done**
+    (it passed its full verified AC — real-device behavior was always a
+    separately-tracked, non-blocking signal, never part of its Done claim, per
+    the iOS fix's own tracked-non-blocking note), and **S19 supersedes its live
+    mechanism the mirror image of how S13 superseded S5's.** S5's own data
+    model/reorder-persistence logic never changed through either direction and
+    carries forward untouched — S19 is a UI/interaction reversal only, no data
+    migration. Added dated cross-story notes to S13 (reverted-by-S19, with the
+    escape hatch below), S5 (un-superseded/mechanism-restored-by-S19), and S9
+    (forward-reference note: its non-Manual-sort clause re-points from S13's
+    drag back to S19's Up/Down on ship, left pointing at S13 until then so
+    Tester's coverage keeps matching what's implemented today — same handling
+    this clause already used across the S5→S13 transition). **Crowding is a
+    PO-accepted tradeoff, explicitly NOT a reopening of the R7 /
+    Tracked-follow-up-#2 crowded-row gate:** that gate existed because the PO
+    had not yet *seen* a crowded row; here the PO has directly experienced the
+    alternative, seen the crowding, and chosen it — same PO-owned-tradeoff
+    handling as S14's sub-24px controls. **Escape hatch (per Orchestrator):**
+    the revert is the PO's decision UNLESS Developer's separate, parallel
+    root-cause diagnosis of the scroll-collision (likely a
+    `touch-action`/non-passive-listener/`preventDefault` issue desktop Chromium
+    can't surface) proves it trivially fixable AND the PO reconsiders — in which
+    case S19 parks and S13's drag is retained. Proceeding with the revert
+    regardless; the diagnosis does not block S19's own doc pipeline. Noted on
+    S13's row that if the diagnosis instead confirms a genuine S13
+    *implementation* defect, that could retroactively warrant the same
+    "In Review" treatment C1 got — a call for once the diagnosis lands, not
+    preempted now.
+  - **Decision 2 → S20 (frameless restyle of all per-row icon controls).** PO's
+    words: "for all the buttons, instead of having a tiny icon in a square
+    button, make the icon the size of the button and remove the square outline.
+    it will give the appearance of a bigger button without the size of the
+    button actually changing." **Structure call — its own story, not folded
+    into S19:** this project consistently keeps visual/styling treatments as
+    their own stories (S14 shrink, S16/S17 visual treatments were all separate),
+    and this restyle applies to every per-row icon control regardless of the
+    reorder mechanism. Scope: the full `.icon-btn` set — Up/Down (S5/S19),
+    delete (S3), note-toggle (S7), aisle-toggle (S8), S15's edit-icon, S16's
+    aisle-sort icon. **Complementary to S14, does NOT undo it:** footprint stays
+    whatever S14's ~25% shrink left it; S20 only removes the square chrome and
+    enlarges the glyph within that footprint. Added a cross-reference note on
+    S14's Done row (mirroring the M14/M17 forward-reference pattern), and on
+    S15's and S16's rows (their icons are in S20's scope). Text tags
+    (`.note-display`/`.aisle-tag`) are out of scope — they aren't "icon in a
+    square button" — same boundary S14 drew. No decision-tool mockup needed:
+    this is a direct, unambiguous PO instruction, not an open subjective call
+    (contrast S13/S15's gesture/icon pickers).
+  - **Sequencing (per Orchestrator):** Developer is mid-implementation on S15
+    (edit button, independent of the reorder mechanism) and finishes it first;
+    S19 and S20 come after, so both their AC assume S15's edit-icon already
+    exists in the row. Both drafted at **Not Started** — neither can Lock until
+    Developer sanity-check + Tester testability-check + QA gate all clear, same
+    pipeline every story on this project has gone through (no shortcut for a
+    revert or a restyle). Did NOT flip either to Locked, consistent with this
+    project's own precedent (the Status column has never reached Locked before
+    Tester + QA both clear a story).
+  - All edits grep-verified as single physical GFM table lines immediately after
+    writing: BACKLOG.md now has 20 story rows (S1-S20), each a well-formed
+    7-segment single-line row (S19/S20 confirmed one physical line each), 263
+    total lines. Top-of-file Priority Queue summary and the Sprint 3 narrative
+    list both updated to reflect S19/S20. No QUESTIONS.md entry created — both
+    decisions are PO answers, not open asks; the escape-hatch conditional
+    becomes a real PO question only if Developer's diagnosis comes back trivial,
+    at which point the Orchestrator surfaces it (flagged to the Orchestrator).
+- **Carryover:** S19/S20 drafted, Not Started — need Developer sanity-check +
+  Tester testability-check + QA gate before Lock; both sequenced after S15,
+  which Developer is finishing first. S13 stays Done (reverted-by-S19, escape
+  hatch open on Developer's scroll-collision diagnosis). S15 Locked, next up for
+  Developer. Reorder ripple notes landed on S5/S9/S13; restyle ripple notes on
+  S14/S15/S16. Two Tester/Orchestrator flags still standing from the prior
+  entry: (1) the missing 219/219 REGRESSION_LOG.md ledger row (Tester);
+  (2) console sync for S13's Done + the two new S19/S20 rows (Orchestrator).
 
 ## Parked / unscheduled
 
