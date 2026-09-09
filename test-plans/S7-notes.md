@@ -53,7 +53,7 @@ originally flagged — both are directly measured and screenshotted against the 
 post-S13+S14 app, not inferred from S13/S14's own isolated formal passes. Script:
 `c:\tmp\pw-test\vopping-worst-case-row-s13-s14-closure.js` — a targeted, one-off closure check, not
 part of the ongoing cumulative regression suite (see `REGRESSION_LOG.md`'s own note on this script
-for why it isn't folded into the 216 running total). Full raw transcript:
+for why it isn't folded into the running total, 219 as of that file's current row). Full raw transcript:
 `c:/tmp/pw-test/worst-case-closure.log`. Cross-referenced from `S8-aisle-designation.md`'s own
 matching closure note rather than duplicated there.
 

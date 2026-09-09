@@ -952,6 +952,71 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   S13's Done reinstatement before Developer picks it up next (per its own AC's
   sequencing, not blocked by C1 itself). iOS Safari real-device re-test (sha
   `50c57c8`) still pending the PO, tracked non-blocking, unrelated to C1.
+- **S13 reinstated to Done, 2026-09-09 (scrum-master's resume-time verification,
+  following a full session/connection drop — re-checked directly against the
+  actual files rather than taking the reinstatement condition as already
+  satisfied on faith):** BACKLOG.md's own S13 row states the reinstatement
+  condition explicitly: "Developer's fix landing, plus Tester adding dedicated
+  regression coverage for the exact combination that triggers it." Verified
+  both halves independently. **(1)** Developer's fix is landed and pushed —
+  sha `90983e3` re-fetches `beginDrag()`'s row element fresh by id immediately
+  after `commitEditor()`, mirroring the already-fresh `idx` re-derivation right
+  below it; also hardens M18's `setPointerCapture` fallback in the same commit
+  (confirmed directly via `git log`, not just cited from memory). **(2)**
+  Tester's dedicated regression coverage for the exact triggering combination
+  is real and landed — read `test-plans/S13-drag-drop-reorder.md` in full: its
+  own STATUS banner already reads "DONE," TC13.11 was strengthened to assert
+  the LIVE row (not a stale detached clone) receives the `dragging` class, and
+  a new TC13.27 covers the identical combination via an aisle editor —
+  219/219 (45 S13-specific + the full 174-check regression baseline), zero
+  defects. Tester additionally, independently settled a discrepancy between
+  QA's original trace and Developer's own repro by reproducing both pre-fix
+  and post-fix behavior directly against an isolated temp copy of the pre-fix
+  code — confirmed the fix genuinely closes the bug, not just that a test
+  happens to pass. Both reinstatement conditions are therefore satisfied, not
+  assumed. **S13 → Done** in BACKLOG.md, with the reinstatement account and a
+  carried-forward severity correction added directly to S13's own row (see
+  below). Also updated the top-of-file Priority Queue summary, which was
+  still describing S13 as reverted/awaiting fix. All edits grep-verified as
+  single physical GFM lines immediately after writing (`^\| S13 \|` still
+  matches exactly once; BACKLOG.md still 18 story rows, 238 total lines, no
+  orphaned stray paragraph at EOF).
+- **Severity/mechanism correction folded in alongside the reinstatement:**
+  QA_FINDINGS.md's own 2026-09-09 "Correction" entry (read directly, not
+  relayed secondhand) found C1's original description — a thrown exception,
+  list permanently unscrollable until reload — was inaccurate: removing the
+  old `<ul>` via `innerHTML` replacement doesn't detach its own descendants,
+  so the stale `li` reference's `insertBefore` call succeeded silently into a
+  dead subtree rather than throwing. The real pre-fix bug was a silent
+  stale-clone visual/positional defect (wrong/missing `dragging` styling, a
+  skewed insertion-index calculation), scoped to that one gesture only and
+  self-resolving the instant it ended — no persistent broken state. QA
+  retroactively reclassified this as **R13 (Real, not Critical)**; the root
+  cause identified and the fix already shipped are unaffected by this
+  correction, only the failure-mode description and severity label change.
+  Folded this correction directly into S13's own BACKLOG.md row (which still
+  described C1 as "Critical" with the now-superseded failure mode) rather
+  than leaving a stale severity claim sitting next to the row's own
+  just-added reinstatement note — same citation-hygiene habit this project
+  has applied to every other correction/drift found on a doc re-read.
+- **Ledger gap found and flagged, not fixed directly (not my file):**
+  `REGRESSION_LOG.md`'s own ledger still shows 216/216 as its last logged row
+  for S13 — the superseding 219/219 run (already fully documented in the
+  test-plan file's own STATUS banner, command output, and verbatim PASS lines)
+  has never been appended as its own dated ledger row, plausibly because the
+  session's connection drop interrupted Tester right as they were finishing
+  this exact bit of bookkeeping. Cited the test-plan's own fully-detailed,
+  independently-reproduced 219/219 evidence directly in BACKLOG.md's S13 row
+  rather than an out-of-date ledger figure, consistent with this project's own
+  "cite the most current verified evidence" practice — but flagging this gap
+  for Tester to close by adding the missing dated row, rather than adding it
+  myself (REGRESSION_LOG.md is Tester-owned, not mine to edit).
+- **Carryover:** S13 Done (reinstated, this session). S15 Locked — S13's Done
+  reinstatement above clears its own sequencing dependency, so Developer can
+  pick it up next. S7/S8 unaffected, already Done. iOS Safari real-device
+  re-test (sha `50c57c8`) still pending the PO, tracked non-blocking. Flagged
+  for Tester (not a scrum-master action item): add the missing 219/219 dated
+  row to REGRESSION_LOG.md's ledger.
 
 ## Parked / unscheduled
 

@@ -1345,3 +1345,72 @@ which side was right — this was a real error in my original trace, not a defen
 testing environment. Worth remembering for future DOM-lifecycle reasoning on this project: removing
 a container only detaches *that container* from its parent; a captured reference to one of its
 *descendants* survives with a non-null (but orphaned) `parentNode`, it does not become `null`.
+
+---
+
+## Re-confirmation — 2026-09-09 (post-outage resume: full-file staleness check + C1 coverage
+verified against real test/repro logic, not just prose)
+
+**Trigger:** whole-team session/connection drop (auth token expiry) recovered. Since my last entry
+(the C1 mechanism correction above, already committed/pushed at `0e8094e`), Developer shipped the
+fix (`beginDrag()` re-fetches `li` fresh by id right after `commitEditor()`, sha `90983e3`) and
+Tester landed dedicated regression coverage for it (TC13.11 strengthened, TC13.27 added, 219/219).
+Asked to (1) re-read this whole file end to end for anything else gone stale during the outage, and
+(2) do one more targeted pass — check the new TC13.11/TC13.27 coverage and the independent repro
+script's actual *logic*, not just `S13-drag-drop-reorder.md`'s prose description of it — against my
+own corrected C1 finding, same "check the real thing" standard as the S7/S8 crowded-row catch.
+
+**(1) Full re-read, no other staleness found.** Every entry above this one is internally consistent
+with itself and with what's now shipped: R9/R10/R11/M9-M18/M15's resolutions all still hold, S13's
+and S15's Lock verdicts aren't contradicted by anything since, and the append-only
+history/correction convention (this file's own header) means nothing needed back-editing. Nothing
+else in this file references C1/S13 in a way the fix or its coverage would invalidate.
+
+**(2) Traced the real fix, the real test script, and the real repro script — not the writeup.**
+
+- **Fix, `script.js` `beginDrag()` (lines 493-526):** confirmed the re-fetch happens exactly where
+  and how it needs to — `if (editingField) commitEditor();` (line 502) can trigger a full
+  `render()`, and **immediately after**, before anything else touches `li`, line 522 re-derives it
+  fresh: `li = listRoot.querySelector('li[data-id="' + id + '"]');`, with a defensive `if (!li)
+  return;` guard, *before* `li.classList.add('dragging')` (line 526) ever runs. This is exactly the
+  fix shape my corrected finding called for (mirroring how `idx` above it is already re-derived
+  fresh, never trusting a reference across a render).
+- **Confirmed `commitEditor()` (line 736) is a genuine fork, not one path wearing two names:** it
+  dispatches to `saveNote()` (line 747) or `saveAisle()` (line 761) by field type, and each
+  independently ends in its own `saveState(); render();` call. So TC13.27 (aisle) exercises a
+  structurally distinct branch from TC13.11 (note), not a redundant re-run of the same one — both
+  converge on the same `render()`-triggered staleness window the fix closes, which is exactly the
+  point of covering both.
+- **Test script logic, `c:\tmp\pw-test\vopping-tests-tester-s1-s13-formal.js`:** read TC13.11
+  (lines ~1450-1482) and TC13.27 (~1764-1788) directly, not the test-plan's prose summary of them.
+  Both: open the *other* row's (row A) note/aisle editor, type an uncommitted draft, then
+  `pointerdown` + wait past the pickup delay on row B (the drag target) — which is precisely when
+  `beginDrag()`'s `commitEditor()` call fires mid-gesture — then assert (a) row A's draft actually
+  committed and (b) `isDragging(page, dragRowId)` is `true`. Read `isDragging()` itself (lines
+  166-171): `page.evaluate(() => document.querySelector(sel).classList.contains('dragging'))` — a
+  **fresh** DOM query executed inside the browser at check time, not a cached reference. Since
+  `document.querySelector` only ever searches the currently-connected document tree, it is
+  structurally incapable of matching an orphaned/detached clone — so this check can only pass if the
+  *live, visible* row actually has the class, which is precisely the distinction my corrected C1
+  mechanism turns on (stale clone gets `dragging`, live row doesn't). Confirmed the check runs
+  *before* the cleanup `pointercancel` removes the class, so timing doesn't accidentally mask a
+  failure either way.
+- **Independent repro script, `c:\tmp\pw-test\vopping-c1-independent-repro.js`:** same fresh-query
+  check pattern (`document.querySelector` + `classList.contains('dragging')`, evaluated in-browser),
+  run against an isolated extraction of the pre-fix commit (`8b17aac`, via `git show`, never
+  touching the live project tree) and the current post-fix files, using the story's own exact
+  sequence (open row A's note editor, draft uncommitted, pointerdown+delay on row B). This isn't a
+  hypothetical instrument — the script's own printed verdict logic explicitly distinguishes "threw
+  an exception" from "live row never got `dragging`," and running it produced concrete, asymmetric
+  results: pre-fix showed zero thrown errors and `liveRowBHasDragging: false` (the silent
+  stale-clone signature, matching my corrected mechanism, not my original thrown-exception trace);
+  post-fix showed zero errors and `liveRowBHasDragging: true`. That the same check mechanism
+  produces different, correct results on the two known-different inputs is direct evidence the check
+  is actually sensitive to the bug, not a tautology that would pass regardless.
+
+**Verdict: the dedicated coverage genuinely closes the gap — confirmed against the real fix, real
+test logic, and a real empirically-run repro, not just asserted by the writeup.** TC13.11/TC13.27's
+`isDragging()` mechanism could not have passed against the pre-fix code (confirmed directly, not
+inferred) and does pass against the shipped fix for both the note and aisle branches. No residual
+gap found. No new findings. S13's Done status and the 219/219 regression citation both stand as
+accurate.
