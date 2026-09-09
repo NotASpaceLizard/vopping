@@ -502,8 +502,27 @@
     if (editingField) commitEditor();
     var idx = findIndexById(id);
     if (idx === -1) return; // defensive - the row can't actually vanish between pointerdown and now (committing an editor doesn't delete rows), but never assume
+    // Bug fix (2026-09-09, QA finding C1 - real, reproducible crash, not
+    // hypothetical): the `li` parameter above is a DOM reference captured at
+    // `pointerdown` time, up to DRAG_PICKUP_DELAY_MS ago. `commitEditor()`
+    // just above (or, more generally, ANY other mutating action that
+    // happened to run during that same arming delay - an Undo, an add, a
+    // delete elsewhere, not only a cross-row editor commit) runs a full
+    // render() - renderList()'s `innerHTML` rebuild - which destroys and
+    // replaces EVERY <li> in the list, including this one. From that point
+    // on the original `li` is a detached node (`parentNode === null`), even
+    // though `id` itself is still perfectly valid in `state.items` (the
+    // `idx` check above only guards the DATA model, not this DOM reference -
+    // exactly the gap that let a detached-node crash through). Re-fetching
+    // the CURRENT live element by id - the same "never trust a reference
+    // across a render, re-derive fresh" discipline `idx` above already
+    // follows - fixes this at the root for every cause of staleness, not
+    // just the one specific repro QA found, rather than special-casing
+    // detachment defensively line by line further down.
+    li = listRoot.querySelector('li[data-id="' + id + '"]');
+    if (!li) return; // defensive - can't actually happen (idx above already confirmed the item is still in state.items, and render() unconditionally renders every state.items entry as its own <li>), but never assume
     armClickSuppression();
-    try { li.setPointerCapture(pointerId); } catch (e) { /* unsupported in this environment - drag still works, just without capture's off-row tolerance */ }
+    try { li.setPointerCapture(pointerId); } catch (e) { /* QA finding M18: this only catches setPointerCapture THROWING outright - it doesn't cover capture silently not being honored. Without real capture, once the pointer moves outside listRoot's own bounds entirely (e.g. released over the header, per the out-of-bounds AC scenario), a pointerup/pointercancel dispatched there via ordinary hit-testing never bubbles through listRoot at all, so the delegated listeners below would never fire - leaving dragState (and drag-active's touch-action:none) stuck indefinitely, the same stuck-state failure family as C1. The document-level fallback listeners further down exist specifically to cover that gap. */ }
     li.classList.add('dragging');
     listRoot.classList.add('drag-active'); // QA finding M12: suppresses ordinary touch-scroll for the drag's duration - auto-scroll above is the only scrolling allowed while this class is present
     var placeholder = document.createElement('li');
@@ -1316,6 +1335,28 @@
     if (dragState && e.pointerId === dragState.pointerId) {
       endDrag(true);
     }
+  });
+
+  // QA finding M18: document-level fallback for the case setPointerCapture
+  // (in beginDrag(), above) silently doesn't take effect - if the pointer
+  // ends up outside listRoot's own bounds entirely without real capture in
+  // place (e.g. released over the header), the resulting pointerup/
+  // pointercancel is dispatched via ordinary hit-testing to whatever's
+  // actually under the pointer there, which never bubbles through listRoot
+  // at all, so the delegated listeners above would simply never fire -
+  // stranding dragState (and drag-active's touch-action:none) indefinitely,
+  // same stuck-state failure family as QA finding C1. `document` always
+  // receives the event via ordinary bubbling regardless of where on the
+  // page it's targeted. Bubble order guarantees listRoot's own listener
+  // (closer to the target) runs FIRST whenever it DOES successfully receive
+  // the event, so this never double-fires endDrag() - `dragState` is
+  // already null by the time this fallback runs in the normal case, making
+  // it a no-op exactly when it should be.
+  document.addEventListener('pointerup', function (e) {
+    if (dragState && e.pointerId === dragState.pointerId) endDrag(false);
+  });
+  document.addEventListener('pointercancel', function (e) {
+    if (dragState && e.pointerId === dragState.pointerId) endDrag(true);
   });
 
   addForm.addEventListener('submit', function (e) {
