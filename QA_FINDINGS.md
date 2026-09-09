@@ -1414,3 +1414,155 @@ test logic, and a real empirically-run repro, not just asserted by the writeup.*
 inferred) and does pass against the shipped fix for both the note and aisle branches. No residual
 gap found. No new findings. S13's Done status and the 219/219 regression citation both stand as
 accurate.
+
+---
+
+## Per-story gate — 2026-09-09 (S19 restore Up/Down + remove drag-and-drop; S20 frameless icon restyle)
+
+**Trigger:** per-story gate, per Orchestrator's request — S19 (revert S13's drag-and-drop back to
+S5's Up/Down buttons after a second real-device drag failure) and S20 (restyle all per-row
+`.icon-btn` controls frameless — glyph fills the footprint, no square outline) both cleared
+Developer's sanity-check and Tester's testability-check, all findings folded into their locked-pending
+AC in BACKLOG.md; about to go to Scrum Master for Lock. First QA review of either.
+
+**Scope/method:** same as the S13-S17 gates and the S13 post-implementation review — read both AC
+rows in full (BACKLOG.md lines 277/278, extracted via `node -e` since they're single-line GFM table
+rows past Read/Grep's line limits), then cross-checked every claim against the **real live code**
+(`script.js`, `style.css`), not the AC prose alone: the shipped drag machinery S19 removes, the
+`focusout`-driven editor-commit path, the `.icon-btn`/`button` CSS S20 restyles, and the
+`sort-manual` class's real consumers. Also verified S19's one outbound cross-story citation (S9's
+"forward-reference note") actually exists rather than being a dangling reference (same check that
+caught M16's dangling backward-reference on S15).
+
+---
+
+### REAL
+
+**None for either story.** Both clear the gate with no Real findings. The one item that genuinely
+matters for these two — the reintroduced 6-icon worst-case row — is already correctly locked as a
+deterministic formal-pass verification requirement (S19 findings (a)+(f)); see "Confirmed sound"
+below for why it's right, not a gap.
+
+---
+
+### MINOR
+
+**M19 (S19). Removal-completeness gap: S19's finding (b) names removing the drag-era
+`#list-root.sort-manual .items li { cursor: grab }` CSS rule, but is silent on the `sort-manual`
+class-toggle in `script.js` (line 1229) that rule's selector depends on.** Verified directly: the
+`sort-manual` class has exactly ONE consumer anywhere in the project — that single `cursor: grab`
+rule (`style.css` line 209, toggled at `script.js` line 1229); grepped `sort-manual` project-wide,
+no other reference in `script.js`/`style.css`/`index.html`. So the moment finding (b)'s named rule
+is removed, the `listRoot.classList.toggle('sort-manual', ...)` call is fully orphaned dead code —
+UNLESS S19 deliberately repurposes `sort-manual` to gate the restored Up/Down buttons' visibility in
+CSS (`#list-root:not(.sort-manual) ... { display:none }`-style), which is one of the two plausible
+ways to implement "Up/Down hidden in non-Manual sort, reappear in Manual." This is exactly the
+"remove ALL drag-only artifacts or they orphan as dead code / latent bugs" category finding (b)
+itself exists to close — it just doesn't resolve this specific one. Recommend one line picking a
+direction: if Up/Down visibility is JS-gated in `renderRow()` (only emit the buttons when
+`sortMode === 'manual'`), the `sort-manual` toggle should be removed alongside the cursor rule; if
+CSS-gated, the toggle stays and is repurposed. Cheap, no PO input, same technical-shape category as
+the rest of finding (b).
+
+**M20 (S20). Removal-completeness + finding-(d)-premise gap: the inherited base
+`button:hover { background: rgba(128,128,128,0.15) }` rule (`style.css` lines 69-71) still matches
+`.icon-btn` after S20's restyle, so "remove the box" is not fully achieved by editing the
+`.items .icon-btn` rule alone.** S20's finding (c) removal list correctly drops the now-dead
+`border-color` declarations on `.icon-btn.delete-btn`/`.icon-btn.aisle-sort-icon` (confirmed against
+real CSS — those DO carry a visible border today via the base `.icon-btn` `border: 1px solid` at
+line 313, so the cleanup is accurate). But removing `border`/`background` from `.items .icon-btn`
+does NOT remove the *separate* base `button:hover` rule, which still applies its rounded grey
+highlight to every `.icon-btn` on hover — so finding (d)'s stated premise ("frameless removes the
+`button:hover` background press-feedback") is slightly inaccurate: it isn't auto-removed, it has to
+be explicitly overridden/removed for `.icon-btn`, and if left, a box-like highlight reappears on
+hover, partially contradicting the PO's "remove the square outline." Low practical stakes — it's
+hover-only, i.e. desktop-only; the PO's real device is a phone with no hover, and finding (d)
+already requires adding *some* non-box press feedback regardless — but it's a genuine
+removal-completeness item in the exact same category as finding (c), just not on its list.
+Recommend S20 explicitly override/remove `button:hover`'s background for `.icon-btn` as part of
+"remove the box," so the frameless result is actually frameless in all states, not just at rest. No
+PO input needed.
+
+---
+
+### NITPICK
+
+**N9 (S20).** `border-radius: 4px` on `.items .icon-btn` (`style.css` line 314) becomes vestigial
+once `border` and `background` are removed (border-radius has no visible effect with no
+border/background/box-shadow to round). Harmless — inert, not a bug — but it's the same
+dead-declaration tidy-up category finding (c) explicitly performs for the dead `border-color`
+declarations; worth dropping it in the same pass for consistency, not because anything breaks if
+left.
+
+**N10 (S20).** S20's scope explicitly lists Up/Down (S5/S19) among its restyle targets, but only
+"sequenced after S15" is stated explicitly ("pairs with S19"). Because `.icon-btn` is a shared
+class, implementation order is not actually load-bearing — whenever S19 re-adds the Up/Down buttons
+with the shared `icon-btn` class, they inherit S20's frameless styling automatically (same way S14's
+shrink auto-applied to future icons), so S20 landing before or after S19 both work. Flagged only for
+completeness, same low-stakes shape as S14/S16's cross-reference sequencing; no action needed.
+
+---
+
+### Confirmed sound (reviewed against real code, no gap found)
+
+- **S19 structurally eliminates the C1/R13 bug class — it does not reintroduce it.** C1 lived in the
+  press-and-hold arm window: `beginDrag()` captured a DOM `li` reference at `pointerdown` and reused
+  it up to 450ms later, across a `commitEditor()`-triggered `render()`, going stale. S19's restored
+  Up/Down reorder is a plain synchronous `click` → array-swap → `render()` with no DOM element
+  reference captured before and reused after a render — so the stale-reference mechanism cannot
+  recur. Removing the drag machinery removes the whole failure surface, not just the one traced repro.
+- **Cross-row editor-commit is inherited automatically by the restored Up/Down, no explicit commit
+  logic needed.** Confirmed the editor commits via the delegated `focusout` listener (`script.js`
+  ~1338-1345), not via each action handler calling `commitEditor()`. Tapping an Up/Down button (in
+  the same `listRoot`) blurs any open editor input → `focusout` → deferred `commitEditor()`, exactly
+  the path `delete` already uses today while an editor is open on another row. The swap operates on
+  the item array by id (order-independent) and the draft commits by id afterward, so no draft is
+  lost and no ordering hazard exists — same already-shipped behavior as delete-while-editing. Not a
+  gap; S19's AC didn't need to (and doesn't) restate it.
+- **S19's cited "S9 forward-reference note" genuinely exists and is correctly formed** — S9's row
+  (BACKLOG.md line 268) carries an explicit 2026-09-09 note stating that once S19 ships, S9's
+  non-Manual-sort clause re-points from S13's drag mechanic to S19's restored Up/Down, behavior
+  unchanged, left pointing at S13 until S19 actually ships so Tester's coverage keeps matching what's
+  implemented. Not a dangling citation (unlike M16's case on S15). The S9 test-side rewrite
+  (TC9.8/TC9.9) is correctly flagged as Tester's call in S19 finding (e).
+- **Disabled Up/Down state survives S20's framelessness** — the disabled affordance is
+  `opacity: 0.3` (`.items .icon-btn:disabled`, `style.css` 326-329) plus `opacity: 0.4` on the base
+  `button:disabled` — opacity-based, fully independent of border/background, so top-row-Up /
+  bottom-row-Down still read as disabled after the frameless restyle. (Went in expecting a possible
+  "disabled cue lost when the box is removed" finding; checking the real CSS ruled it out.)
+- **The 6-icon worst-case row is correctly identified and its verification correctly locked.**
+  Enumerated it against `renderRow()`: a both-fields-EMPTY item in Manual sort renders note-toggle +
+  aisle-toggle + S15 edit (`name-toggle`, always present since names are never empty) + Up + Down +
+  delete = 6 primary-line icons; populating a field removes its toggle (moves to a second line), and
+  every non-Manual sort hides Up/Down (≤4 icons), so Manual/empty-fields/6-icon genuinely is the
+  horizontal worst case. S19 (a)+(f) lock the right thing: measure that real row at 320/360/375/390px
+  with the no-horizontal-overflow guardrail (flex-wrap permitted) as the deterministic pass/fail
+  line, "~20 chars" kept as a PO-accepted observation not a per-character assertion, and the same
+  measurement doubling as the deferred definitive S7/S8 crowded-row closure re-measurement. Correct.
+- **S20 does not undo S14's shrink and does not itself relieve horizontal crowding** — it changes
+  chrome (removed) and glyph size (enlarged to fill) within S14's existing ~19.5px footprint only.
+  Consequence worth noting (not a defect): since S20 adds no horizontal room, if the 6-icon row wraps
+  at 320px, that wrap is within S19 (f)'s accepted no-overflow-with-flex-wrap guardrail, not a
+  failure — S19 and S20 are internally consistent on this.
+- **S20's text-tag exclusion is correct against real CSS** — `.note-display`/`.aisle-tag` carry only
+  a dashed underline + small padding (no `.icon-btn` border/box), so the PO's "tiny icon in a square
+  button" instruction correctly doesn't apply to them; same boundary S14 already drew (N6).
+- **The `user-select`/`-webkit-*` handling in S19 finding (c) matches the real CSS** — base
+  `user-select: none` (S1/S2 whole-row-tap guard, line 169) correctly stays; the drag-motivated
+  `-webkit-user-select`/`-webkit-touch-callout` additions (line ~170-190) correctly kept but
+  re-scoped as general whole-row tap suppression, and the previously-tracked iOS real-device re-test
+  correctly becomes moot once no press-and-hold gesture remains.
+
+---
+
+### Verdict
+
+**Both S19 and S20 clear this gate — no Real findings for either.** Two Minors (M19 on S19, M20 on
+S20), both cheap no-PO-input removal-completeness clarifications in the same category the stories'
+own Developer-sanity-check findings already handle; recommend Scrum Master fold both in before Lock
+(fastest, matches how prior gates folded small items in one pass) or track them as explicit
+non-blocking follow-ups — neither blocks Lock on its own merits. N9/N10 (S20) are optional tidy-ups,
+no action required. The substantive verification that must actually happen at S19's formal pass — the
+true 6-icon empty-fields row measured at 320px against the no-overflow guardrail, doubling as the
+S7/S8 closure re-measurement — is correctly locked and correctly scoped; nothing to add there.
+Advisory only, as always — the Lock decision is Scrum Master's.
