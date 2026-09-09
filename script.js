@@ -345,246 +345,50 @@
     showToast('Cleared ' + entries.length + ' item' + (entries.length === 1 ? '' : 's') + ' — Undo');
   }
 
-  // ---- S13: drag-and-drop reorder (supersedes S5's Up/Down buttons) -------
-  // Locked AC, 2026-09-08 (6 rounds of QA hardening - drop-position rule,
-  // jitter tolerance, out-of-bounds clamp, pointercancel abort, then
-  // M9-M12, then M15's tie-break). Built on raw Pointer Events specifically
-  // (not a touch-only listener) so it's Playwright-automatable and behaves
-  // consistently across mouse/touch/pen. No dedicated drag-handle icon -
-  // the whole row (outside the other nested controls) is the drag surface,
-  // a Developer-level choice explicitly left open by the AC; this also
-  // avoids adding yet another icon to the row S14 just finished shrinking
-  // for space.
+  // ---- S19: Up/Down reorder buttons (restores S5's mechanism; supersedes
+  // and fully removes S13's drag-and-drop) ---------------------------------
+  // Drafted/Locked 2026-09-09, PO decision after drag-and-drop failed a
+  // SECOND time on their real iPhone: the Pointer-Events drag lost to the
+  // browser's native scroll ("when i try to drag the item, it scrolls the
+  // screen instead of moving the item"). Root cause diagnosed as a WebKit
+  // touch-action-latched-at-touchstart conflict that desktop Chromium (and
+  // Playwright's synthetic pointer events) structurally cannot reproduce, so
+  // it passed 219/219 in automation yet fails on device - not trivially
+  // fixable without a dedicated drag handle (a UX change the PO declined).
+  // PO: "i'll take crowded over not working." All of S13's drag machinery is
+  // gone entirely - the pointer state machine (dragArm/dragState), the pickup
+  // delay + jitter arming, the live placeholder, the auto-scroll-near-edge
+  // loop, the trailing-click suppression, the document-level fallback
+  // listeners (old M18), and the drag-only CSS. This is a pure UI/interaction
+  // reversal: S13 never touched S5's persisted manual-order data model, so
+  // there is no migration - the array-order/localStorage/undo logic is
+  // identical to what S5 shipped and S13 carried forward verbatim.
   //
-  // Three-phase state machine, deliberately kept as two separate variables
-  // rather than one - `dragArm` (during the pickup delay, before anything
-  // visible has happened) and `dragState` (an actual drag is underway) have
-  // different shapes and different valid transitions, and conflating them
-  // risked exactly the kind of "is this armed or dragging" ambiguity bugs
-  // like this tend to produce:
-  //   dragArm   = { pointerId, id, startX, startY, timerId }
-  //   dragState = { pointerId, id, startIndex, otherIds, currentIndex,
-  //                 rowEl, placeholderEl, scrollDir, lastClientX,
-  //                 lastClientY, rafId }
-  var DRAG_PICKUP_DELAY_MS = 450; // Developer-level tuning detail, not PO-locked - long enough that an ordinary scroll/tap never accidentally arms a pickup
-  var DRAG_JITTER_TOLERANCE_PX = 10; // Developer-level tuning detail, not PO-locked
-  var DRAG_EDGE_ZONE_PX = 56; // auto-scroll trigger-zone size, Developer-level tuning detail
-  var DRAG_EDGE_SCROLL_SPEED = 14; // px/frame while inside the edge zone, Developer-level tuning detail
-
-  var dragArm = null;
-  var dragState = null;
-  // Set the instant a real pickup begins (see beginDrag), consumed by the
-  // very next 'click' event (see the click listener below). Needed because
-  // `rowEl.setPointerCapture()` (below) redirects the eventual pointerup -
-  // and therefore the browser's own trailing synthetic `click` - back onto
-  // the ORIGINAL row element regardless of where the pointer physically
-  // ended up, which would otherwise cross the item off as an unwanted side
-  // effect of every successful (or no-op) drag.
-  var suppressNextClick = false;
-
-  // Arms the suppression above. Split into its own function rather than a
-  // bare assignment specifically to attach a safety-net expiry: a real
-  // trailing `click` reliably follows the pointerup that ends a genuine
-  // drag (browsers generate one via the captured pointer regardless of how
-  // far it moved - this is exactly why the suppression is needed at all),
-  // but this flag must never stay armed indefinitely waiting for one, in
-  // case some browser/input-device quirk ever skips it without going
-  // through a proper `pointercancel`. 250ms comfortably covers a real
-  // click's arrival while being far shorter than DRAG_PICKUP_DELAY_MS, so it
-  // can't bleed into some later, unrelated gesture's own click.
-  function armClickSuppression() {
-    suppressNextClick = true;
-    setTimeout(function () { suppressNextClick = false; }, 250);
-  }
-
-  // Returns every real row <li> currently in the DOM except the one being
-  // dragged - i.e. exactly `otherIds`, in current display order. Drag is
-  // manual-sort-only (guarded at pointerdown, below), so DOM order matches
-  // state.items order 1:1 with no group-header rows in between.
-  function getOtherRowElements() {
-    var all = listRoot.querySelectorAll('li[data-id]');
-    var rows = [];
-    for (var i = 0; i < all.length; i++) {
-      if (all[i] !== dragState.rowEl) rows.push(all[i]);
-    }
-    return rows;
-  }
-
-  // Drop-position rule (locked AC testability-check finding #1): whether the
-  // pointer sits above or below the midpoint of the row it's currently over
-  // determines insert-before vs. insert-after that row. A pointer above the
-  // very first row, or past the very last row's midpoint, clamps to the
-  // nearest boundary (testability-check finding #3) rather than treating it
-  // as a no-match - this same function serves both the live placeholder
-  // position AND the eventual drop target, since they're the same
-  // computation run continuously.
-  function computeInsertionIndex(rows, clientY) {
-    if (rows.length === 0) return 0;
-    var firstRect = rows[0].getBoundingClientRect();
-    if (clientY < firstRect.top) return 0;
-    for (var i = 0; i < rows.length; i++) {
-      var rect = rows[i].getBoundingClientRect();
-      var mid = rect.top + rect.height / 2;
-      if (clientY < mid) return i;
-    }
-    return rows.length; // past the last row's midpoint (or past its bottom edge, out-of-bounds) - clamp to the end
-  }
-
-  function movePlaceholderTo(rows, target) {
-    var placeholder = dragState.placeholderEl;
-    var ul = listRoot.querySelector('ul.items');
-    if (!ul) return; // defensive - can't happen mid-drag (the list can't have gone empty while an item is still being dragged)
-    if (target >= rows.length) {
-      ul.appendChild(placeholder);
-    } else {
-      rows[target].parentNode.insertBefore(placeholder, rows[target]);
-    }
-  }
-
-  // Deliberately does NOT call render() - a full DOM rebuild on every single
-  // pointermove would be wasteful (Developer sanity-check note) and would
-  // also destroy the very placeholder/dragging-row elements this function
-  // and its caller depend on. Only a raw `insertBefore` of the lightweight
-  // placeholder element moves; state.items itself is untouched until drop.
-  function updateDragPosition(clientX, clientY) {
-    dragState.lastClientX = clientX;
-    dragState.lastClientY = clientY;
-    var vh = window.innerHeight;
-    if (clientY < DRAG_EDGE_ZONE_PX) dragState.scrollDir = -1;
-    else if (clientY > vh - DRAG_EDGE_ZONE_PX) dragState.scrollDir = 1;
-    else dragState.scrollDir = 0;
-    var rows = getOtherRowElements();
-    var target = computeInsertionIndex(rows, clientY);
-    if (target === dragState.currentIndex) return;
-    dragState.currentIndex = target;
-    movePlaceholderTo(rows, target);
-  }
-
-  // PO-required auto-scroll (2026-09-08, resolving Developer's sanity-check
-  // question - "the grocery lists can sometimes be quite long... that level
-  // of complexity is unfortunately important"): while the pointer stays near
-  // the top/bottom edge of the viewport during an active drag, keep scrolling
-  // in that direction for as long as it stays there, re-deriving the
-  // insertion point after each scroll tick since scrolling moves every row's
-  // viewport-relative rect even though the pointer itself hasn't moved.
-  function startAutoScrollLoop() {
-    function tick() {
-      if (!dragState) return;
-      if (dragState.scrollDir !== 0) {
-        window.scrollBy(0, dragState.scrollDir * DRAG_EDGE_SCROLL_SPEED);
-        updateDragPosition(dragState.lastClientX, dragState.lastClientY);
-      }
-      dragState.rafId = requestAnimationFrame(tick);
-    }
-    dragState.rafId = requestAnimationFrame(tick);
-  }
-
-  // Takes the drag-state snapshot explicitly rather than reading the
-  // module-level `dragState` variable itself - endDrag() below nulls that
-  // out FIRST, before calling this, specifically so tick()'s own
-  // `if (!dragState) return` guard is already live for any frame that might
-  // somehow still be in flight, and this function's own cancelAnimationFrame
-  // call is pure belt-and-suspenders on top of that, not the only line of
-  // defense.
-  function stopAutoScrollLoop(ds) {
-    if (ds && ds.rafId) cancelAnimationFrame(ds.rafId);
-  }
-
-  function beginDrag(id, li, pointerId) {
-    dragArm = null;
-    // Cross-row commit guarantee (locked AC): starting a pickup must commit,
-    // never silently discard, a note/aisle/name draft still open on a
-    // DIFFERENT row (S15 extends this same guarantee to its own name
-    // editor) - same "unrelated action" treatment S7/S8 already require of
-    // Undo/reorder/add. (A SAME-row open editor can never reach this point
-    // at all - see the pointerdown guard below, QA finding M9 - so any
-    // `editingField` still set here is guaranteed to belong to some other
-    // row.)
-    if (editingField) commitEditor();
+  // A neighbor move (splice the item out and back in one slot over) is
+  // exactly equivalent to S5's original swap-with-immediate-neighbor and
+  // produces an identical resulting order, so it reuses performUndo()'s
+  // existing { type:'reorder', id, fromIndex, toIndex } handler verbatim
+  // (undo = splice back out, reinsert at fromIndex) rather than resurrecting
+  // S5's retired { idA, idB } swap-shaped entry, which no longer has any
+  // producer. Up/Down are rendered per-row (renderRow) only while in Manual
+  // sort, and gated at the top/bottom by a `disabled` attribute - so a
+  // non-Manual sort simply doesn't render them at all. That JS-gate is what
+  // lets QA finding M19's now-dead `sort-manual` CSS class be removed
+  // outright (it existed only to give the drag its `grab` cursor hint).
+  function moveItem(id, direction) {
+    // direction: -1 = up (toward index 0), +1 = down (toward the end).
     var idx = findIndexById(id);
-    if (idx === -1) return; // defensive - the row can't actually vanish between pointerdown and now (committing an editor doesn't delete rows), but never assume
-    // Bug fix (2026-09-09, QA finding C1 - real, reproducible crash, not
-    // hypothetical): the `li` parameter above is a DOM reference captured at
-    // `pointerdown` time, up to DRAG_PICKUP_DELAY_MS ago. `commitEditor()`
-    // just above (or, more generally, ANY other mutating action that
-    // happened to run during that same arming delay - an Undo, an add, a
-    // delete elsewhere, not only a cross-row editor commit) runs a full
-    // render() - renderList()'s `innerHTML` rebuild - which destroys and
-    // replaces EVERY <li> in the list, including this one. From that point
-    // on the original `li` is a detached node (`parentNode === null`), even
-    // though `id` itself is still perfectly valid in `state.items` (the
-    // `idx` check above only guards the DATA model, not this DOM reference -
-    // exactly the gap that let a detached-node crash through). Re-fetching
-    // the CURRENT live element by id - the same "never trust a reference
-    // across a render, re-derive fresh" discipline `idx` above already
-    // follows - fixes this at the root for every cause of staleness, not
-    // just the one specific repro QA found, rather than special-casing
-    // detachment defensively line by line further down.
-    li = listRoot.querySelector('li[data-id="' + id + '"]');
-    if (!li) return; // defensive - can't actually happen (idx above already confirmed the item is still in state.items, and render() unconditionally renders every state.items entry as its own <li>), but never assume
-    armClickSuppression();
-    try { li.setPointerCapture(pointerId); } catch (e) { /* QA finding M18: this only catches setPointerCapture THROWING outright - it doesn't cover capture silently not being honored. Without real capture, once the pointer moves outside listRoot's own bounds entirely (e.g. released over the header, per the out-of-bounds AC scenario), a pointerup/pointercancel dispatched there via ordinary hit-testing never bubbles through listRoot at all, so the delegated listeners below would never fire - leaving dragState (and drag-active's touch-action:none) stuck indefinitely, the same stuck-state failure family as C1. The document-level fallback listeners further down exist specifically to cover that gap. */ }
-    li.classList.add('dragging');
-    listRoot.classList.add('drag-active'); // QA finding M12: suppresses ordinary touch-scroll for the drag's duration - auto-scroll above is the only scrolling allowed while this class is present
-    var placeholder = document.createElement('li');
-    placeholder.className = 'drag-placeholder';
-    li.parentNode.insertBefore(placeholder, li.nextSibling);
-    var otherIds = [];
-    for (var i = 0; i < state.items.length; i++) {
-      if (state.items[i].id !== id) otherIds.push(state.items[i].id);
-    }
-    dragState = {
-      pointerId: pointerId, id: id, startIndex: idx, otherIds: otherIds,
-      // Inserting at `idx` within `otherIds` exactly reproduces the
-      // original array (otherIds is state.items with this one id removed,
-      // so everything before `idx` is unchanged and everything from `idx`
-      // on shifts back into place) - this is also exactly M11's no-op
-      // tie-break condition: currentIndex still equal to startIndex at drop
-      // time means nothing actually moved.
-      currentIndex: idx,
-      rowEl: li, placeholderEl: placeholder, scrollDir: 0,
-      lastClientX: 0, lastClientY: 0, rafId: null
-    };
-    startAutoScrollLoop();
-  }
-
-  // aborted=true is a `pointercancel` (QA finding R9): abort entirely, no
-  // commit, no undo entry, item snaps back to its original position (true
-  // by construction - state.items was never touched during the drag, only
-  // the placeholder moved) - a pointercancel is never treated as an implicit
-  // drop. aborted=false is a normal `pointerup`: commit the move UNLESS
-  // it's a same-position no-op (M11/M15 - no undo entry either, since the
-  // resulting order is provably identical either way).
-  function endDrag(aborted) {
-    var ds = dragState;
-    dragState = null; // cleared FIRST - see stopAutoScrollLoop()'s own comment for why the ordering matters
-    stopAutoScrollLoop(ds);
-    try { ds.rowEl.releasePointerCapture(ds.pointerId); } catch (e) { /* already released, or capture was never supported - harmless either way */ }
-    ds.rowEl.classList.remove('dragging');
-    listRoot.classList.remove('drag-active');
-    if (ds.placeholderEl.parentNode) ds.placeholderEl.parentNode.removeChild(ds.placeholderEl);
-    if (aborted) {
-      // No trailing `click` will ever fire for a cancelled pointer (per the
-      // Pointer Events spec, a pointercancel means the compatibility mouse
-      // events - including the eventual click - never fire at all) - don't
-      // leave the flag armed to wrongly swallow some LATER, unrelated tap.
-      suppressNextClick = false;
-    } else if (ds.currentIndex !== ds.startIndex) {
-      var byId = {};
-      for (var i = 0; i < state.items.length; i++) byId[state.items[i].id] = state.items[i];
-      var newIds = ds.otherIds.slice();
-      newIds.splice(ds.currentIndex, 0, ds.id);
-      var rebuilt = [];
-      for (var j = 0; j < newIds.length; j++) rebuilt.push(byId[newIds[j]]);
-      state.items = rebuilt;
-      setLastAction({ type: 'reorder', id: ds.id, fromIndex: ds.startIndex, toIndex: ds.currentIndex });
-      saveState();
-    }
-    // else: same-position no-op (M11/M15) - no mutation, no undo entry, but
-    // the pointerup that ended this drag still generates a trailing `click`
-    // on the captured row (setPointerCapture redirects it there) -
-    // `suppressNextClick` stays armed from beginDrag() to swallow exactly
-    // that one click, so a no-op drag doesn't ALSO cross the item off.
+    if (idx === -1) return;
+    var targetIdx = idx + direction;
+    if (targetIdx < 0 || targetIdx >= state.items.length) return; // top row's Up / bottom row's Down: no neighbor to swap with, no-op (buttons are also rendered `disabled` in these positions, this is belt-and-suspenders)
+    var item = state.items[idx];
+    state.items.splice(idx, 1);
+    state.items.splice(targetIdx, 0, item);
+    // Undo-eligible, same as S5's swaps and S13's drops both were (one of
+    // S6's four types); undo restores the exact prior order via the existing
+    // 'reorder' handler in performUndo().
+    setLastAction({ type: 'reorder', id: id, fromIndex: idx, toIndex: targetIdx });
+    saveState();
     render();
   }
 
@@ -602,7 +406,9 @@
     } else if (action.type === 'delete') {
       restoreEntries(action.entries);
     } else if (action.type === 'reorder') {
-      // Inverse of a drag-drop move (S13): pull the item out from wherever
+      // Inverse of a reorder move (S19's Up/Down neighbor swap; previously
+      // S13's drag-drop - identical undo entry shape, so this handler is
+      // unchanged across that supersession): pull the item out from wherever
       // it landed and reinsert it at its exact prior position. By
       // construction this is always the single most recent mutating action
       // when reached here (S6's single-slot buffer - any other mutation in
@@ -982,7 +788,7 @@
       .replace(/'/g, '&#39;');
   }
 
-  function renderRow(item) {
+  function renderRow(item, index, total) {
     var safeName = escapeHtml(item.name);
     var noteVal = item.note || '';
     var aisleVal = item.aisle || '';
@@ -1059,6 +865,24 @@
       ? '<button type="button" class="icon-btn" data-role="name-toggle" title="Edit item">' + NAME_EDIT_ICON_GLYPH + '</button>'
       : '';
 
+    // S19 (Locked, 2026-09-09): Up/Down reorder controls, restored from S5,
+    // replacing S13's removed drag-and-drop. Rendered ONLY in Manual sort -
+    // the same manual-order-only rule S9 has always described (S13 had merely
+    // swapped in its drag equivalent under that same rule); JS-gating it here
+    // is what let the old `sort-manual` class be removed (QA M19). `index`/
+    // `total` are the item's position in the current display order, which in
+    // Manual sort is identical to its state.items index (no group headers, no
+    // sorted reordering interposed), exactly what moveItem() operates on - so
+    // the top row's Up and the bottom row's Down are `disabled` no-ops with no
+    // neighbor to swap with. In any non-Manual sort this is empty (drag/
+    // Up-Down are meaningless when visible order != manual order).
+    var reorderButtons = '';
+    if (sortMode === 'manual') {
+      reorderButtons =
+        '<button type="button" class="icon-btn" data-role="up" title="Move up"' + (index === 0 ? ' disabled' : '') + '>▲</button>' +
+        '<button type="button" class="icon-btn" data-role="down" title="Move down"' + (index === total - 1 ? ' disabled' : '') + '>▼</button>';
+    }
+
     // Second line (locked AC, S7/S8): a row with a non-empty note/aisle (or
     // either editor currently open) may grow to a second line to fit it;
     // `flex-basis: 100%` (style.css) is what forces this onto its own line
@@ -1096,7 +920,7 @@
     return '<li class="' + (item.checked ? 'checked' : '') + '" data-id="' + item.id + '"' +
       ' role="checkbox" tabindex="0" aria-checked="' + (item.checked ? 'true' : 'false') + '" aria-label="' + safeName + '">' +
       nameContent +
-      noteAffordance + aisleAffordance + editButton +
+      noteAffordance + aisleAffordance + editButton + reorderButtons +
       '<button type="button" class="icon-btn delete-btn" data-role="delete" title="Delete">✕</button>' +
       secondLine +
       '</li>';
@@ -1130,7 +954,7 @@
     }
 
     // S9: iterate the SORTED VIEW for display only - every mutation
-    // function (findIndexById, S13's drag-drop endDrag, removeEntries/
+    // function (findIndexById, S19's Up/Down moveItem, removeEntries/
     // restoreEntries) keeps operating on `state.items`' own true order,
     // completely independent of whatever's rendered here.
     var displayItems = getSortedItems();
@@ -1150,7 +974,7 @@
         }
       }
 
-      html += renderRow(item);
+      html += renderRow(item, i, displayItems.length);
     }
     html += '</ul>';
     listRoot.innerHTML = html;
@@ -1220,13 +1044,10 @@
     renderClearCheckedButton();
     renderAisleDatalist();
     renderSuggestions();
-    // S13: cursor affordance only - draggability itself is gated at
-    // pointerdown time (see the listener below) by the same `sortMode`
-    // check, this class just gives a visual "grab" cursor hint in Manual
-    // mode instead of the ordinary tap cursor, and reappears/disappears
-    // automatically with every render, same as Up/Down used to appear/
-    // disappear per S9's original locked AC.
-    listRoot.classList.toggle('sort-manual', sortMode === 'manual');
+    // S19 (QA finding M19): the old `sort-manual` class toggle (S13's, which
+    // existed only to switch on the drag `grab` cursor hint) is gone -
+    // Up/Down visibility is JS-gated directly in renderRow() by `sortMode`,
+    // so there's nothing left for a body/container class to drive here.
   }
 
   function showToast(message) {
@@ -1251,14 +1072,6 @@
   // `data-role` now, and a click to position the cursor inside an open
   // editor must not fall through to the row-toggle branch either.
   listRoot.addEventListener('click', function (e) {
-    // S13: swallow exactly the one trailing `click` a completed drag-pickup
-    // gesture generates (see beginDrag()/endDrag()'s own comments for why
-    // this is necessary, not just defensive) - must be the very first check,
-    // before any other branch gets a chance to act on this click.
-    if (suppressNextClick) {
-      suppressNextClick = false;
-      return;
-    }
     var li = e.target.closest && e.target.closest('li[data-id]');
     if (!li) return;
     var nested = e.target.closest('[data-role]');
@@ -1269,6 +1082,8 @@
       else if (role === 'note-toggle') openEditor(id, 'note');
       else if (role === 'aisle-toggle') openEditor(id, 'aisle');
       else if (role === 'name-toggle') openEditor(id, 'name');
+      else if (role === 'up') moveItem(id, -1); // S19: swap with the neighbor above
+      else if (role === 'down') moveItem(id, 1); // S19: swap with the neighbor below
       // role === 'note-input' / 'aisle-input' / 'name-input': no action
       // needed here, just let the native input handle cursor placement - but
       // still return below rather than falling through to toggleChecked.
@@ -1345,109 +1160,12 @@
     }
   });
 
-  // S13: drag-and-drop pickup/move/drop, delegated on listRoot per the
-  // app's established event-delegation pattern. Split across four Pointer
-  // Event types (locked AC requires Pointer Events specifically, not a
-  // touch-only listener, so this is Playwright-automatable):
-  //   pointerdown   - arm a pickup after a deliberate delay, IF this press
-  //                    didn't land on a nested control and isn't this row's
-  //                    own open editor (nested-control precedence, both
-  //                    directions - QA finding M9/M10)
-  //   pointermove   - while armed: jitter-tolerance check, cancels the arm
-  //                    (falls through to an ordinary scroll) if exceeded;
-  //                    while actively dragging: drive the live placeholder
-  //   pointerup     - while armed: released before the delay elapsed, an
-  //                    ordinary tap - just clear the arm, let the natural
-  //                    `click` fire unchanged; while dragging: commit
-  //   pointercancel - while armed: clear the arm, no side effects; while
-  //                    dragging: abort entirely, no commit (QA finding R9)
-  listRoot.addEventListener('pointerdown', function (e) {
-    if (sortMode !== 'manual') return; // S9: drag is a manual-order-only operation, same restriction S5's buttons had
-    if (dragArm || dragState) return; // a gesture is already in flight for another pointer - defensive, this is a single-user phone app, not a real multi-touch target
-    var li = e.target.closest && e.target.closest('li[data-id]');
-    if (!li) return;
-    if (e.target.closest('[data-role]')) return; // nested-control precedence: never arm a pickup from delete/note-toggle/aisle-toggle or an open editor's own input
-    var id = Number(li.dataset.id);
-    // QA finding M9: a row with its OWN note/aisle/name editor currently
-    // open cannot be drag-picked-up at all (S15's name editor is covered by
-    // this exact same `editingField.id === id` check, generic over field
-    // type - no S15-specific change needed here) - a press-and-hold anywhere
-    // on that row is left as ordinary interaction with the open editor, not
-    // a drag attempt. (The data-role check just above already excludes the
-    // input element itself; this additionally excludes the rest of that same
-    // row - its item-name text, its blank space - while that row's editor
-    // is open.)
-    if (editingField && editingField.id === id) return;
-    var startX = e.clientX, startY = e.clientY, pointerId = e.pointerId;
-    var timerId = setTimeout(function () {
-      beginDrag(id, li, pointerId);
-    }, DRAG_PICKUP_DELAY_MS);
-    dragArm = { pointerId: pointerId, id: id, startX: startX, startY: startY, timerId: timerId };
-  });
-
-  listRoot.addEventListener('pointermove', function (e) {
-    if (dragArm && e.pointerId === dragArm.pointerId) {
-      var dx = e.clientX - dragArm.startX, dy = e.clientY - dragArm.startY;
-      if (Math.sqrt(dx * dx + dy * dy) > DRAG_JITTER_TOLERANCE_PX) {
-        // Jitter tolerance exceeded before the delay elapsed (locked AC
-        // testability-check finding #2): cancel the arm outright and treat
-        // this as an ordinary scroll - no drag begins, and a LATER press
-        // starts a fresh delay from zero, it never resumes from where this
-        // one left off.
-        clearTimeout(dragArm.timerId);
-        dragArm = null;
-      }
-      return;
-    }
-    if (dragState && e.pointerId === dragState.pointerId) {
-      e.preventDefault(); // block native touch-scroll for the rest of this gesture (QA finding M12) - the auto-scroll loop above is the only scrolling that happens now
-      updateDragPosition(e.clientX, e.clientY);
-    }
-  });
-
-  listRoot.addEventListener('pointerup', function (e) {
-    if (dragArm && e.pointerId === dragArm.pointerId) {
-      clearTimeout(dragArm.timerId);
-      dragArm = null; // released before the delay elapsed - ordinary tap, the natural click fires unchanged, nothing to suppress
-      return;
-    }
-    if (dragState && e.pointerId === dragState.pointerId) {
-      endDrag(false);
-    }
-  });
-
-  listRoot.addEventListener('pointercancel', function (e) {
-    if (dragArm && e.pointerId === dragArm.pointerId) {
-      clearTimeout(dragArm.timerId);
-      dragArm = null;
-      return;
-    }
-    if (dragState && e.pointerId === dragState.pointerId) {
-      endDrag(true);
-    }
-  });
-
-  // QA finding M18: document-level fallback for the case setPointerCapture
-  // (in beginDrag(), above) silently doesn't take effect - if the pointer
-  // ends up outside listRoot's own bounds entirely without real capture in
-  // place (e.g. released over the header), the resulting pointerup/
-  // pointercancel is dispatched via ordinary hit-testing to whatever's
-  // actually under the pointer there, which never bubbles through listRoot
-  // at all, so the delegated listeners above would simply never fire -
-  // stranding dragState (and drag-active's touch-action:none) indefinitely,
-  // same stuck-state failure family as QA finding C1. `document` always
-  // receives the event via ordinary bubbling regardless of where on the
-  // page it's targeted. Bubble order guarantees listRoot's own listener
-  // (closer to the target) runs FIRST whenever it DOES successfully receive
-  // the event, so this never double-fires endDrag() - `dragState` is
-  // already null by the time this fallback runs in the normal case, making
-  // it a no-op exactly when it should be.
-  document.addEventListener('pointerup', function (e) {
-    if (dragState && e.pointerId === dragState.pointerId) endDrag(false);
-  });
-  document.addEventListener('pointercancel', function (e) {
-    if (dragState && e.pointerId === dragState.pointerId) endDrag(true);
-  });
+  // S19: drag-and-drop is gone entirely (see moveItem()'s header comment for
+  // why). Reordering is now S5's Up/Down buttons, handled by the delegated
+  // `click` listener above (data-role 'up'/'down' -> moveItem). No Pointer
+  // Event listeners remain - the whole pointerdown/move/up/cancel state
+  // machine and the document-level M18 fallback listeners were removed with
+  // the drag mechanism they served.
 
   addForm.addEventListener('submit', function (e) {
     e.preventDefault(); // Enter key also submits via the form itself

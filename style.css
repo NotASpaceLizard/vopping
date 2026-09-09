@@ -198,54 +198,17 @@ button:disabled {
   color: var(--text-muted);
 }
 
-/* S13 (Locked, 2026-09-08): drag-and-drop reorder, built on raw Pointer
-   Events (script.js). No dedicated drag-handle icon - the whole row is the
-   drag surface in Manual sort, so `grab` is the cursor hint that a row is
-   draggable at all (a plain `pointer` cursor already covers "tappable" via
-   the base `.items li` rule above, in every sort mode; `sort-manual` narrows
-   this specifically to when dragging is actually possible - S9 locked AC,
-   dragging is a manual-order-only operation, same restriction S5's Up/Down
-   buttons had). */
-#list-root.sort-manual .items li {
-  cursor: grab;
-}
-
-/* The row actively being held mid-drag - dimmed in place (not moved in the
-   DOM; only the placeholder below moves) so it's clearly "picked up" while
-   the placeholder shows where it'll land. */
-.items li.dragging {
-  opacity: 0.35;
-  cursor: grabbing;
-}
-
-/* Live insertion-point indicator - a slim accent-colored bar rather than a
-   full ghost row, deliberately lightweight since it's repositioned via a
-   raw `insertBefore` on every pointermove (script.js's updateDragPosition),
-   not a full render(). The extra class beats the generic `.items li` rule's
-   padding/border/flex-wrap on specificity, so this doesn't inherit the
-   ordinary row chrome (padding/border/cursor) at all. */
-.items li.drag-placeholder {
-  padding: 0;
-  margin: 3px 0;
-  border: none;
-  border-radius: 2px;
-  background: var(--accent);
-  height: 4px;
-  min-height: 4px;
-  cursor: default;
-  flex-wrap: nowrap;
-}
-
-/* QA finding M12: once a drag is actively underway, ordinary touch-scroll
-   of the page is suppressed for the drag's duration - the auto-scroll-near-
-   viewport-edge mechanic (script.js) is the only scrolling that happens
-   while this class is present. Applied to the list container (not just the
-   dragged row) since the whole list must stop panning underneath an active
-   drag, not only the one row. */
-#list-root.drag-active {
-  touch-action: none;
-  user-select: none;
-}
+/* S19 (Locked, 2026-09-09): S13's drag-and-drop was removed entirely (it lost
+   to native scroll on the PO's real iPhone - see script.js's moveItem() header
+   for the root-cause diagnosis). All of its drag-only CSS was removed with it:
+   the `#list-root.sort-manual .items li { cursor: grab }` hint, the
+   `.items li.dragging` picked-up state, the `.items li.drag-placeholder`
+   insertion bar, and `#list-root.drag-active`'s `touch-action: none`
+   scroll-suppression. Reordering is back to S5's Up/Down buttons, which are
+   ordinary `.icon-btn` controls (styled below). The row's plain
+   `user-select: none` and the `-webkit-user-select`/`-webkit-touch-callout`
+   suppressions remain on `.items li` above as general tap-target hygiene,
+   independent of the drag gesture they were last touched for. */
 
 .items .item-name {
   flex: 1;
@@ -307,14 +270,29 @@ button:disabled {
    just reached via the reverse implementation order. */
 .items .icon-btn {
   flex-shrink: 0;
+  /* S14: footprint held at 19.5px (~25% below the original 26px). S20 keeps
+     this footprint EXACTLY unchanged - width/height/min-width stay 19.5px, so
+     the row height is unaffected; S20 only strips the chrome and enlarges the
+     glyph WITHIN this same box. */
   width: 19.5px;
   height: 19.5px;
   min-width: 19.5px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  /* S20 (Locked, 2026-09-09): frameless - drop the square outline/background
+     (PO: "make the icon the size of the button and remove the square
+     outline... the appearance of a bigger button without the size of the
+     button actually changing"). `border: none` is EXPLICIT, not just omitted,
+     because it must beat the base `button { border: 1px solid var(--border) }`
+     rule; the old `border-radius: 4px` is dropped as dead (nothing left to
+     round without a border/background). */
+  border: none;
   background: transparent;
   color: var(--text-muted);
-  font-size: 0.6rem;
+  /* S20: glyph scaled up to fill the 19.5px footprint. One uniform size across
+     the mixed glyph set (🗋 ⚑ ✎ ✕ ▲ ▼) renders slightly unevenly - accepted
+     per the AC. Font-size does NOT change layout width (the box stays a fixed
+     19.5px), and line-height:1 + the fixed height + inline-flex centering keep
+     the enlarged glyph in-box, so the row does not grow taller. */
+  font-size: 1.15rem;
   line-height: 1;
   display: inline-flex;
   align-items: center;
@@ -328,9 +306,25 @@ button:disabled {
   cursor: default;
 }
 
+/* S20 (QA M20): the inherited base `button:hover { background }` still matches
+   `.icon-btn` and would pop the grey square back on hover - the exact box S20
+   removes. Override it so the control stays frameless on hover. */
+.items .icon-btn:hover {
+  background: transparent;
+}
+
+/* S20 (QA M20, finding d): with no background/border, the background-based
+   press feedback is gone - substitute a subtle, chrome-free `:active` cue. A
+   transform doesn't affect layout, so it can't change row height; it reads as
+   a quick press on the enlarged glyph. */
+.items .icon-btn:active {
+  transform: scale(0.82);
+}
+
 .items .icon-btn.delete-btn {
+  /* S20: `border-color` here is now dead (no border) - removed; the delete
+     control's distinct color survives entirely via `color`. */
   color: #e08080;
-  border-color: #6b3d3d;
 }
 
 /* S16 (Locked, 2026-09-08): PO's icon pick (U+2691 ⚑) was specifically
@@ -343,8 +337,10 @@ button:disabled {
    in Manual/Alphabetical mode, which keeps its ordinary muted-gray
    .icon-btn color unchanged. */
 .items .icon-btn.aisle-sort-icon {
+  /* S20: `border-color` here is now dead (no border) - removed; the aisle-sort
+     icon's accent color survives entirely via `color` (still Okabe-Ito-safe:
+     one uniform accent, not per-aisle color-coding). */
   color: var(--accent);
-  border-color: #2e5a7a;
 }
 
 /* S7/S8: second-line note/aisle content - LOCKED AC (see script.js's
