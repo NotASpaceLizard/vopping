@@ -167,6 +167,26 @@ button:disabled {
   border-bottom: 1px solid var(--bg-card);
   cursor: pointer;
   user-select: none;
+  /* Bug fix (2026-09-09, PO real-device finding on iOS): plain `user-select:
+     none` above was already here from S1/S2's original density lock, but
+     that alone doesn't stop iOS Safari specifically - PO's screenshot showed
+     the browser's own native long-press-to-select-text gesture (blue
+     selection handles + highlighted item-name text) firing at the same time
+     as S13's drag pickup on a 450ms press-and-hold. Two WebKit-specific
+     gaps, neither of which a desktop Chromium test browser has any way to
+     surface (Chromium doesn't implement the same long-press-select/callout
+     behavior on touch that Safari does, so this class of bug is only
+     reachable via a real iOS device, exactly how the PO caught it):
+     `-webkit-user-select: none` for older iOS Safari's own prefixed
+     implementation, and `-webkit-touch-callout: none` for the SEPARATE
+     long-press callout/copy-menu mechanism, which isn't governed by
+     `user-select` at all. This must live on the row's resting state
+     unconditionally (not gated to `.dragging` or `drag-active` below) -
+     iOS's own gesture recognizer starts evaluating a long-press the instant
+     a finger touches down and holds, before S13's JS pickup-delay timer has
+     had any chance to run, let alone add a class. */
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .items li:active {
@@ -332,6 +352,18 @@ button:disabled {
   border-radius: 4px;
   background: var(--bg-page);
   color: var(--text);
+  /* Explicit override, 2026-09-09 (part of the iOS press-and-hold fix
+     above): the parent `.items li`'s new `user-select: none` /
+     `-webkit-user-select: none` / `-webkit-touch-callout: none` are
+     inherited properties - this input's own cursor-placement/text-selection/
+     press-and-hold-to-select-a-word editing behavior must stay completely
+     normal while a note/aisle editor is open, same as any ordinary text
+     field. (The paste-ingest textarea, `#paste-input`, isn't a descendant of
+     `.items li` at all, so it was never at risk here - this override is
+     only needed for the note/aisle editor's own inline input.) */
+  user-select: text;
+  -webkit-user-select: text;
+  -webkit-touch-callout: default;
 }
 
 /* Saved note/aisle display buttons (tap to re-open the editor) - a dashed
