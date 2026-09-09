@@ -1,9 +1,10 @@
 # Test Plan — S20: Frameless icon restyle (glyph fills the footprint)
 
-**STATUS: TESTABILITY REVIEW IN PROGRESS — AC not yet locked.** Testability-check pass on the AC
-drafted 2026-09-09; Developer's sanity-check already landed. Not yet implemented — no formal pass
-exists yet. This is the pre-implementation Tester touch-point; the executed formal pass and Results
-table come after Developer implements.
+**STATUS: DONE — formally executed 2026-09-09, PASS (222/222 combined run; 12 S20-specific checks,
+TC20.1-TC20.10), zero defects.** Citation of record:
+`c:\tmp\pw-test\vopping-tests-tester-s1-s20-formal.js` (new canonical suite, Part 6). Implemented +
+self-verified by Developer at sha `0f76063`. Full transcript: `c:/tmp/pw-test/s1-s20-run2.log`. The
+testability-review section is retained as history.
 
 **Story:** As a user, I want the row control buttons to look bigger and be easier to tap without the
 row getting any taller, so that the row stays comfortable even after the Up/Down buttons come back
@@ -79,12 +80,55 @@ fits at 320px — but because S20 restyles the same controls, the single definit
 measurement flagged on S19's formal pass should be taken against the final **post-S19+S20** layout, so
 it reflects exactly what ships. No separate S20 measurement needed.
 
-## Planned test approach (pre-implementation draft — refined against the shipped build at formal-pass time)
-- TC20.1 Every `.icon-btn` in the set has border removed (computed `border-style: none`/width 0).
-- TC20.2 Every `.icon-btn` has a transparent/none background.
-- TC20.3 Footprint unchanged: each `.icon-btn` computed width/height/min-width still 19.5px (S14 value).
-- TC20.4 Row height unchanged before/after S20 for an identical item (single-line and worst-case rows).
-- TC20.5 Glyph enlarged: computed `font-size` on the glyph is materially larger than the pre-S20 value.
-- TC20.6 Text tags out of scope: `.note-display`/`.aisle-tag` styling unaffected.
-- TC20.7 No behavioral change: each restyled control still fires its own action (full nested-control re-run).
-- TC20.8 S16 aisle-sort icon keeps its accent color, still the locked Okabe-Ito value; + screenshot for PO visual sign-off.
+## Test cases (executed) + Results
+All 12 S20-specific checks passed on a clean run after two test-script bugs were found and fixed
+during authoring (neither an app defect — see the note after this table). Real values quoted from
+the script output.
+
+| Test Case | Covers AC | Actual | Pass/Fail |
+|-----------|-----------|--------|-----------|
+| TC20.1 | Border removed | `.icon-btn` `borderStyle=none borderWidth=0px` | Pass |
+| TC20.2 | Background removed | `.icon-btn` `bg=rgba(0, 0, 0, 0)` (transparent) | Pass |
+| TC20.3 | Footprint UNCHANGED | all 6 icon roles `19.5x19.5` (note/aisle/name/up/down/delete) — the PO's "size doesn't actually change" | Pass |
+| TC20.4 | Row height unchanged | `rowHeight=36.17px` (single-line, no growth) | Pass |
+| TC20.5 | Glyph enlarged | `fontSize=18.4px` (1.15rem — scaled up to fill the footprint) | Pass |
+| TC20.6 | M20 `:hover` | hovering a frameless icon: `bgHover=rgba(0, 0, 0, 0)` (no grey box returns) | Pass |
+| TC20.7 | M20 `:active` cue | real `mouse.down()` press → `transform=matrix(0.82, 0, 0, 0.82, 0, 0)` (chrome-free scale press feedback) | Pass |
+| TC20.8 | Text tags out of scope | `.aisle-tag` `borderBottomStyle=dashed` (its own edit-affordance chrome untouched) | Pass |
+| TC20.9 | No behavioral change | frameless edit-icon still opens its editor; frameless delete still deletes (`before=3 after=2`) (2 sub-checks) | Pass |
+| TC20.10 | Color preserved / colorblind-safe | delete `color=rgb(224, 128, 128)`; By-Aisle icon `color === --accent token` (`rgb(77, 166, 255)`) (2 sub-checks) | Pass |
+
+**Overall verdict: PASS, 0 defects in S20.** 12/12 S20-specific checks + the full rebuilt regression
+baseline clean = **222/222** — see `REGRESSION_LOG.md`'s 2026-09-09 S19/S20 row (current canonical).
+
+**Disclosed, not asserted (not a defect):** a frameless `.icon-btn` still computes `border-radius: 6px`
+inherited from the base `button` rule (the `.icon-btn` rule dropped its own radius as dead). With no
+border and a transparent background there is nothing to round — it has zero rendering effect and is
+not a visible "box", so it satisfies the AC's "remove the square outline" intent. This pass therefore
+asserts the real, visible guarantees (border + background removed) rather than `border-radius === 0`,
+which would be testing an invisible property.
+
+**Observation, out of scope for S20 (routed for awareness, NOT a defect here):** the project's
+`--accent` token computes to `rgb(77, 166, 255)` / `#4DA6FF` (a dark-theme accent blue), not the
+playbook §7 reference `#0072B2`. This value is pre-existing (introduced with S16's accent-colored
+aisle icon, which shipped and passed its own formal pass); S20 only removed the dead `border-color`
+and preserved the `color: var(--accent)` binding. Flagged only so the palette can be reconciled
+against the colorblind-safe reference if desired — not an S20 regression and not blocking.
+
+**Two test-script bugs found and fixed while authoring Part 6 (neither an app defect):**
+1. **TC20.7 (`:active` press cue):** the first draft introspected `document.styleSheets` for the
+   `.icon-btn:active` rule — `cssRules` is not readable for an external stylesheet over `file://`
+   (SecurityError, silently skipped), so it returned `null`. Rewritten to actually hold the pointer
+   down (`mouse.down()`) and read the live computed `transform` — a stronger, real-behavior check.
+2. **TC20.10 (accent color):** the first draft hardcoded the playbook's `#0072B2`; the project's real
+   `--accent` is `#4DA6FF`. Rewritten to read the live `--accent` token value and assert the icon
+   binds to it — the actual S20 guarantee (token preserved through the restyle), not a specific hex.
+
+## Commands run and output
+```
+node c:/tmp/pw-test/vopping-tests-tester-s1-s20-formal.js
+```
+Part 6 subtotal marker: `---- Part 6 (S20 frameless icon restyle) total: 12 new checks ----`.
+Combined total: `222/222 passed`, zero console/page errors, zero dialogs, zero non-`file://` requests.
+Full transcript `c:/tmp/pw-test/s1-s20-run2.log`. The earlier `c:/tmp/pw-test/s1-s20-run1.log` is the
+run that surfaced the two disclosed script bugs (TC20.7/TC20.10), left in place as history.

@@ -1,10 +1,13 @@
 # Test Plan — S19: Restore Up/Down buttons (remove drag-and-drop)
 
-**STATUS: TESTABILITY REVIEW IN PROGRESS — AC not yet locked.** Testability-check pass (this file's
-current purpose) on the AC drafted 2026-09-09; Developer's sanity-check already landed. Not yet
-implemented — no formal pass exists yet. This is the pre-implementation Tester touch-point (verify
-every criterion is concretely verifiable, route gaps to Scrum Master); the executed formal pass and
-Results table come after Developer implements.
+**STATUS: DONE — formally executed 2026-09-09, PASS (222/222 combined run; 13 S19-specific checks,
+TC19.1-TC19.10), zero defects.** Citation of record:
+`c:\tmp\pw-test\vopping-tests-tester-s1-s20-formal.js` (new canonical suite, Part 4 — rebuilt from the
+drag-era s1-s13 suite, which is retired since S19 removes the drag behavior its TC13.* cases asserted).
+Implemented + self-verified by Developer at sha `0f76063` (net −286 lines). Full transcript:
+`c:/tmp/pw-test/s1-s20-run2.log`. The authoritative 6-icon worst-case-row measurement (this story's
+formal-pass deliverable, also discharging the deferred S7/S8 closure) ran clean — see "Worst-case-row
+measurement result" below. The testability-review section is retained as history.
 
 **Story:** As a user, I want to reorder items with Up/Down buttons again instead of drag-and-drop, so
 that reordering actually works on my phone — where the drag gesture loses to the browser's native
@@ -95,16 +98,68 @@ context changed materially since S5 (S15's edit icon is new, S14 shrank the cont
 also assert drag-and-drop is *gone*, which S5's cases never covered). Fresh cases keep S5's own
 history intact as the record of what shipped for its time.
 
-## Planned test approach (pre-implementation draft — refined against the shipped build at formal-pass time)
-- TC19.1 Up/Down buttons present on each row (data-role `up`/`down`), Manual sort.
-- TC19.2 Down-swap exchanges a row with its lower neighbor; nothing else moves.
-- TC19.3 Up-swap exchanges a row with its upper neighbor.
-- TC19.4 Top row's Up disabled (attribute) AND a click is a no-op.
-- TC19.5 Bottom row's Down disabled (attribute) AND a click is a no-op.
-- TC19.6 Swap persists to localStorage immediately and survives refresh.
-- TC19.7 Swap is S6-undo-eligible; Undo restores the exact prior order (self-inverse).
-- TC19.8 Nested-control precedence: clicking Up/Down does NOT toggle the row's cross-off (`aria-checked` unchanged); keyboard variant too.
-- TC19.9 Up/Down hidden/disabled in Alphabetical and By-Aisle; reappear in Manual (re-points S13-era TC9.8/TC9.9 back to Up/Down).
-- TC19.10 Drag-and-drop is gone: press-and-hold past the old delay never arms a drag; `.dragging`/`.drag-placeholder`/`.drag-active` never appear; `touch-action` never goes to `none`; ordinary scroll not suppressed.
-- TC19.11 Whole-row cross-off tap (S2) still works unchanged.
-- TC19.12 (formal-pass measurement) real 6-icon both-fields-empty worst-case row at 320px: no horizontal overflow at 320/360/375/390px (controls may wrap), + screenshot; doubles as the deferred S7/S8 closure re-measurement.
+## Test cases (executed)
+| ID | Covers AC | Expected |
+|----|-----------|----------|
+| TC19.1 | Up/Down restored | Every row has `[data-role=up]`/`[data-role=down]` in Manual sort, glyphs ▲/▼ |
+| TC19.2 | Down-swap | Clicking Down swaps a row with its lower neighbor, nothing else moves |
+| TC19.3 | Up-swap | Clicking Up swaps a row with its upper neighbor |
+| TC19.4 | Top-Up disabled | Top row's Up is `disabled` AND a forced (synthetic) click is a no-op |
+| TC19.5 | Bottom-Down disabled | Bottom row's Down is `disabled` AND a forced click is a no-op |
+| TC19.6 | Persist + refresh | A swap persists to localStorage immediately and survives a reload |
+| TC19.7 | Undo self-inverse | A swap is S6-undo-eligible; Undo restores the exact prior order |
+| TC19.8 | Nested-control precedence | Clicking Up/Down performs only the swap, never crosses off the row |
+| TC19.9 | Drag removed entirely | A full press-hold-move-release reorders nothing; no `.dragging`/`.drag-placeholder`; no stuck `touch-action:none` |
+| TC19.10 | S2 unaffected | Whole-row cross-off tap still works after the drag removal |
+
+Sort-mode gating (Up/Down hidden in non-Manual, present in Manual) is verified in Part 2's rewritten
+TC9.8/TC9.9 (see `S9-sort-view.md`'s dated note) rather than duplicated here.
+
+## Results
+All 13 S19-specific checks passed on a clean run. Real values quoted from the script output.
+
+| Test Case | Actual | Pass/Fail |
+|-----------|--------|-----------|
+| TC19.1 | `up=5 down=5 glyphs=▲/▼` | Pass |
+| TC19.2 | Down on index 1: `after=[0,2,1,3,4]` | Pass |
+| TC19.3 | Up on index 2: `after=[0,2,1,3,4]` | Pass |
+| TC19.4 | top Up `disabled=true`, forced click `order=[0,1,2,3,4]` unchanged | Pass |
+| TC19.5 | bottom Down `disabled=true`, forced click `order=[0,1,2,3,4]` unchanged | Pass |
+| TC19.6 | `stored=[1,0,2,3,4] dom=[1,0,2,3,4]`; after reload `[1,0,2,3,4]` (2 sub-checks) | Pass |
+| TC19.7 | `before=[0,1,2] moved=[1,0,2] undone=[0,1,2]` | Pass |
+| TC19.8 | Down click: `aria-checked before=false after=false` | Pass |
+| TC19.9 | press-hold-move-release: `after==before` order, `.dragging/.drag-placeholder count=0`, `touch-action mid=auto after=auto` (3 sub-checks) | Pass |
+| TC19.10 | whole-row tap crosses off (`aria-checked=true`) | Pass |
+
+**Overall verdict: PASS, 0 defects in S19.** 13/13 S19-specific checks + the full rebuilt regression
+baseline clean = **222/222** — see `REGRESSION_LOG.md`'s 2026-09-09 S19/S20 row (current canonical).
+
+## Worst-case-row measurement result (authoritative — the PO's headline, also discharges the deferred S7/S8 closure)
+Real DOM measurement + screenshots at 320/360/375/390px (R7's method), post-S19+S20 (sha `0f76063`),
+script `c:\tmp\pw-test\vopping-worst-case-row-6icon-closure.js` (10/10 passed, zero console errors):
+
+- **Axis B — both fields EMPTY, Manual sort = the true 6-icon max-crowding case** (`note-toggle`,
+  `aisle-toggle`, S15 `name-toggle`, S19 `up`, S19 `down`, `delete`): **the row FITS CLEANLY on a
+  single line at all four widths — zero horizontal overflow, no wrapping, row height 36.17px
+  (unchanged).** Item-name space: 117px @320px, 157px @360px, 172px @375px, 187px @390px — the PO's
+  "~20 characters even with Up/Down + the edit button" estimate holds. Screenshots
+  `vop-worstcase-6icon-axisB-empty-{320,360,375,390}px.png`.
+- **Axis A — both note AND aisle SET:** the note/aisle icons hide (content moves to the second line),
+  leaving 4 primary-line icons; the two-line row (66.61px) also has zero horizontal overflow at all
+  widths. Screenshots `vop-worstcase-6icon-axisA-set-{320,360,375,390}px.png`.
+
+**Bottom line: the reintroduced crowding fits within the locked no-horizontal-overflow guardrail at
+every supported width, comfortably, without even needing to wrap.** This supersedes the pre-S15/S19
+`vopping-worst-case-row-s13-s14-closure.js` evidence and closes the S7/S8 deferred re-measurement.
+Transcript: `c:/tmp/pw-test/worstcase-6icon-closure.log`.
+
+## Commands run and output
+Formal pass (S19 is Part 4 of the combined suite):
+```
+node c:/tmp/pw-test/vopping-tests-tester-s1-s20-formal.js
+```
+Part 4 subtotal marker: `---- Part 4 (S19 Up/Down restored, drag removed) total: 13 new checks ----`.
+Combined total: `222/222 passed`, zero console/page errors, zero dialogs, zero non-`file://` requests.
+Full transcript `c:/tmp/pw-test/s1-s20-run2.log`. Worst-case measurement:
+`node c:/tmp/pw-test/vopping-worst-case-row-6icon-closure.js` → `10/10 passed`, transcript
+`c:/tmp/pw-test/worstcase-6icon-closure.log`.

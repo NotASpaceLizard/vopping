@@ -22,6 +22,19 @@ superseding the 2026-09-08 `…s7-s10-formal.js` citation above for TC9.8/TC9.9 
 other TC9.x assertion is unchanged and re-confirmed clean in the same run). Full transcript:
 `S13-drag-drop-reorder.md`'s Commands section.
 
+**Dated update, 2026-09-09 (S19 shipped — TC9.8/TC9.9 rewritten AGAIN, back to Up/Down visibility):**
+S19 (restore Up/Down, remove drag; sha `0f76063`) reverses S13's mechanism: drag-and-drop is gone and
+S5's `[data-role="up"/"down"]` buttons are restored (rendered only in Manual sort). The same
+manual-order-only-reorder guarantee TC9.8/TC9.9 have always stood for is unchanged; only the observable
+reverts — from the drag-availability probe (S13 era) back to **Up/Down button visibility** (as it was
+pre-S13). TC9.8 now asserts the Up/Down buttons are not rendered in a non-Manual sort; TC9.9 asserts
+they reappear in Manual. Re-verified clean in the rebuilt canonical suite. Citation of record for the
+current regression baseline is now `c:\tmp\pw-test\vopping-tests-tester-s1-s20-formal.js` (Part 2;
+`REGRESSION_LOG.md`'s 2026-09-09 S19/S20 row, 222/222), superseding the s1-s13 citation above for
+TC9.8/TC9.9 (every other TC9.x assertion is unchanged and re-confirmed clean in the same run). The
+Results rows below still show the S13-era drag-probe wording; the governing behavior is now Up/Down
+visibility per this note.
+
 **Story:** As a user, I want to view my list sorted by aisle or alphabetically, in addition to my
 own manual order, so that I can shop more efficiently by store layout or find an item quickly.
 
