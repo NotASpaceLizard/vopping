@@ -865,3 +865,238 @@ re-reading them fresh in light of everything since folded in doesn't change that
 **Verdict: S13 is clean.** R9, M9, M10, M11, M12, and M15 are all correctly and fully resolved,
 no new contradictions found on this full re-read, and the two remaining nitpicks are cosmetic only.
 No objection to moving S13 to Locked.
+
+---
+
+## Lock-gate re-read — 2026-09-09 (S15, whole-AC check)
+
+**Trigger:** Orchestrator relayed that Scrum Master folded in the PO's confirmed icon-pairing pick
+(pencil moves to S15's new edit affordance, freed from S7's note-toggle) but held Status at "Not
+Started" rather than "Locked" — S15 is the one Sprint-3 story whose content settled in pieces over
+several rounds (Developer sanity-check, Tester's 3 testability gaps, QA's own R10, now the
+icon-pairing confirm) rather than one clean pass, so it never got the whole-AC "zero new
+contradictions" Lock-gate re-read the others (S13 especially) got. Same methodology as S13's final
+re-confirmation above: trace every round's fixes against every other round, and against every
+neighboring story S15 touches, not just the two most recently folded in.
+
+**Rounds traced:** (0) original functional core — in-place edit, position/checked/note/aisle
+preserved, blank-reverts-to-original; (1) Developer sanity-check — arm's-length from S10's counter,
+live-resort-on-mutation under non-Manual sort, undo-eligibility flagged open; (2) Tester's
+testability-check — implementation-approach-agnostic draft-survival/commit guarantees, third-editor
+mutual exclusivity, truncation; (3) PO gesture/icon decision — dedicated edit-icon (not
+double-tap/long-press), pencil confirmed; (4) QA's R10 — PO accepted the rename/stale-suggestion
+quirk as-is; (5) icon-pairing PO-confirmed. Cross-checked against S6's Undo scope note (and its
+2026-09-08 extension), S9's sort/grouping rules, S10's suggestion filter, S13's drag-eligibility and
+cross-row-commit rules, S14's shrink-scope list, and S16's icon precedent.
+
+---
+
+### REAL
+
+**R11. S15's live-resort-on-mutation guarantee ("editing an item's text while a non-Manual sort is
+active immediately re-renders the item at its newly-correct position") doesn't say whether the
+re-sort is computed from the live in-progress draft or only the last-committed name — and read
+literally via its own worked example, it reproduces a bug class already found and fixed twice in
+this exact codebase.** Round 1(b)'s example is "editing 'zucchini' to 'apple' under Alphabetical
+sort moves the row to reflect 'apple's new alphabetical position immediately" — worded as an
+after-the-fact description, but "immediately" is never pinned to commit-time specifically. If a
+naive implementation recomputes sort position from the live keystroke-by-keystroke draft rather than
+the committed value, a row under Alphabetical sort could change position on every keystroke while
+the user is still typing into that row's own open editor — potentially relocating the very DOM node
+the input's focus/cursor lives in mid-type. That's the identical failure shape as S7/S8's
+already-twice-fixed "focus loss on render" bug (script.js, per S7/S8's own Implementation-status
+notes: "focus loss on opening the editor, and a focusout-triggered re-render that could swallow a
+pending click") — except here the disruptive re-render would be self-triggered by the edit itself,
+not an unrelated action, so Round 2(1)'s draft-survives-*unrelated*-re-render guarantee doesn't
+cover it by its own stated scope. The obviously-intended fix already exists as precedent elsewhere in
+this same codebase — sweep 2's N5 confirmed S8/S9's By-Aisle grouping key reads the committed
+`item.aisle`, never the live `editingField.draft`, specifically so a row never visually jumps groups
+mid-keystroke. S15's AC never states the equivalent for its own Alphabetical-sort case. Concretely
+reachable via the story's own headline example (type "zucchini" → "apple" letter by letter under
+Alphabetical sort) — not a contrived edge case. Recommend one explicit sentence: re-sort position is
+computed from the last-committed name, not the live draft, so a row never relocates while its own
+editor is open — matching the existing aisle-grouping precedent. No PO input needed, same
+technical-shape category R9 was for S13.
+
+---
+
+### MINOR
+
+**M16. S15's own new edit-icon never actually gets the explicit nested-control-precedence
+statement every sibling control in this project has — despite S15's own row text implying it
+already does.** S3's delete, S5's up/down, S7's note-toggle, S8's aisle-toggle, and S13's
+drag-pickup gesture each get an explicit one-line "tapping this performs only its own action, never
+also triggers the row's whole-row cross-off toggle" statement, cross-referencing S2's original rule
+by name. S15's row states this requirement for S7's *future replacement glyph* ("Whatever S7 ends up
+with, it must not conflict with the row's existing nested-control precedence... — same requirement
+already stated for this story's own edit-icon") — but tracing back through S15's own row, that
+backward-reference doesn't resolve anywhere; no sentence anywhere in S15's text actually states the
+guarantee for S15's own edit-icon. Cheap one-sentence fix, same pattern as every sibling control.
+
+**M17. S15's new edit-icon was never cross-referenced into S14's already-Locked/Done shrink-scope
+list, the same way S16's new aisle-icon explicitly was (M14).** S14 enumerates note-toggle (S7),
+aisle-toggle (S8), delete (S3), and S13's drag-handle as in-scope for its ~25% shrink, and got an
+explicit dated cross-reference added post-Lock when S16's new icon-only aisle affordance was
+introduced afterward (M14). S15's edit-icon is the same shape of new nested per-row icon control,
+introduced the same day — yet no equivalent cross-reference exists on S14's row for it. The
+sequencing rationale on S15's own row ("Sequenced after S13/S14 so the decision-tool mockup reflects
+the row's final post-shrink... layout") implies the answer is "ships at S14's already-reduced size,"
+and the PO's confirmed pick was plausibly made looking at exactly that — but implying isn't stating,
+and M14 needed an explicit sentence for the analogous case on S16. Recommend the same one-line
+cross-reference treatment M14 already established.
+
+---
+
+### NITPICK
+
+**N7. S13's cross-row-commit sentence ("starting a drag-pickup on one row must commit... an
+in-progress note/aisle draft still open on a different row") still literally enumerates only
+"note/aisle," not "name" — inconsistent with M9's already-updated "note/aisle/name editor" phrasing
+for the same-row case, folded in later the same day.** Not a functional gap: the guarantee itself is
+independently and unambiguously stated from S15's own side (Round 2(1)(ii): a drag-pickup starting
+elsewhere correctly commits an in-progress name edit). Purely a wording-completeness mismatch
+between two stories describing the same rule — worth a one-word addition to S13's older sentence for
+consistency, not because anything is untested or unspecified.
+
+**N8. S13's illustrative list of nested controls immune to its pickup-delay threshold
+("whole-row cross-off tap, note/aisle-toggle, delete") predates S15's edit-icon and S16's
+icon-only aisle affordance and was never updated to name either.** Already covered in substance —
+S13's own governing sentence uses inclusive language ("every other nested control still performs
+only its own action"), so both new controls are automatically included by the general rule. The
+enumerated list is just a stale, non-exhaustive illustration, same low-stakes shape M14 addressed
+for S14's list before it got its cross-reference — flagged only for completeness, not because
+anything is actually ambiguous.
+
+---
+
+### Confirmed sound (reviewed, no gap found — S15-specific)
+
+- **R10's resolution (PO accepted the rename/stale-suggestion-chip quirk as-is) is consistent** with
+  S10's existing "no dismiss/snooze" self-disclosed limitation and doesn't reopen the
+  counter-identity/fragmentation question S15's Developer sanity-check deliberately kept closed —
+  no new tension found.
+- **Undo-eligibility's working default (NOT undo-eligible, same as S7/S8) is consistent** between
+  BACKLOG.md's top-of-file Undo scope note (2026-09-08 extension) and QUESTIONS.md's still-open
+  non-blocking row — same text, same status, no drift.
+- **M9 (S13's same-row drag-ineligibility rule) already says "note/aisle/name editor," correctly
+  anticipating S15** — confirmed no gap on this side of the cross-row/same-row split, only the
+  cross-row sentence lags (N7 above).
+- **The mutual-exclusivity extension (Tester's testability-check item 2) correctly folds name in as
+  a third editor type** alongside note/aisle, consistent with S7/S8's already-tested
+  second-editor-commits-first-draft guarantee — no gap, this is a clean extension of existing tested
+  behavior.
+- **The truncation clause is unambiguous and consistent** with S1/S2's locked row-density spec and
+  correctly distinguishes itself from S7's note-wrapping precedent, same distinction QA's earlier
+  S13/S15/S16 gate already confirmed sound for a different pair of stories.
+- **The deliberate non-locking of S7's specific replacement glyph is not a gap** — confirmed via
+  SPRINT_LOG.md (2026-09-08 resume entry) that this is explicitly tracked as a separate, non-blocking
+  open item on `s7-note-icon-picker.html`'s side, "not tracked as a BACKLOG.md gate on any
+  locked/Done story" — S15's own deferral to that process is accurate, not a silent gap.
+
+---
+
+### Verdict
+
+**S15 is not yet clean for Lock — one Real finding (R11).** R11 is the same technical-shape
+category R9 was for S13 (no PO input needed, a one-sentence deterministic rule addition) and is
+concretely reachable via the story's own headline example, not a hypothetical. M16/M17 are cheap,
+narrow completeness gaps — recommend folding in alongside R11 in one pass (matches how S13 folded
+R9+M9-M12 together rather than looping separately), but not blockers on their own if Scrum Master
+prefers to track them as non-blocking follow-ups instead. N7/N8 are wording-only, no action required
+before Lock. Recommend one more QA re-read after R11 (and M16/M17, if folded in) land, same
+"one-more-look" pattern S13 needed before its own final clean verdict — this file's own prior entry
+is proof that a single pass rarely catches everything the first time even when the individual
+findings are each small.
+
+---
+
+## Final re-confirmation — 2026-09-09 (S15, R11/M16/M17 folded in — Lock check)
+
+**Trigger:** Orchestrator relayed that Scrum Master resolved all three outstanding items from the
+above pass (R11, M16, M17) and asked for the final re-read so S15 can move to Locked.
+
+**R11 — confirmed fully resolved, clean.** S15's row now reads: "this re-sort trigger reads the
+item's last-committed name, never the live in-progress draft still being typed in the open editor —
+same precedent S8/S9's own grouping-key logic already established... While the editor is open and
+actively being typed into, the row does NOT relocate on every keystroke; it snaps to its
+newly-correct position only once the edit commits (blur/Enter), exactly like every other
+mutation-triggered re-sort in this project." This is exactly the deterministic rule asked for —
+explicitly commit-time, explicitly not per-keystroke, explicitly named as closing the same
+failure shape as S7/S8's already-fixed focus-loss bug. Directly Tester-testable as written (type
+into the name editor under Alphabetical sort, assert no position change until blur/Enter).
+
+**M16 — confirmed fully resolved, clean.** The dangling backward-reference is gone — S15's row now
+states, in its own right, "tapping this story's own dedicated edit-icon performs ONLY the edit-open
+action and must NOT also trigger the row's whole-row cross-off toggle, same nested-control-precedence
+rule already established for every other per-row control (S2's original rule, restated on
+S3/S5/S7/S8/S13 for their own controls) — now actually stated for this story's edit-icon too, not
+left as a dangling reference." Matches the pattern every sibling control already has; no gap left.
+
+**M17 — confirmed fully resolved, clean, and correctly bidirectional.** S15's row: "this edit-icon
+is also a nested per-row icon control, so it's in scope for S14's ~25% shrink, same cross-reference
+treatment S16's icon already got on S14's own row... Developer applies the shrink to it at S15's own
+implementation time, not retroactively to S14." Checked S14's own row for the mirrored note, per
+S15's own citation: present and consistent — "S15's new dedicated edit-icon... is likewise a nested
+per-row icon control and is also in scope for this ~25% shrink — Developer applies it when S15
+itself is implemented, same forward-reference pattern as S16's icon above." Both sides agree, same
+shape as S16/M14's already-proven cross-reference pattern.
+
+**Whole-AC coherence check, since this is the Lock gate, not just three isolated fixes:** re-read
+S15 top to bottom with all six rounds now layered in (original draft → Developer sanity-check →
+Tester's 3 gaps → gesture/icon PO decision → R10 → icon-pairing confirm → R11/M16/M17) and traced
+each new fix against the others and against neighboring stories, not just the two most recently
+touched:
+- R11's fix vs. Tester's testability-check item (1)(i) (draft survives an *unrelated* re-render):
+  complementary, not overlapping — (1)(i) covers a different row's action or an unrelated mutation
+  disrupting this row's open editor; R11 covers the row's *own* edit self-triggering a disruptive
+  re-render. Together they now fully cover both directions of "does this editor survive a
+  re-render," with no seam left uncovered.
+- M16's fix vs. S13's M9 (row-with-open-editor is drag-ineligible): no interaction — M9 governs
+  whether a row with *any* open editor (including now-explicit S15 name editor) can be
+  drag-picked-up; M16 governs whether S15's edit-icon itself also fires cross-off. Different
+  controls, no overlap.
+- M17's fix vs. S16's M14 (same shrink-scope cross-reference pattern): confirmed structurally
+  identical, both now correctly forward-referencing from S14's already-Done row — no drift between
+  how the two are worded or dated.
+- Re-checked R10's resolution and the undo-eligibility open question against all three new fixes:
+  neither interacts with re-sort timing, icon precedence, or icon sizing — both remain exactly as
+  they were, still correctly open/accepted respectively.
+
+**Outstanding items, for the record, not for blocking:** N7 and N8 (S13 wording-only nitpicks,
+exact text below per the Orchestrator's request) remain unactioned and non-blocking — they don't
+touch S15 at all, only S13's already-Locked/Done row, and were never a condition of S15's own Lock.
+
+**Verdict: S15 is clean.** R11, M16, and M17 are all correctly and fully resolved, no new
+contradictions found on this full re-read, and N7/N8 are unrelated to this story. No objection to
+moving S15 to Locked.
+
+---
+
+### N7 / N8 exact text (S13 nitpicks, non-blocking — provided verbatim per Orchestrator's request,
+since the prior relay carried only a paraphrase)
+
+**N7.** S13's cross-row-commit sentence ("starting a drag-pickup on one row must commit... an
+in-progress note/aisle draft still open on a different row") still literally enumerates only
+"note/aisle," not "name" — inconsistent with M9's already-updated "note/aisle/name editor" phrasing
+for the same-row case, folded in later the same day. Not a functional gap: the guarantee itself is
+independently and unambiguously stated from S15's own side (Round 2(1)(ii): a drag-pickup starting
+elsewhere correctly commits an in-progress name edit). Purely a wording-completeness mismatch
+between two stories describing the same rule — worth a one-word addition to S13's older sentence for
+consistency, not because anything is untested or unspecified.
+
+**N8.** S13's illustrative list of nested controls immune to its pickup-delay threshold
+("whole-row cross-off tap, note/aisle-toggle, delete") predates S15's edit-icon and S16's
+icon-only aisle affordance and was never updated to name either. Already covered in substance —
+S13's own governing sentence uses inclusive language ("every other nested control still performs
+only its own action"), so both new controls are automatically included by the general rule. The
+enumerated list is just a stale, non-exhaustive illustration, same low-stakes shape M14 addressed
+for S14's list before it got its cross-reference — flagged only for completeness, not because
+anything is actually ambiguous.
+
+**Suggested one-line fixes, if Scrum Master wants to fold these in (optional, non-blocking):**
+- N7: in S13's cross-row-commit sentence, change "an in-progress note/aisle draft still open on a
+  different row" to "an in-progress note/aisle/name draft still open on a different row."
+- N8: in S13's pickup-delay-immunity sentence, change "tapping the row's other nested controls
+  (whole-row cross-off tap, note/aisle-toggle, delete)" to "tapping the row's other nested controls
+  (whole-row cross-off tap, note/aisle-toggle, delete, S15's edit-icon, S16's icon-only aisle
+  affordance)."

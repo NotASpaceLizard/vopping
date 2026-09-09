@@ -1,9 +1,15 @@
 # Test Plan — S8: Aisle/category designation
 
 **STATUS: DONE — formally executed 2026-09-08, PASS (154/154 combined run: 74 Sprint-1 regression
-re-confirmed + 80 new S7-S10 checks), zero defects.** Citation of record:
-`c:\tmp\pw-test\vopping-tests-tester-s7-s10-formal.js`. Full canonical transcript archived in
-`S7-notes.md`'s Commands section, cross-referenced here rather than duplicated.
+re-confirmed + 80 new S7-S10 checks), zero defects.** This "DONE" is scoped to this story's own
+functional AC/testing, which is fully closed — **BACKLOG.md's Status column for S8 is separately
+held at "In Review," not "Done,"** by the same cross-story Tracked follow-up #2 gate as S7 (QA
+finding R7, crowded-row review): that gate stays open until S13/S14 actually ship and Tester
+re-verifies the row is no longer the crowded one the PO flagged. Don't read this file's DONE banner
+as implying BACKLOG.md's overall Status is also Done — check BACKLOG.md's S8 row directly for that.
+Citation of record: `c:\tmp\pw-test\vopping-tests-tester-s7-s10-formal.js`. Full canonical
+transcript archived in `S7-notes.md`'s Commands section, cross-referenced here rather than
+duplicated.
 
 **Story:** As a user, I want to assign an aisle/category to an item, either from a short suggested
 list or my own custom free text, so that I can group my shopping by store layout.

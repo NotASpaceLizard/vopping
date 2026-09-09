@@ -736,6 +736,113 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   story — textbook disclosed-scope-creep handling per the playbook's
   Developer-role guidance, not a case that needed a new gate. All edits
   grep-verified as single physical GFM lines; BACKLOG.md still 18 rows.
+- **S14/S16/S17 implemented and formally verified, 2026-09-08 (same day, continued;
+  commit `606285f`):** Developer implemented all three against their Locked AC,
+  self-verified (15/15 new checks, 0 console errors, both prior regression suites
+  re-confirmed clean since shared `renderRow()`/`.icon-btn` code was touched), then
+  Tester's independent formal pass landed — **180/180 assertions passed** (74
+  Sprint-1 + 80 Sprint-2 re-confirmed clean + 26 new: TC14.1-14.5, TC16.1-16.12,
+  TC17.1-17.6), zero defects, zero console errors — see REGRESSION_LOG.md's
+  2026-09-08/180-total row (script `vopping-tests-tester-s14-s16-s17-formal.js`),
+  test-plans/S14-shrink-buttons.md, S16-aisle-sort-compact-icon.md, and
+  S17-aisle-header-distinction.md all now STATUS: DONE. **S14, S16, S17 → Done.**
+  S16's own icon decision-tool mockup (`s16-aisle-icon-picker.html`, Developer-built)
+  then went to the PO, who picked U+2691 (BLACK FLAG); Developer swapped it in
+  (commit `8724733`) with an accent-color treatment scoped to that icon — closes
+  S16/S17's previously-tracked "placeholder glyph, PO to hand-pick" note, no longer
+  provisional. Session paused cleanly after this (commit `d91e9d7`) with S13 Locked
+  but not started, S15 blocked on the PO's icon-pairing pick.
+- **Resume, 2026-09-08 (scrum-master's own end-to-end doc re-read, per standing
+  wind-down/resume habit):** Full re-read of BACKLOG.md, SPRINT_LOG.md, and
+  QUESTIONS.md end to end. Found one real drift: BACKLOG.md's Status column still
+  read "Locked" for S14/S16/S17 despite the formal 180/180 pass above already
+  having landed and closed — this SPRINT_LOG had no entry recording that pass ever
+  happening either, so the omission was in both files, not just a stale status
+  cell. Root cause: implementation + Tester's formal pass happened in the same
+  continued session as the prior Carryover note (which still said "ready for
+  Developer"), and neither file's narrative was closed out afterward before the
+  pause. Fixed directly: added the entry above, flipped BACKLOG.md's S14/S16/S17
+  Status cells to Done with full citations, updated the top-of-file Priority Queue
+  summary and the Tracked follow-up #2 gate note (S14 now shipped and verified;
+  **S13 is the sole remaining blocker on that gate and the main open implementation
+  thread going into resume** — it is Locked but Developer has not started it).
+  Independently confirmed by the Orchestrator relaying the same correction from a
+  fresh QA resume-check; both landed on the same fix. All edits grep-verified as
+  single physical GFM lines; BACKLOG.md still 18 rows (194 total lines, up from
+  before due to added citation text, not new rows).
+- **S15 icon-pairing PO-confirmed, 2026-09-08 (same day, continued):** PO explicitly
+  confirmed the "recommended" pairing from `s15-edit-gesture-picker.html`'s Option 3
+  is their actual pick — "yes the one i said i like the most is my confirmed
+  choice. i'll be clearer about that language in the future." Folded into S15's AC:
+  this story's own dedicated edit-icon is now locked to the pencil glyph (✎), freed
+  from S7's note-toggle. **Deliberately did NOT also lock the mockup's specific
+  replacement glyph for S7's note-toggle (a "sticky note" emoji, 🗒️)** — caught on
+  this same re-read that `s7-note-icon-picker.html` is a separate, dedicated,
+  more-targeted decision-tool redo already in flight for that exact glyph, prompted
+  by the PO's own later, more specific stated preference to avoid colorful
+  emoji-style pictographs in favor of plain Unicode symbol/dingbat glyphs (see
+  PLAYBOOK_UPDATES_PENDING.md's glyph-rendering notes). Locking "sticky-note emoji"
+  onto S7 via this story's side-channel would risk contradicting that other,
+  purpose-built process for the identical icon — left it to S7's own row/mockup to
+  settle instead; this story only locks that the pencil itself moves to become its
+  own edit-icon. **Did not flip S15's Status to Locked** despite this closing the
+  last open content question — same process pushback as earlier this sprint:
+  Tester's re-check and QA's gate (finding R10, now resolved) already ran on S15,
+  but QA never did the final Lock-gate re-read every other Sprint-3 story got after
+  its last fix landed (S13's own explicit "zero new contradictions, no objection to
+  Locking" pass is the precedent). Recommending that one more QA pass before Lock,
+  not treating the PO's content confirmation as a substitute for it. All edits
+  grep-verified as single physical GFM lines; BACKLOG.md still 18 rows.
+- **QA's whole-AC re-read on S15 landed, 2026-09-08 (same day, continued):** one
+  Real finding (R11) and two Minors (M16, M17), all folded in directly (no PO
+  input needed, same technical-shape category as everything else resolved
+  directly this sprint). **R11:** the M2-precedent re-sort-on-edit guarantee never
+  said whether the re-sort reads the live in-progress draft or the last-committed
+  name — read literally, a naive implementation could relocate the row on every
+  keystroke while its own editor is still open, the same failure shape as S7/S8's
+  already-twice-fixed focus-loss-on-render bug, just self-triggered this time.
+  Fixed: re-sort now explicitly reads the last-committed name only, same
+  precedent S8/S9's grouping-key logic already established (reads committed
+  `item.aisle`, never a live draft); the row does not relocate mid-edit, only
+  once the edit commits. **M16:** my own icon-pairing edit earlier this session
+  had claimed nested-control-precedence for S15's edit-icon was "already stated"
+  elsewhere on this row — it wasn't, a dangling cross-reference to nothing.
+  Fixed: actually stated it now (tapping the edit-icon performs only the
+  edit-open action, never also the row's cross-off toggle). **M17:** S15's
+  edit-icon, like S16's, is a nested per-row icon control and was never
+  cross-referenced into S14's ~25% shrink scope. Fixed: added the cross-reference
+  on both S14's row (mirroring S16's own M14 note) and S15's row. **Also flagged,
+  not yet actioned:** two non-blocking wording Nitpicks (N7/N8) on S13 — the
+  Orchestrator's relay didn't include their actual text, and S13 is described as
+  "not urgent," so holding off on inventing wording rather than guessing at what
+  QA meant; will fold in once the actual finding text is available. **Did not
+  flip S15 to Locked** — QA's own recommendation after this finding was "fold
+  these in, then one more quick re-read before flipping to Locked," i.e. this
+  pass is not itself the final sign-off. All edits grep-verified as single
+  physical GFM lines; BACKLOG.md still 18 rows.
+- **S15 → Locked; S13's N7/N8 folded in, 2026-09-08 (same day, continued):** QA's
+  final re-read on S15 confirmed R11/M16/M17 all resolved with no new
+  contradictions across all 6 rounds of fixes this story went through — same
+  Lock-gate-clean bar S13 cleared earlier this sprint. **S15 → Locked**, clear
+  for Developer, sequenced after S13/S14 per its own AC. Also folded in S13's two
+  Nitpicks now that the Orchestrator relayed QA's actual verbatim text (not just
+  a summary) from QA_FINDINGS.md: **N7** — S13's cross-row-commit sentence now
+  reads "note/aisle/**name**" draft (was "note/aisle draft"), since S15's name
+  editor is itself one of the drafts a drag-pickup elsewhere must commit, not
+  discard. **N8** — S13's pickup-delay-immunity illustrative list (the controls
+  an ordinary tap on must never be mistaken for a drag pickup) now also names
+  "S15's edit-icon, S16's icon-only aisle affordance" alongside the
+  already-listed whole-row cross-off tap/note-aisle-toggle/delete — both controls
+  exist now and belong in that list, same reasoning as the original list itself.
+  Updated the top-of-file Priority Queue summary to reflect S15 → Locked. All
+  edits grep-verified as single physical GFM lines; BACKLOG.md still 18 rows.
+- **Carryover:** S13 and S15 are both Locked, doc pipeline fully cleared for both
+  — Developer implementation is the only remaining step, S13 first (main open
+  thread), S15 sequenced after S13/S14 per its own AC. S7/S8 still "In Review,"
+  blocked on S13 shipping and Tester re-verifying the worst-case row (S14's half
+  of that gate is already satisfied). S16's replacement note-icon glyph for S7
+  remains a separate open item on `s7-note-icon-picker.html`'s side, not tracked
+  as a BACKLOG.md gate on any locked/Done story.
 
 ## Parked / unscheduled
 

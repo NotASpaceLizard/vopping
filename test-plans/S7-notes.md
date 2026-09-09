@@ -1,8 +1,13 @@
 # Test Plan — S7: Per-item text notes
 
 **STATUS: DONE — formally executed 2026-09-08, PASS (154/154 combined run: 74 Sprint-1 regression
-re-confirmed + 80 new S7-S10 checks), zero defects.** Citation of record:
-`c:\tmp\pw-test\vopping-tests-tester-s7-s10-formal.js` (Tester-independent — supersedes Developer's
+re-confirmed + 80 new S7-S10 checks), zero defects.** This "DONE" is scoped to this story's own
+functional AC/testing, which is fully closed — **BACKLOG.md's Status column for S7 is separately
+held at "In Review," not "Done,"** by the cross-story Tracked follow-up #2 gate (QA finding R7,
+crowded-row review): that gate stays open until S13/S14 actually ship and Tester re-verifies the
+row is no longer the crowded one the PO flagged. Don't read this file's DONE banner as implying
+BACKLOG.md's overall Status is also Done — check BACKLOG.md's S7 row directly for that. Citation of
+record: `c:\tmp\pw-test\vopping-tests-tester-s7-s10-formal.js` (Tester-independent — supersedes Developer's
 own self-check `vopping-s7-s10-verify.js` as citation of record per playbook). This file holds the
 canonical full transcript for that script (cross-referenced by S8/S9/S10's own files rather than
 duplicated, same convention as Sprint 1's `S6-undo.md`/`S5-reorder-buttons.md` arrangement).
