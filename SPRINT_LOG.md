@@ -1204,6 +1204,73 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   Tester after S19/S20 land). Standing flags: missing 219/219 REGRESSION_LOG.md
   row (Tester); console sync for S13 Done / S15 In Review / S19+S20 new rows
   (Orchestrator).
+- **S15 → Done, and S19/S20's Developer+Tester pipeline findings folded in,
+  2026-09-09 (same day, relayed by Orchestrator in two back-to-back messages):**
+  - **S15 → Done.** Tester's independent formal pass landed — **246/246**
+    (219 regression baseline re-confirmed + 27 new S15 checks; 219 + 27 = 246),
+    zero defects — the citation of record, superseding S15's Locked/In-Review
+    states and Developer's own 33/33 self-check per the playbook's
+    independent-formal-pass-supersedes-self-check rule. Flipped the Status cell
+    and the top-of-file summary's S15 clause. **Ledger note:** neither this 246
+    total nor the earlier 219 (S13 C1-fix) run has been appended as its own
+    dated row in REGRESSION_LOG.md yet — cited directly from Tester's formal-pass
+    results in the meantime and re-flagged to Tester (that file's owner) to add
+    both rows plus the canonical script name; not mine to edit.
+  - **S19 (revert) sanity-check + testability-check findings folded in.** The
+    sanity-check did NOT land clean (my earlier carryover's open question is now
+    answered — the Orchestrator had relayed the diagnosis to the PO but not the
+    findings to me). Triaged: **(a)** locked a verification requirement — Tester
+    must measure the true 6-icon both-fields-empty worst-case row at 320px
+    (S15's always-visible edit-icon pushes it to 6, one past R7's original 5),
+    which also serves as the deferred definitive re-measurement for the S7/S8
+    closure evidence I softened; **(b)** locked removal-completeness naming the
+    specific drag-only orphans to delete (`suppressNextClick`/
+    `armClickSuppression()`/its click-guard, the document-level M18 fallback
+    listeners, the `cursor: grab` rule); **(c)** made the conscious `user-select`
+    call directly (plain `user-select:none` stays as S1/S2's guard; the
+    drag-era `-webkit-*` additions kept but re-scoped as general tap-target
+    selection/callout suppression) — which incidentally makes the iOS-fix's
+    tracked-non-blocking real-device re-test MOOT (no drag gesture left to
+    collide with); **(d)** left the undo-entry shape as Developer's
+    implementation choice (behavioral guarantee locked, not the shape), same
+    treatment this project always gives technical-approach findings; **(e)**
+    noted the downstream S9 TC9.8/TC9.9 re-write (Tester's). Then Tester's
+    testability-check landed clean with one clarification — **(f):** the
+    PO-accepted crowding does NOT waive S1/S2's locked no-horizontal-overflow
+    guardrail (checked at 320/360/375/390px, flex-wrap permitted); that stays
+    the deterministic pass/fail line, the "~20 chars" figure is an
+    accepted-tradeoff observation, not a per-character assertion.
+  - **S20 (frameless restyle) findings folded in.** **(a)** expectation-setting
+    note that one uniform font-size across the mixed glyph set won't render
+    visually uniform (per-glyph tuning is a Developer detail, may accept some
+    unevenness); **(b)** locked footprint/row-height verification (glyphs stay
+    within the ~19.5px box, no row-height growth); **(c)** removal-completeness
+    (drop the now-dead `border-color` on `.icon-btn.delete-btn`/`.aisle-sort-icon`,
+    color distinction survives via `color:`); **(d)** preserve-press-feedback
+    requirement + real-device legibility/separation look (frameless removes the
+    hover-background feedback), PO-requested so proceeding. Testability
+    clarification **(e):** "scale the glyph to fill the footprint" pinned to
+    "computed font-size materially larger than pre-S20" (fill ratio a Developer
+    tuning detail, like S14's ~25%/S13's constants); "remove the box" =
+    border + background + box-shadow removed, NOT shrinking the tap target.
+  - **Triage principle applied throughout (unchanged from this project's norm):**
+    AC-worthy requirements, verification items, deliberate decisions, and
+    removal-completeness clauses locked into the AC directly (all narrow
+    technical-shape calls, no PO input needed — same category as S13's R9/R11);
+    pure implementation-approach choices (S19's undo shape, S20's per-glyph
+    tuning method) left to Developer. Reference (Tester-owned, not edited):
+    `test-plans/S19-restore-updown-buttons.md`,
+    `test-plans/S20-frameless-icon-restyle.md`.
+  - All edits grep-verified as single physical GFM table lines: 20 story rows,
+    zero malformed, S15 now Done, S19/S20 still Not Started (headed to QA gate),
+    279 lines.
+- **Carryover:** S15 Done. S19/S20 Not Started — sanity-check + testability-check
+  both cleared and all findings folded in; **next step is QA's per-story gate**,
+  then AC Lock, then implementation. S13 Done (drag out for good). S7/S8 Done
+  (definitive icon re-measure now assigned to S19's formal pass via S19 finding
+  (a)). Standing flags for others: REGRESSION_LOG.md missing both the 219 and
+  246 dated rows (Tester); console sync now covers S15 → Done as well as the
+  S19/S20 rows (Orchestrator).
 
 ## Parked / unscheduled
 
