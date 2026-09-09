@@ -843,6 +843,115 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   of that gate is already satisfied). S16's replacement note-icon glyph for S7
   remains a separate open item on `s7-note-icon-picker.html`'s side, not tracked
   as a BACKLOG.md gate on any locked/Done story.
+- **S13 implemented and formally verified, 2026-09-09 (session resumed after a
+  brief connectivity pause):** Developer implemented S13 (sha `33deddf`, part of
+  `635f906`) — whole-row drag surface, raw Pointer Events, self-verified 27/27.
+  Tester's independent formal pass landed: **216/216 assertions** (67 Sprint-1
+  retrofitted + 81 Sprint-2 retrofitted + 26 Sprint-3 reconfirmed + 42 new
+  S13-specific), zero defects — REGRESSION_LOG.md's 2026-09-09 row, script
+  `vopping-tests-tester-s1-s13-formal.js`. This retrofit retired S5's 7
+  now-inapplicable Up/Down test cases and rewrote S9's TC9.8/TC9.9 for the drag
+  era — both already anticipated in BACKLOG.md's own forward-reference notes
+  before S13 shipped, not surprises. **S13 → Done.** Closed the matching
+  forward-reference notes on S5's and S9's own rows now that the anticipated
+  supersession actually happened, and updated S9's AC clause to point at S13's
+  drag mechanic instead of S5's buttons. **Disclosed fix, not yet fully closed:**
+  the PO found a real bug testing S13 on an actual iPhone — the drag pickup
+  collided with iOS Safari's native long-press-select/callout gesture. Developer
+  fixed it (sha `50c57c8`, `-webkit-user-select`/`-webkit-touch-callout: none`)
+  but disclosed the verification gap themselves: Chromium doesn't implement
+  those iOS-specific gestures at all, so this pass only confirms the CSS parses
+  and scopes correctly, not that the real behavioral fix works on an actual
+  device. Tracked as non-blocking (same real-hardware-is-the-real-signal
+  standard this project already applies elsewhere), not folded into S13's Done
+  citation as if it were independently confirmed.
+- **Tracked follow-up #2 gate: checked, still open — real gap found, not closed
+  by S13 shipping alone.** The Orchestrator asked directly whether S13 shipping
+  finally closes S7/S8's crowded-row gate now that both S13 and S14 have landed.
+  Checked every test-plan file for a dedicated "worst-case row" check (an item
+  with both S7's note and S8's aisle set) — none exists. S13's and S14's own
+  formal passes each verify their own story's functional AC in isolation, not
+  the combined visual effect on the specific row this gate is about. Declined to
+  treat "2 controls removed + the rest shrunk 25%, so it must be fine now" as
+  sufficient — this project's own M3 gate already explicitly rejected exactly
+  that shape of inference once (sub-parts passing individually is not the same
+  as a dedicated pass against the real, full row). Recommending one cheap
+  targeted Tester check (render the worst-case row today, assert control
+  count/row height/no mobile-viewport overflow, same shape as S1/S2/S5's own
+  density Done-gate check) before this gate can close and S7/S8 move to Done.
+  Updated the gate's own note and the top-of-file Priority Queue summary
+  accordingly. All edits grep-verified as single physical GFM lines; BACKLOG.md
+  still 18 rows.
+- **Carryover:** S13 Done. S15 Locked, next in line for Developer now that S13
+  has shipped. S7/S8 still "In Review" — one specific, cheap Tester check (the
+  worst-case-row measurement above) away from closing that gate, not a product
+  question and not blocked on the PO. The iOS Safari fix (sha `50c57c8`) is
+  tracked non-blocking pending the PO's real-device re-test.
+- **Tracked follow-up #2 gate CLOSED; S7/S8 → Done, 2026-09-09 (same day,
+  continued):** Tester delivered exactly the recommended check — rendered the
+  real worst-case row post-S13+S14, measured both crowding axes directly
+  (screenshots + DOM data, 17/17), not inferred. Axis A (note+aisle both set)
+  collapses to name + 1 delete icon on one line; Axis B (both empty, the likely
+  real source of the original "5 controls" figure) is down to 3 icons at
+  19.5px from 5 at 26px. Both confirmed no longer crowded. **S7, S8 → Done.**
+- **QA's adversarial post-Done review found a real Critical bug in S13 (C1) —
+  first time this exact scenario has come up on this project, 2026-09-09 (same
+  day, continued):** starting a drag-pickup on one row while a note/aisle
+  editor is open on a DIFFERENT row throws an uncaught exception and leaves the
+  list permanently unscrollable until reload. Root cause: `beginDrag` captures
+  the row's `li` DOM node as a closure variable at `pointerdown` time, then the
+  cross-row-commit guarantee (correct, locked AC) fires `commitEditor()` on the
+  other row's open draft, which calls `render()` and rebuilds the ENTIRE list —
+  detaching the closure's `li` reference six lines before it gets dereferenced.
+  A real, ordinary-use crash (no contrivance needed), not a hypothetical — full
+  trace in QA_FINDINGS.md's C1. Not a gap in Tester's 216/216 pass's own
+  assertions (each of those passed exactly as written) — a coverage gap: the
+  specific *combination* of an open cross-row draft AND a completed drag
+  sequence was never scripted together, sitting at the intersection of two
+  independently-well-tested areas (S7/S8's editor-commit guarantee, S13's own
+  drag-arm mechanics) neither of which obviously implied the other needed it.
+  Fix already sent to Developer by the Orchestrator (re-fetch `li` fresh from
+  the DOM right after `commitEditor()`, mirroring the already-fresh `idx`
+  re-derivation immediately below it in the same function).
+  **Status handling — no prior precedent existed for this exact scenario
+  (Done story, real regression found post-Done via QA's adversarial sweep, not
+  pre-Done as with S4's disclosed paste-marker defect); establishing one now:**
+  this project's controlled Status vocabulary has no "Reopened" label, and the
+  playbook explicitly warns that inventing a new one silently breaks the
+  console's filter logic. Reused **"In Review"** instead of inventing a label —
+  same word S7/S8 used moments earlier in this same session, but for a
+  deliberately different reason, called out explicitly on S13's own row so a
+  future reader can tell the two apart: S7/S8's meant "functionally correct,
+  blocked by an external gate"; this one means "a confirmed defect exists in
+  shipped code, fix in progress, Done is not currently an accurate claim."
+  **S13 → In Review** (down from Done). Reinstating Done requires Developer's
+  fix landing plus Tester's dedicated regression coverage for the exact
+  triggering combination — same resolution shape as R9/R11 (technical, no PO
+  input needed), just Critical severity given the confirmed reproducible crash
+  with a persistent broken-UI side effect, not an ambiguous rule.
+  **Explicitly did NOT let this reopen or block anything else:** S5's/S9's own
+  already-closed forward-reference notes describe a real, already-shipped
+  markup/behavior change unaffected by this unrelated interaction bug — left
+  untouched. **Also explicitly did NOT hold S7/S8's Done flip (above) for
+  this** — the Orchestrator flagged both threads as orthogonal and left the
+  call to me: crowding is a physical-layout fact (verified, unaffected by C1);
+  C1 is a functional bug in a specific drag+cross-row-editor interaction path
+  in a different story. Treating one as blocking the other would be new,
+  unpracticed caution — cross-story independence (S5 staying Done through
+  S13's own UI supersession) is already this project's working model. Folded
+  M18 (a cheap Minor, mischaracterized risk in a `setPointerCapture` fallback
+  comment) in as non-blocking alongside C1's fix, per QA's own recommendation.
+  Updated S13's own row, the Tracked follow-up #2 gate note, and the top-of-file
+  Priority Queue summary (rewritten more broadly while in there, since several
+  layered updates had made it hard to follow — consolidated to current state
+  rather than patched again). All edits grep-verified as single physical GFM
+  lines; BACKLOG.md still 18 rows.
+- **Carryover:** S7/S8 Done — closed, nothing further pending. S13 "In Review"
+  pending C1's fix landing + Tester's dedicated regression coverage for the
+  triggering combination; M18 to fold in alongside. S15 Locked, waiting on
+  S13's Done reinstatement before Developer picks it up next (per its own AC's
+  sequencing, not blocked by C1 itself). iOS Safari real-device re-test (sha
+  `50c57c8`) still pending the PO, tracked non-blocking, unrelated to C1.
 
 ## Parked / unscheduled
 

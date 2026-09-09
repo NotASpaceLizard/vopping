@@ -1,19 +1,63 @@
 # Test Plan — S13: Drag-and-drop reorder (supersedes S5's Up/Down buttons)
 
-**STATUS: DONE — formally executed 2026-09-09, PASS (216/216 combined run: 67 Sprint-1 regression
-re-confirmed [retrofitted from 74 — 7 checks that directly probed S5's now-removed
-`[data-role="up"/"down"]` buttons retired, see `S5-reorder-buttons.md`'s own dated retirement note]
-+ 81 Sprint-2 re-confirmed [S9's TC9.8/TC9.9 rewritten for the S13 era, see `S9-sort-view.md`'s own
-dated update note] + 26 Sprint-3 S14/S16/S17 re-confirmed unchanged + 42 new S13-specific checks),
-zero defects.** Citation of record: `c:\tmp\pw-test\vopping-tests-tester-s1-s13-formal.js`
-(Tester-independent — supersedes Developer's own self-check `vopping-s13-drag-verify.js` as
-citation of record per playbook, AND supersedes the three prior canonical scripts
+**STATUS: DONE — re-formally executed 2026-09-09 after QA finding C1's fix, PASS (219/219 combined
+run: 67 Sprint-1 + 81 Sprint-2 + 26 Sprint-3 regression re-confirmed + 45 S13-specific checks), zero
+defects.** **This is the current citation of record for S13's Done flip — supersedes the 216/216 row
+below (same day), which had a real coverage gap (see "QA finding C1" section below), not just a
+routine re-run.** Citation of record: `c:\tmp\pw-test\vopping-tests-tester-s1-s13-formal.js`
+(Tester-independent — supersedes Developer's own self-check scripts as citation of record per
+playbook, AND supersedes the three prior canonical scripts
 [`vopping-tests-tester-s1-s2-s5-density-formal.js`, `vopping-tests-tester-s7-s10-formal.js`,
 `vopping-tests-tester-s14-s16-s17-formal.js`] as citation of record for the regression-baseline
 checks they used to own — those three now hang Playwright if run as-is, since they probe DOM
 elements S13 physically removes; not a defect in this pass, a stale artifact of a superseded UI
-mechanism). Pushed sha `33deddf` (part of `635f906`), Developer self-verified first (27/27 new
-checks, zero unexpected regressions) — this is the independent Tester formal pass on top of that.
+mechanism).
+
+## QA finding C1 — stale DOM reference in `beginDrag()`, fixed sha `90983e3`, re-verified 2026-09-09
+
+QA's adversarial review found `beginDrag()` holding a DOM reference (`li`) captured up to 450ms
+earlier at `pointerdown` time. Its own cross-row commit guarantee (`commitEditor()`, called at the
+top of `beginDrag()`) can trigger a full `render()` in between — which replaces the list's entire
+`innerHTML` — after which that captured `li` is stale for the rest of the gesture. Developer's fix
+re-fetches the row element fresh by id immediately after the commit (same "never trust a reference
+across a render" discipline the function's own `idx` re-lookup already followed), and separately
+hardened M18 (a document-level `pointerup`/`pointercancel` fallback for when `setPointerCapture`
+silently isn't honored, same stuck-state failure family as C1). Developer's own self-check: 32/32
+passing, zero regressions on my existing 67/172-check scratch suites.
+
+**A real, important gap in my OWN prior formal pass, disclosed rather than glossed over:** the
+216/216 run below already contained TC13.11, which exercises this EXACT sequence (open a note editor
+on row A, don't commit, start a drag-pickup on row B) — but it only asserted that row A's draft got
+committed, never checking WHICH element actually received the `dragging` class. That gap meant
+TC13.11 kept passing even against the pre-fix, genuinely buggy code — a silent failure with zero
+thrown error, so a check that only watches for errors/wrong-data would never have caught it either.
+**Fixed by strengthening TC13.11** to also assert the LIVE row (re-queried fresh by id, exactly what
+a real user's screen shows) is the one that gets `dragging`, and by **adding TC13.27** as a dedicated
+aisle-editor variant (C1's root cause applies identically regardless of which field's editor was
+open — covering both, not assuming one stands in for the other).
+
+**Independently settling QA-vs-Developer's discrepancy over the exact failure mode:** QA's own trace
+expected a thrown, catchable exception; Developer's repro instead found a silent stale-clone bug.
+Rather than trusting either account, I independently reproduced BOTH the pre-fix and post-fix
+behavior myself: extracted the pre-fix `script.js`/`index.html`/`style.css` via
+`git show 8b17aac:<file>` (script.js's parent commit, immediately before the `90983e3` fix) into an
+isolated temp copy (`c:/tmp/pw-test/vopping-c1-repro-old/`) that never touches the live project
+files, then ran the exact QA sequence against it. **Confirmed independently: zero thrown page/console
+errors pre-fix, and the LIVE row B never got the `dragging` class** (a genuine stale detached clone
+got it instead) — matching Developer's disclosed account, not QA's original thrown-exception trace.
+Root cause of the discrepancy, confirmed directly: `listRoot.innerHTML = html` only detaches the OLD
+`<ul>` (the direct child of `#list-root`) from the live document — the stale `<li>`'s own
+`parentNode` (that now-orphaned old `<ul>`) stays non-null, so `insertBefore` succeeds silently into
+a dead, invisible subtree rather than throwing. Post-fix, the same repro shows zero errors AND the
+live row correctly getting `dragging`. Script:
+`c:\tmp\pw-test\vopping-c1-independent-repro.js`; full transcript below.
+
+---
+
+**Original formal pass, 2026-09-09 (superseded above for the citation-of-record slot, left intact as
+history per this project's transparency convention):** Pushed sha `33deddf` (part of `635f906`),
+Developer self-verified first (27/27 new checks, zero unexpected regressions) — this was the
+independent Tester formal pass on top of that, before C1's fix existed.
 
 Drafted ahead of implementation on 2026-09-09 while Developer started building — the draft's 26
 cases were checked directly against the shipped `script.js`/`style.css` before this formal pass ran
@@ -117,7 +161,7 @@ below are all exercised against the row element itself.
 | TC13.8 | Drop outside bounds (below) commits to bottom boundary | Drag an item and release below the list's bottom edge | Item lands at the last position; not a no-op, not cancelled |
 | TC13.9 | `pointercancel` aborts cleanly (QA R9) | Begin a drag (past pickup delay, item lifted), then dispatch `pointercancel` instead of `pointerup` | Item returns to its exact original position; nothing committed to storage; no undo-buffer entry created |
 | TC13.10 | Drag surface uses Pointer Events, not touch-only | Inspect event listeners / dispatch synthetic `pointerdown`/`pointermove`/`pointerup` | Drag responds correctly to Pointer Events directly (not gated behind a touch-only listener) |
-| TC13.11 | Starting a drag-pickup commits a pending draft elsewhere (cross-row commit) | Open a note or aisle editor on row A, type a draft, don't commit; begin a drag-pickup on row B | Row A's draft is committed (not discarded) before/as row B's drag begins |
+| TC13.11 | Starting a drag-pickup commits a pending draft elsewhere (cross-row commit); **strengthened 2026-09-09 to also close QA finding C1** | Open a note editor on row A, type a draft, don't commit; begin a drag-pickup on row B | Row A's draft is committed (not discarded) before/as row B's drag begins; the LIVE row B (not a stale detached clone) actually receives the `dragging` class |
 | TC13.12 | Hidden/disabled during non-Manual sort | Switch to Alphabetical or By-Aisle sort | Drag is unavailable (no pickup possible) on any row |
 | TC13.13 | Reappears in Manual | Switch back to Manual from a non-Manual sort | Drag is available again |
 | TC13.14 | Undo-eligible, restores exact prior position | Drag an item to a new position, click Undo | Order returns to exactly what it was before the drag |
@@ -133,6 +177,7 @@ below are all exercised against the row element itself.
 | TC13.24 | Persists immediately, survives refresh | Drag-reorder an item, reload | New order retained after reload |
 | TC13.25 | Nested-control precedence unaffected | Tap delete/note-toggle/aisle-toggle on a row (below drag's pickup-delay threshold) | Each control's own action still fires correctly; no accidental drag pickup |
 | TC13.26 | Accessibility scope confirmed N/A | Inspect for any keyboard-equivalent drag mechanism | None present — correctly out of scope, not a gap |
+| TC13.27 | **(NEW, 2026-09-09)** Closes QA finding C1's aisle-editor variant | Open an AISLE editor on row A, type a draft, don't commit; begin a drag-pickup on row B | Row A's aisle draft is committed (not discarded); the LIVE row B actually receives the `dragging` class |
 
 ## Results
 All 42 checks below passed on the first clean run after one script-authoring bug was found and
@@ -151,7 +196,7 @@ directly from the script's own output.
 | TC13.8 | Releasing below the list clamps to the last index (`[1,2,3,4,0]`) | Pass |
 | TC13.9 | `pointercancel`: order unchanged, Undo state unchanged (`true`→`true`), dragging/placeholder visuals cleaned up, no trailing click fires (4 sub-checks) | Pass |
 | TC13.10 | Confirmed structurally — every TC13 check in the script drives the app via dispatched `PointerEvent` alone, zero Playwright-mouse-API calls, and the app responds correctly throughout | Pass |
-| TC13.11 | Cross-row commit: Milk's draft note correctly saved as `"half gallon - draft"` before/as a different row's pickup begins | Pass |
+| TC13.11 | Cross-row commit: Milk's draft note correctly saved as `"half gallon - draft"` before/as a different row's pickup begins; **strengthened check confirms the LIVE row B (`liveDragRowDragging=true`), not a stale clone, gets `dragging` — this closes QA finding C1** (2 sub-checks) | Pass |
 | TC13.12 | Drag never arms while Alphabetical sort is active | Pass |
 | TC13.13 | Drag becomes available again once back in Manual sort | Pass |
 | TC13.14 | A real drag changes order, creates an undo-eligible action, and Undo restores the exact prior order (3 sub-checks) | Pass |
@@ -167,13 +212,16 @@ directly from the script's own output.
 | TC13.24 | Drag result persists to localStorage immediately and survives a reload (`after=[1,2,0]`, matches post-reload) (2 sub-checks) | Pass |
 | TC13.25 | Press-and-hold on Delete never arms a pickup; Delete still performs its own action (2 sub-checks) | Pass |
 | TC13.26 | No keyboard-equivalent reorder mechanism exists — confirmed absent by design, consistent with project-wide accessibility scope | Pass |
+| TC13.27 | Aisle variant of C1's closure: `Eggs`'s draft aisle correctly saved as `"Pantry - draft"` before/as row B's pickup begins; the LIVE row B (`liveDragRow2Dragging=true`) gets `dragging`, not a stale clone (2 sub-checks) | Pass |
 
-**Overall verdict: PASS, 0 defects in S13.** 42/42 new S13-specific checks passed, plus the full
-174-check regression baseline (67 Sprint-1 + 81 Sprint-2 + 26 Sprint-3) re-confirmed clean in the
-same run — **216/216 total**, matching the script's own single printed total exactly. Zero
-console/page errors, zero dialogs, zero non-`file://` network requests across the entire run.
-Regression count: 216/216, `REGRESSION_LOG.md`'s 2026-09-09 row (current canonical figure) — S13
-is DONE.
+**Overall verdict: PASS, 0 defects in S13.** 45/45 S13-specific checks passed (42 original + 1 new
+sub-check strengthening TC13.11 + 2 new checks in TC13.27), plus the full 174-check regression
+baseline (67 Sprint-1 + 81 Sprint-2 + 26 Sprint-3) re-confirmed clean in the same run —
+**219/219 total**, matching the script's own single printed total exactly. Zero console/page
+errors, zero dialogs, zero non-`file://` network requests across the entire run. Regression count:
+219/219, `REGRESSION_LOG.md`'s current canonical row — S13 is DONE, this time closing QA finding C1
+with dedicated, verified-against-the-real-bug coverage rather than a check that happened to pass for
+the wrong reason.
 
 **Script-authoring bug found and fixed while writing this pass (not an app defect):** the first
 draft of TC13.15 assumed row id=0 (Milk) still had an empty note and its `note-toggle` icon-btn
@@ -188,10 +236,10 @@ surface, not because it reflects on the app itself — the underlying S7 behavio
 TC7.3b.
 
 ## Commands run and output
-Script: `c:\tmp\pw-test\vopping-tests-tester-s1-s13-formal.js` (independent, fresh authorship — not
-a copy of Developer's `vopping-s13-drag-verify.js` self-check, though it uses the same general
-dispatched-Pointer-Event technique the AC itself calls for; covers the full retrofitted regression
-baseline plus all-new S13 coverage in one run):
+
+**Current canonical run (219/219, closes QA finding C1):**
+Script: `c:\tmp\pw-test\vopping-tests-tester-s1-s13-formal.js`, updated in place (TC13.11 strengthened,
+TC13.27 added) rather than replaced, same file/citation as before:
 ```
 node c:/tmp/pw-test/vopping-tests-tester-s1-s13-formal.js
 ```
@@ -203,16 +251,54 @@ Part-subtotal markers from the actual run (in execution order):
 ---- Part 2 (S7+S8+S9 so far) subtotal: 60 checks ----
 ---- Part 2 (S7+S8+S9+S10) total: 81 new checks ----
 ---- Part 3 (S14+S16+S17) total: 26 new checks ----
----- Part 4 (S13 drag-and-drop) total: 42 new checks ----
+---- Part 4 (S13 drag-and-drop) total: 45 new checks ----
+```
+Key new/changed lines (verbatim):
+```
+PASS - TC13.11 starting a drag-pickup on another row commits a still-open note draft on a DIFFERENT row, never silently discards it :: {"id":0,"name":"Milk","checked":false,"note":"half gallon - draft","aisle":""}
+PASS - TC13.11 (closes QA C1) the LIVE, visible dragged row - not a stale detached clone left behind by the cross-row commit's render() - actually receives the dragging class :: liveDragRowDragging=true
+PASS - TC13.27 (closes QA C1, aisle-editor variant) starting a drag-pickup on another row commits a still-open AISLE draft on a DIFFERENT row, never silently discards it :: {"id":1,"name":"Eggs","checked":false,"note":"","aisle":"Pantry - draft"}
+PASS - TC13.27 (closes QA C1, aisle-editor variant) the LIVE, visible dragged row actually receives the dragging class, not a stale detached clone :: liveDragRow2Dragging=true
 ```
 Final summary line:
 ```
-216/216 passed
+219/219 passed
 
 Console/page errors captured across entire run: none
 Dialogs captured across entire run: none
 Non-local network requests: 0
 ```
-Full raw transcript archived at `c:/tmp/pw-test/s1-s13-run2.log` (this file is the canonical copy
-for this script going forward — S5's and S9's own dated update notes cross-reference this section
-rather than duplicating it, same convention as prior Sprint files).
+Full raw transcript archived at `c:/tmp/pw-test/s1-s13-run3-c1fix.log` (canonical copy going
+forward, superseding `s1-s13-run2.log`, which is left in place as history).
+
+**Independent C1 exception-vs-silent-bug repro (settles the QA/Developer discrepancy):**
+Script: `c:\tmp\pw-test\vopping-c1-independent-repro.js` — runs the exact QA sequence against an
+isolated temp copy of the pre-fix code (`git show 8b17aac:<file>`, never touches the live project
+files) and separately against the current post-fix project files:
+```
+node c:/tmp/pw-test/vopping-c1-independent-repro.js
+```
+Output (verbatim):
+```
+==== PRE-FIX (commit 8b17aac, isolated temp copy) ====
+Page errors thrown during the gesture: NONE
+Console errors during the gesture: none
+LIVE row B (the one the user would actually see) has "dragging" class: false
+Row A's draft note got committed (cross-row commit guarantee): {"id":0,"name":"Milk","checked":false,"note":"uncommitted draft","aisle":""}
+
+==== POST-FIX (current project files, sha 90983e3) ====
+Page errors thrown during the gesture: NONE
+Console errors during the gesture: none
+LIVE row B (the one the user would actually see) has "dragging" class: true
+Row A's draft note got committed (cross-row commit guarantee): {"id":0,"name":"Milk","checked":false,"note":"uncommitted draft","aisle":""}
+
+==== VERDICT ====
+PRE-FIX: threw an exception = false | live row got 'dragging' = false
+CONFIRMED (independently, this environment): the pre-fix bug is a SILENT STALE-CLONE failure,
+NOT a thrown exception. ...
+POST-FIX: zero errors AND the live row correctly gets 'dragging' = true -> fix CONFIRMED working
+```
+
+**Original (superseded) 216/216 run:** full raw transcript archived at
+`c:/tmp/pw-test/s1-s13-run2.log`, left in place as history per this project's transparency
+convention — not the current citation, see the STATUS banner above.

@@ -2,15 +2,60 @@
 
 **STATUS: DONE — formally executed 2026-09-08, PASS (154/154 combined run: 74 Sprint-1 regression
 re-confirmed + 80 new S7-S10 checks), zero defects.** This "DONE" is scoped to this story's own
-functional AC/testing, which is fully closed — **BACKLOG.md's Status column for S7 is separately
-held at "In Review," not "Done,"** by the cross-story Tracked follow-up #2 gate (QA finding R7,
-crowded-row review): that gate stays open until S13/S14 actually ship and Tester re-verifies the
-row is no longer the crowded one the PO flagged. Don't read this file's DONE banner as implying
-BACKLOG.md's overall Status is also Done — check BACKLOG.md's S7 row directly for that. Citation of
+functional AC/testing, which is fully closed. Citation of
 record: `c:\tmp\pw-test\vopping-tests-tester-s7-s10-formal.js` (Tester-independent — supersedes Developer's
 own self-check `vopping-s7-s10-verify.js` as citation of record per playbook). This file holds the
 canonical full transcript for that script (cross-referenced by S8/S9/S10's own files rather than
 duplicated, same convention as Sprint 1's `S6-undo.md`/`S5-reorder-buttons.md` arrangement).
+
+**Tracked follow-up #2 gate (QA finding R7, crowded-row review) — CLOSED, 2026-09-09.** The gate
+that had been holding BACKLOG.md's S7 Status at "In Review" (not "Done") is now closed: S13 shipped
+(removed Up/Down entirely) and S14 shipped (~25% icon shrink), and per Scrum Master's explicit
+flag when reviewing S13's closure, closing this gate required one dedicated measurement of the real
+combined worst-case row against the live app — inferring "S13 and S14 each passed their own AC, so
+the combined row must be fine" would have repeated the exact inference this project already rejected
+once (the M3 gate). That measurement is now done — see "Worst-case-row closure evidence" below.
+BACKLOG.md's own S7 row is Scrum Master's to update; this section is the evidence that closes it.
+
+## Worst-case-row closure evidence, 2026-09-09 (closes Tracked follow-up #2 / QA finding R7)
+
+New, independent, one-off script (not a re-run of S13/S14's own AC — each already has its own
+formal pass; this is the ONE check that was actually missing): real DOM measurement + screenshots of
+the live app's combined worst-case row, post-S13+S14. Two distinct worst-case axes exist — checked
+both, not just the one literally named in the ask, since which axis actually produces the PO's
+originally-flagged "5 nested controls" figure needed verifying, not assuming (confirmed directly
+against `script.js` before writing this: `noteAffordance`/`aisleAffordance` only render their
+icon-btn when that field is EMPTY, so the two axes are genuinely different scenarios):
+
+- **Axis A — both note (S7) AND aisle (S8) SET** (the literal scenario named in the ask): primary
+  line collapses to item-name + delete only (note/aisle icons hide once populated — true even before
+  S13). Measured: exactly 1 nested icon control (`["delete"]`), that control measures 19.5×19.5px
+  (S14's shrink confirmed present in this exact combined scenario, not just isolated single-field
+  rows), second line shows note-display + aisle-tag together with zero icon-btn clutter, total row
+  height 94.66px (bounded — under 3× the locked 39.8px single-line baseline), zero horizontal
+  overflow at 320/360/375/390px, delete still functions correctly on this exact row. Screenshots:
+  `c:/tmp/pw-test/vop-worstcase-axisA-both-set-390px.png`,
+  `c:/tmp/pw-test/vop-worstcase-axisA-both-set-320px.png` — visually confirms a clean single-icon
+  primary line with note+aisle stacked cleanly below, no crowding.
+- **Axis B — both note AND aisle EMPTY** (the axis that actually maximizes icon-control count, and
+  the more likely real source of BACKLOG.md's own "5 nested controls beside the item name" figure —
+  checked so this closure isn't itself resting on an unverified assumption about which axis that
+  figure meant): primary line has exactly 3 nested icon controls (`note-toggle`, `aisle-toggle`,
+  `delete`) — down from 5 pre-S13 (which also had Up/Down) — each measuring 19.5×19.5px (was 26px
+  pre-S14). Total icon-strip width beside the item-name: 58.5px measured now vs. 130px documented
+  pre-S13/S14 (5 × 26px) — well under half. Zero horizontal overflow at 320/390px with all 3 icons
+  visible. Screenshots: `c:/tmp/pw-test/vop-worstcase-axisB-both-empty-320px.png`,
+  `c:/tmp/pw-test/vop-worstcase-axisB-both-empty-390px.png` — visually confirms 3 small icons fit
+  comfortably even at the narrowest supported width.
+
+**Result: 17/17 checks passed, zero console/page errors.** Neither axis shows the crowding the PO
+originally flagged — both are directly measured and screenshotted against the real, live,
+post-S13+S14 app, not inferred from S13/S14's own isolated formal passes. Script:
+`c:\tmp\pw-test\vopping-worst-case-row-s13-s14-closure.js` — a targeted, one-off closure check, not
+part of the ongoing cumulative regression suite (see `REGRESSION_LOG.md`'s own note on this script
+for why it isn't folded into the 216 running total). Full raw transcript:
+`c:/tmp/pw-test/worst-case-closure.log`. Cross-referenced from `S8-aisle-designation.md`'s own
+matching closure note rather than duplicated there.
 
 **Story:** As a user, I want to attach a short free-text note to an item (e.g. "half gallon",
 "red"), so that I can capture size/color/brand detail without cluttering the item name itself.

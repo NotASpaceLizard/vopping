@@ -2,14 +2,18 @@
 
 **STATUS: DONE — formally executed 2026-09-08, PASS (154/154 combined run: 74 Sprint-1 regression
 re-confirmed + 80 new S7-S10 checks), zero defects.** This "DONE" is scoped to this story's own
-functional AC/testing, which is fully closed — **BACKLOG.md's Status column for S8 is separately
-held at "In Review," not "Done,"** by the same cross-story Tracked follow-up #2 gate as S7 (QA
-finding R7, crowded-row review): that gate stays open until S13/S14 actually ship and Tester
-re-verifies the row is no longer the crowded one the PO flagged. Don't read this file's DONE banner
-as implying BACKLOG.md's overall Status is also Done — check BACKLOG.md's S8 row directly for that.
-Citation of record: `c:\tmp\pw-test\vopping-tests-tester-s7-s10-formal.js`. Full canonical
+functional AC/testing, which is fully closed. Citation of record:
+`c:\tmp\pw-test\vopping-tests-tester-s7-s10-formal.js`. Full canonical
 transcript archived in `S7-notes.md`'s Commands section, cross-referenced here rather than
 duplicated.
+
+**Tracked follow-up #2 gate (QA finding R7, crowded-row review) — CLOSED, 2026-09-09,** same
+cross-story gate as S7's, closed by the same evidence (this gate spans both stories together, since
+the PO's original complaint was about the combined note+aisle+delete+Up/Down row, not either
+story's field in isolation). Full closure evidence — the real worst-case-row measurement against the
+live post-S13+S14 app, both crowding axes checked, 17/17 checks passed, screenshots included — is
+recorded in `S7-notes.md`'s "Worst-case-row closure evidence, 2026-09-09" section, not duplicated
+here. Script: `c:\tmp\pw-test\vopping-worst-case-row-s13-s14-closure.js`.
 
 **Story:** As a user, I want to assign an aisle/category to an item, either from a short suggested
 list or my own custom free text, so that I can group my shopping by store layout.

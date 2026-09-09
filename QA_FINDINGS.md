@@ -1100,3 +1100,248 @@ anything is actually ambiguous.
   (whole-row cross-off tap, note/aisle-toggle, delete)" to "tapping the row's other nested controls
   (whole-row cross-off tap, note/aisle-toggle, delete, S15's edit-icon, S16's icon-only aisle
   affordance)."
+
+---
+
+## Post-implementation adversarial review — 2026-09-09 (S13, real code vs. locked AC)
+
+**Trigger:** Tester's independent formal pass on S13 landed — 216/216, zero defects. Per the
+Orchestrator's request, same methodology as the S7/S8 crowded-row catch: trace the actual shipped
+`script.js`/`style.css`/`index.html` against every rule in S13's now-six-rounds-deep locked AC
+(drop-position, jitter-tolerance, out-of-bounds clamp, `pointercancel` abort, auto-scroll,
+nested-control precedence, cross-row draft-commit, undo-eligibility), not just re-read the AC
+prose — plus a specific check on the iOS text-selection fix (`-webkit-user-select`/
+`-webkit-touch-callout`) the PO found on their own real device, since that's a real bug our own
+process didn't catch.
+
+**Method:** read `beginDrag`/`endDrag`/`updateDragPosition`/`computeInsertionIndex`/the four
+delegated `pointerdown`/`pointermove`/`pointerup`/`pointercancel` listeners in full (script.js
+~lines 348-620 and 1241-1330), plus `commitEditor`/`saveNote`/`saveAisle`/`openEditor`/`renderList`
+(the shared editor/render pipeline S13's cross-row-commit rule depends on), plus the relevant
+`style.css` rules (`.items li`, `.items li.dragging`, `.items li.drag-placeholder`,
+`#list-root.drag-active`, `.row-meta-input`). Traced execution paths, not just individual clauses
+in isolation — this is what surfaced the finding below, which sits at the *intersection* of two
+independently-correct, independently-tested mechanisms (S7/S8's shared-editor commit-on-render, and
+S13's DOM-reference-carrying drag-arm callback).
+
+---
+
+### CRITICAL
+
+**C1. Starting a drag-pickup on one row while a note/aisle editor is open on a DIFFERENT row throws
+an uncaught exception and leaves the list permanently unscrollable until page reload — a real,
+easily-reachable crash in code Tester just passed 216/216, found by tracing execution rather than
+re-reading the AC.**
+
+Reproduction (ordinary, sequential single-finger phone use — no contrivance, no multi-touch):
+1. Tap a note or aisle icon on any item (row B) to open its editor. Do not commit it.
+2. Press and hold on a *different* row (row A) for the full pickup delay (450ms) without releasing.
+
+What happens in code: `beginDrag(id, li, pointerId)` (script.js ~line 493) receives `li` — the DOM
+node for row A, captured as a closure variable back at `pointerdown` time, 450ms earlier. Its first
+action is the cross-row-commit guarantee (locked AC, correctly required): `if (editingField)
+commitEditor();` (line 502). Since row B's editor is open, this fires — `commitEditor()` →
+`saveNote`/`saveAisle` → `render()` → `renderList()`, which does a full `listRoot.innerHTML = html`
+rebuild (line 1050). **This destroys and replaces every `<li>` in the list, including row A's** —
+the `li` variable `beginDrag` is holding is now a *detached* node (`li.parentNode` is `null`).
+`beginDrag` never re-fetches it. Six lines later, `li.parentNode.insertBefore(placeholder,
+li.nextSibling)` (line 511) throws `TypeError: Cannot read properties of null (reading
+'insertBefore')`.
+
+The crash happens *after* `listRoot.classList.add('drag-active')` already ran (line 508) but
+*before* `dragState` gets assigned (line 516) — so the drag silently fails (no placeholder, no
+visual pickup, the item doesn't move, an uncaught error lands in the console) AND `drag-active`
+is now stuck on `#list-root` permanently, since only `endDrag()` removes it and `endDrag()` can
+never run (nothing ever sets `dragState`, so the `pointerup`/`pointercancel` listeners' `if
+(dragState && ...)` guards never fire for the rest of the session). Per `style.css`
+(`#list-root.drag-active { touch-action: none; user-select: none; }`), **the entire list becomes
+unscrollable and unselectable by touch from that point on, with no user-visible error and no
+recovery except reloading the page.**
+
+This is not a contrived edge case — it's the primary real-world scenario the cross-row-commit
+guarantee itself exists to handle (a user editing a note, then separately deciding to reorder a
+different item without first tapping away to close the note editor) — and it affects BOTH note and
+aisle editors symmetrically (`saveNote` and `saveAisle` both call `render()` unconditionally). The
+existing defensive comment at line 504 ("the row can't actually vanish between pointerdown and now
+— committing an editor doesn't delete rows") reasons correctly about whether the *item* survives in
+`state.items` (it does, and `findIndexById` is correctly re-derived fresh at line 503) but doesn't
+address the different, actual failure: whether the *DOM element reference* survives a `render()` —
+it doesn't, because `renderList()` replaces the entire subtree unconditionally, regardless of
+whether the specific item was deleted.
+
+Plausible reason Tester's 216/216 didn't catch this: cross-row-commit and drag-mechanics are each
+independently well-tested (per S7/S8's own dedicated regression coverage and S13's own drop-
+position/jitter/bounds/pointercancel test cases), but this specific *combination* — starting a
+drag-pickup on one row while a **different** row's editor is still open — sits at the intersection
+of both and doesn't obviously fall under either area's own test-case list unless someone thought to
+combine them explicitly.
+
+**Suggested fix shape (Developer's call on exact implementation, not prescribing it):** re-fetch
+`li` fresh from the DOM immediately after the `commitEditor()` call, the same way `idx` is already
+freshly re-derived right below it — e.g. `li = listRoot.querySelector('li[data-id="' + id + '"]');`
+with a guard for not-found, mirroring the existing `idx === -1` defensive check. Recommend this
+blocks S13's Done status until fixed and Tester adds dedicated regression coverage for exactly this
+combination (open an editor on row B, drag-pickup row A, confirm no exception and the drag completes
+normally) — same "technical-shape, no PO input needed" category as R9/R11, but Critical rather than
+Real given it's a confirmed, reproducible crash with a persistent broken-UI side effect in code
+about to ship, not an ambiguous rule or a low-stakes cosmetic quirk.
+
+---
+
+### MINOR
+
+**M18. The `try/catch` fallback comment around `li.setPointerCapture(pointerId)` ("unsupported in
+this environment - drag still works, just without capture's off-row tolerance") understates the
+actual consequence of a capture failure.** Without `setPointerCapture` succeeding, subsequent
+`pointermove`/`pointerup` events are dispatched to whatever element is physically under the pointer
+rather than being retargeted to the captured row — which works fine *while* the pointer stays over
+some `<li>` inside `#list-root` (delegation still catches it regardless of which row), but breaks
+down the moment the pointer moves entirely outside `#list-root`'s DOM subtree (e.g., dragged up over
+the page header and released there) — exactly the scenario rule (3) of the locked AC names by
+example ("released over the header... commits to the nearest valid boundary position"). Without
+capture, that release's native `pointerup` would fire on the header (or whatever's there), never
+bubble to `listRoot`'s delegated listener, and `endDrag` would never run — leaving `dragState` stuck
+(same class of persistent broken-list symptom as C1, via a different path) rather than the
+"off-row tolerance" the comment implies is the only thing at stake. Low practical likelihood —
+`setPointerCapture` is well-supported on all realistic target devices (iOS Safari 13+, Android
+Chrome) — but the comment's own characterization doesn't match the real failure mode, and there's
+no test coverage for a capture-failure scenario (understandably hard to simulate). Recommend either
+correcting the comment to reflect the real risk, or adding a defensive document-level
+`pointerup`/`pointercancel` fallback so a stray release outside `listRoot`'s subtree is still caught
+regardless of capture success. No PO input needed.
+
+---
+
+### Confirmed sound (reviewed, no gap found — traced against real code, not just AC prose)
+
+- **Drop-position rule, jitter tolerance, out-of-bounds clamp, and the M11/M15 same-position no-op
+  tie-break are all correctly implemented exactly as specced.** Traced `computeInsertionIndex`
+  (clamps to 0 for above-first-row, clamps to `rows.length` for past-last-row — never a "no match"),
+  the jitter check in the `pointermove` listener (measures from `dragArm.startX/startY`, clears and
+  nulls the arm — not just cancels — so a later press restarts fresh, never resumes), and `endDrag`'s
+  `ds.currentIndex !== ds.startIndex` check (the M15 tie-break falls out structurally for free: an
+  above-the-top release for the *first* item computes insertion index 0, which already equals its
+  own `startIndex`, so it's already the same-position no-op branch without any special-casing
+  needed).
+- **`pointercancel` abort (R9) is correctly unconditional and side-effect-free** — `endDrag(true)`
+  never touches `state.items`, never calls `setLastAction`, always re-renders from unchanged state.
+- **Auto-scroll (PO-required) only ever runs after a real pickup begins**, never during the arming
+  delay — `startAutoScrollLoop()` is only called from `beginDrag()`, confirmed correctly gated.
+- **M12's scroll suppression is correctly scoped** — `touch-action: none` only applies while
+  `#list-root.drag-active` is present (added in `beginDrag`, removed in `endDrag`), and
+  `pointermove`'s `e.preventDefault()` for the actively-dragging pointer is likewise gated to
+  `dragState` being set, not the arming phase — an ordinary scroll during the pickup delay is
+  correctly left alone (matches jitter-tolerance's own "falls through to ordinary scroll" language).
+- **Undo-eligibility and exact-position restoration are correct** — `reorder`'s `lastAction` stores
+  `fromIndex`/`toIndex`, and `performUndo`'s reorder branch reinserts the *same object reference*
+  removed from wherever it landed back at `fromIndex` — position, and every other field (note,
+  aisle, checked state), are preserved by construction, not reconstructed.
+- **S16's icon-only aisle affordance (already shipped) correctly reuses `data-role="aisle-toggle"`**
+  (script.js line 955), so it's automatically covered by the nested-control-precedence check at
+  `pointerdown` (`if (e.target.closest('[data-role]')) return;`) without needing its own
+  special-case — confirmed no drag-arming-from-the-new-icon gap exists in the shipped code.
+- **The iOS text-selection fix (PO's own real-device finding) is correctly and narrowly scoped.**
+  `-webkit-user-select: none` / `-webkit-touch-callout: none` on the base `.items li` rule
+  (unconditional, not gated to `.dragging`/`.drag-active`, with a comment correctly explaining why —
+  iOS's long-press gesture recognizer evaluates before the JS pickup-delay timer can add any class)
+  is exactly right for stopping the native text-selection/callout collision with S13's own
+  press-and-hold. The override restoring normal `user-select: text` / `-webkit-user-select: text` /
+  `-webkit-touch-callout: default` is correctly scoped to `.row-meta-input` only (the note/aisle
+  editor's own inline `<input>`) — verified this selector actually matches the element script.js
+  creates (`class="row-meta-input"`, lines 980/985) and does NOT also accidentally re-enable
+  selection on `.note-display`/`.aisle-tag` (the saved-value *display* buttons, which correctly stay
+  non-selectable since they're tap-to-edit affordances, not editable text) or on `.item-name` (never
+  at risk of losing its original, intentional non-selectable whole-row-tap behavior). Also confirmed
+  `#paste-input` isn't a descendant of `.items li` and was correctly identified as never at risk, per
+  the fix's own comment.
+
+---
+
+### Verdict
+
+**S13's Done status should NOT proceed until C1 is fixed and Tester adds dedicated regression
+coverage for the specific combination that triggers it** (drag-pickup on one row while a different
+row's note/aisle editor is open) — this is a confirmed, reproducible crash with a persistent
+broken-UI side effect (list becomes unscrollable until reload), not a hypothetical. M18 is cheap and
+non-blocking (correct the comment, or add a defensive fallback listener) — worth folding in
+alongside C1's fix rather than as a separate pass, but not itself a reason to hold things up. Every
+other traced rule (drop-position, jitter, bounds-clamp, pointercancel, auto-scroll, M11/M15's tie-
+break, M12's scroll suppression, undo-eligibility/restoration, S16's icon reuse, and the iOS
+text-selection fix) held up cleanly against the real shipped code — this is not a story-wide quality
+problem, it's one specific, narrow, well-isolated intersection bug plus one comment-accuracy nit.
+
+**Severity/mechanism correction, 2026-09-09 — see the dedicated section below.** C1's exact failure
+mechanism as originally described above is wrong (not a thrown exception, not a permanent lockup) —
+re-verified against Developer's own repro after they fixed it. The reachability and root cause
+(a stale DOM reference used across a `render()` call) still stand, and the shipped fix still fully
+closes it either way; only the specific downstream DOM behavior and resulting severity are revised.
+Read alongside, not instead of, the original entry above (kept verbatim per this file's own
+append-only/historical convention) — see "Correction — 2026-09-09" immediately below.
+
+---
+
+## Correction — 2026-09-09 (C1's exact failure mechanism, re-verified against Developer's repro)
+
+**Trigger:** Developer fixed C1 (root cause, correctly: `beginDrag()` now re-fetches the row element
+fresh by id right after the cross-row `commitEditor()` call, rather than trusting a reference that
+can go stale across that render). Developer's own repro of the exact sequence found the failure
+mode differs from how C1 originally described it — asked to re-verify my trace against theirs and
+determine whether this is a real environment/engine difference or an inaccuracy in my original
+trace.
+
+**Re-verified from first principles (the DOM "replace all"/removal algorithm, not
+re-running anything) — my original trace was wrong, and it's not an engine difference.**
+
+`listRoot.innerHTML = html` only replaces `listRoot`'s *direct* children — in this app that's the
+single `<ul class="items">` element, not the `<li>`s themselves. Removing that old `<ul>` from
+`listRoot` sets the *old `<ul>`'s own* `parentNode` to `null` — but removing a container from its
+parent does not recursively detach the container's own descendants; the old `<ul>`'s internal child
+list (the old `<li>`s) stays fully intact, just now rooted in an orphaned subtree rather than the
+document. So the stale `li` I traced in C1 does **not** end up with `parentNode === null` as I
+claimed — its `parentNode` is the old, disconnected `<ul>`, itself a perfectly valid non-null node.
+`li.parentNode.insertBefore(...)` therefore succeeds silently, landing in that dead subtree, rather
+than throwing. This is standard, spec-defined DOM removal behavior (the same reason a detached
+subtree can be manipulated or reattached elsewhere with its internal structure unchanged) —
+identical across every conformant engine, not something that could differ between my check and
+Developer's repro. **The inaccuracy was mine, not an environment discrepancy.**
+
+**Corrected consequence, worked through from the same code:** since nothing throws, execution
+continues to completion — `dragState` *does* get populated (contrary to C1's claim that the crash
+left it unset), with `rowEl`/`placeholderEl` pointing into the dead subtree. `listRoot.classList.
+add('drag-active')` still applies to the real, live `listRoot`, and `endDrag()` still runs normally
+on release (nothing ever threw to prevent it), removing `drag-active` correctly — **no permanent
+lockup, no crash, no reload required**, contrary to C1's central claim. The real, quieter bug:
+`getOtherRowElements()` queries the *live* DOM and filters out `dragState.rowEl` — but since that
+stale node was never among the live query's results to begin with, nothing actually gets excluded,
+so the live counterpart of the dragged row stays in the "other rows" candidate list. This both keeps
+the live row from ever getting `.dragging`'s dimmed treatment (only the invisible stale clone gets
+that class) and skews the insertion-index math by one extra uncounted row, plausibly landing the
+item at the wrong final position on drop — a real, silent correctness/visual bug, not a crash.
+Matches Developer's own observed symptom exactly ("the disconnected stale clone got the `dragging`
+class while the live, visible row never dimmed").
+
+**What stands, unchanged:** the underlying root cause (a DOM element reference captured before a
+`render()` call, used again afterward without re-fetching) is exactly what I identified, and the
+fix Developer shipped — re-fetch `li` fresh by id immediately after `commitEditor()`, mirroring how
+`idx` is already freshly re-derived there — is correct and fully closes the bug regardless of which
+exact downstream DOM behavior follows from the stale reference. The reachability (ordinary
+sequential single-finger use: leave a note/aisle editor open on one row, then long-press a different
+row) is unchanged and was accurate.
+
+**What's corrected:** the failure mode was NOT a thrown exception, and did NOT leave the list
+permanently unscrollable requiring a reload — that specific mechanism and its "Critical" framing
+were wrong. The actual (pre-fix) bug was a silent visual/positional correctness defect scoped to the
+one drag gesture itself (wrong/missing dimming of the live dragged row, a skewed insertion-index
+calculation likely landing the item at an incorrect final position), self-contained and
+self-resolving the moment that one drag ends — real and worth fixing, which is exactly what
+happened, but **Real severity, not Critical** — no persistent app-breaking state, no data loss
+survives past that single gesture. Re-classifying retroactively for the record: C1 should be read as
+R13 (Real, not Critical) with the corrected mechanism above superseding its original description.
+M18 (the separate `setPointerCapture` fallback-comment finding) is unaffected by this correction and
+stands as originally written.
+
+**Process note:** flagging plainly rather than hedging, since the ask was specifically to determine
+which side was right — this was a real error in my original trace, not a defensible difference in
+testing environment. Worth remembering for future DOM-lifecycle reasoning on this project: removing
+a container only detaches *that container* from its parent; a captured reference to one of its
+*descendants* survives with a non-null (but orphaned) `parentNode`, it does not become `null`.
