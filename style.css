@@ -255,6 +255,35 @@ button:disabled {
   white-space: nowrap;
 }
 
+/* S15 (Locked, 2026-09-08): in-place item-name edit input - replaces
+   `.item-name` on the primary line only while a row's name editor is open
+   (script.js's renderRow(), isEditingName). Takes over the exact same flex
+   slot (`flex: 1; min-width: 0`) so opening/closing the editor never
+   reflows any of the row's other controls. Deliberately given NO
+   text-overflow/ellipsis truncation the way `.item-name` has - per locked
+   AC, the live in-progress edit shows the full text (scrolling within the
+   input as any standard text input already does); truncation only applies
+   to the saved/displayed name once committed, back on `.item-name`. */
+.name-input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  padding: 0.1rem 0.3rem;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--bg-page);
+  color: var(--text);
+  /* Same iOS long-press-collision override `.row-meta-input` already needed
+     (2026-09-09 fix, see below) - this input's own text-selection/cursor-
+     placement behavior must stay completely normal while the name editor is
+     open, unaffected by the parent `.items li`'s user-select:none/-webkit-*
+     overrides, which are aimed at the ROW's own long-press-drag gesture, not
+     at text actually being edited. */
+  user-select: text;
+  -webkit-user-select: text;
+  -webkit-touch-callout: default;
+}
+
 /* S14 (Locked, 2026-09-08): uniform ~25% size reduction on the row's
    nested icon/button controls (note-toggle, aisle-toggle, delete, and any
    future icon-btn-classed control - S16's new aisle-edit icon and S13's

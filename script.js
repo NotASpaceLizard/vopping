@@ -493,8 +493,9 @@
   function beginDrag(id, li, pointerId) {
     dragArm = null;
     // Cross-row commit guarantee (locked AC): starting a pickup must commit,
-    // never silently discard, a note/aisle draft still open on a DIFFERENT
-    // row - same "unrelated action" treatment S7/S8 already require of
+    // never silently discard, a note/aisle/name draft still open on a
+    // DIFFERENT row (S15 extends this same guarantee to its own name
+    // editor) - same "unrelated action" treatment S7/S8 already require of
     // Undo/reorder/add. (A SAME-row open editor can never reach this point
     // at all - see the pointerdown guard below, QA finding M9 - so any
     // `editingField` still set here is guaranteed to belong to some other
@@ -666,7 +667,28 @@
   // rather than a mode-specific accent color the way S16's does.
   var NOTE_TOGGLE_ICON_GLYPH = '🗋';
 
-  var editingField = null; // { id, field: 'note'|'aisle', draft }
+  // S15 (Locked, 2026-09-08): dedicated edit-icon glyph for in-place
+  // item-name editing, PO's confirmed pick from `s15-edit-gesture-picker.html`
+  // Option 3 ("dedicated edit-icon/button", not double-tap or long-press —
+  // long-press was explicitly ruled out since S13 already claims it for
+  // drag-pickup). This is the pencil glyph FREED from S7's own note-toggle
+  // (which moved to NOTE_TOGGLE_ICON_GLYPH above) — same glyph, different
+  // job, per the PO's explicitly-confirmed icon-pairing.
+  var NAME_EDIT_ICON_GLYPH = '✎';
+
+  // 'name' is a THIRD editor field type, added by S15, sharing this exact
+  // same mechanism (mutual exclusivity, cross-row/cross-action commit,
+  // draft-survives-unrelated-render) with S7's 'note' and S8's 'aisle' —
+  // locked AC requirement, not a Developer convenience: "the same mutual-
+  // exclusivity rule already established and tested for S7/S8... extends to
+  // include this story's new name editor as a third editor type in that same
+  // set." Every function below that switches on `editingField.field` (see
+  // commitEditor()) has a name-specific branch; every generic function that
+  // doesn't need to switch (openEditor, updateDraft, the render-time
+  // focus-restore/draft-survival logic) already works for this new field
+  // type for free, by construction, since none of that code names 'note'/
+  // 'aisle' specifically.
+  var editingField = null; // { id, field: 'note'|'aisle'|'name', draft }
 
   function openEditor(id, field) {
     var idx = findIndexById(id);
@@ -739,8 +761,10 @@
     editingField = null;
     if (current.field === 'note') {
       saveNote(current.id, current.draft);
-    } else {
+    } else if (current.field === 'aisle') {
       saveAisle(current.id, current.draft);
+    } else {
+      saveName(current.id, current.draft);
     }
   }
 
@@ -767,6 +791,35 @@
     // to nothing should revert to "Unassigned", not save as literal
     // whitespace).
     state.items[idx].aisle = String(rawValue).trim();
+    saveState();
+    render();
+  }
+
+  // ---- S15: in-place item-name editing --------------------------------------
+  // A blank/whitespace-only edit reverts to the item's ORIGINAL text unchanged
+  // (locked AC) - deliberately different from S7/S8's trim-to-empty-and-clear
+  // handling above, since a name can never legitimately be empty the way a
+  // note/aisle can. Achieved by simply never writing `state.items[idx].name`
+  // at all when the trimmed draft is empty - the field is left exactly as it
+  // was, not overwritten with '' and not specially "restored" from anywhere,
+  // since it was never touched in the first place.
+  function saveName(id, rawValue) {
+    var idx = findIndexById(id);
+    if (idx === -1) return;
+    var trimmed = String(rawValue).trim();
+    if (trimmed) {
+      state.items[idx].name = trimmed;
+    }
+    // Deliberately does NOT call incrementFrequency/decrementFrequency - S10's
+    // separate frequency counter simply never observes this edit in either
+    // direction (locked AC, resolving the Developer sanity-check finding on
+    // this story's own row: renaming "zucchini" to "2 zucchini" must not
+    // fragment into two counter entries). No de-duplication check against
+    // other item names either (project-wide no-dedup policy, S1/S4).
+    // Name edits are NOT undo-eligible and do NOT clobber the pending undo
+    // target (locked AC, same working-default treatment as S7/S8's note/
+    // aisle edits) - achieved for free by simply never calling setLastAction
+    // anywhere in this function.
     saveState();
     render();
   }
@@ -935,6 +988,23 @@
     var aisleVal = item.aisle || '';
     var isEditingNote = !!editingField && editingField.id === item.id && editingField.field === 'note';
     var isEditingAisle = !!editingField && editingField.id === item.id && editingField.field === 'aisle';
+    var isEditingName = !!editingField && editingField.id === item.id && editingField.field === 'name';
+
+    // S15 (Locked, 2026-09-08): while this row's name editor is open, an
+    // <input> takes over the EXACT same primary-line flex slot the passive
+    // `<span class="item-name">` normally occupies (see `.name-input` in
+    // style.css - same `flex: 1; min-width: 0`) - opening/closing the editor
+    // never reflows anything else in the row. Deliberately NOT rendered on a
+    // second line the way S7/S8's editors are - item text is primary-line
+    // content, not secondary metadata, and the locked AC is explicit that
+    // truncation/wrapping behavior for the SAVED name is unchanged (no new
+    // multi-line wrapping the way S7's notes wrap) - only the live editor
+    // itself shows the in-progress text in full, via a plain <input>'s own
+    // native horizontal-scroll-within-the-field behavior, no ellipsis logic
+    // needed here since that's just how an <input> already works.
+    var nameContent = isEditingName
+      ? '<input type="text" class="name-input" data-role="name-input" value="' + escapeHtml(editingField.draft) + '">'
+      : '<span class="item-name">' + safeName + '</span>';
 
     // Primary line: name + delete (S13's drag pickup is the whole row
     // itself, no dedicated button), same locked single-line spec as
@@ -974,6 +1044,21 @@
       ? '<button type="button" class="icon-btn' + (aisleSortCompact ? ' aisle-sort-icon' : '') + '" data-role="aisle-toggle" title="' + (aisleVal ? 'Edit aisle' : 'Add aisle') + '">' + AISLE_EDIT_ICON_GLYPH + '</button>'
       : '';
 
+    // S15 (Locked, 2026-09-08): unlike note/aisle's affordances above, this
+    // icon is NOT conditioned on the field being empty (an item's name is
+    // never empty) - it's always present, same "dedicated icon/button"
+    // mechanic the PO picked over double-tap/long-press in
+    // `s15-edit-gesture-picker.html`'s Option 3. Only hidden while this
+    // row's own name editor is already open (isEditingName), same as note/
+    // aisle's own icon hiding while THEIR editor is open - no point showing
+    // a second way to open what's already open, and the slot it'd occupy is
+    // busy with the `.name-input` above anyway. Placement (between the
+    // aisle affordance and delete) matches the exact arrangement the PO
+    // reviewed and approved via that same decision-tool page.
+    var editButton = !isEditingName
+      ? '<button type="button" class="icon-btn" data-role="name-toggle" title="Edit item">' + NAME_EDIT_ICON_GLYPH + '</button>'
+      : '';
+
     // Second line (locked AC, S7/S8): a row with a non-empty note/aisle (or
     // either editor currently open) may grow to a second line to fit it;
     // `flex-basis: 100%` (style.css) is what forces this onto its own line
@@ -1010,8 +1095,8 @@
 
     return '<li class="' + (item.checked ? 'checked' : '') + '" data-id="' + item.id + '"' +
       ' role="checkbox" tabindex="0" aria-checked="' + (item.checked ? 'true' : 'false') + '" aria-label="' + safeName + '">' +
-      '<span class="item-name">' + safeName + '</span>' +
-      noteAffordance + aisleAffordance +
+      nameContent +
+      noteAffordance + aisleAffordance + editButton +
       '<button type="button" class="icon-btn delete-btn" data-role="delete" title="Delete">✕</button>' +
       secondLine +
       '</li>';
@@ -1021,7 +1106,9 @@
     // Bug fix (2026-09-04, self-caught during nested-control-precedence
     // testing of the whole-row-tap change): a full `innerHTML` rebuild
     // destroys and recreates every row, including whatever currently has
-    // keyboard focus OR an open note/aisle editor. Captures which element
+    // keyboard focus OR an open note/aisle/name editor (S15's name editor
+    // reuses this exact same generic mechanism, no special-casing needed
+    // here). Captures which element
     // (the row itself, a nested button by role, or the open editor input)
     // had focus before the rebuild, and restores focus (and cursor
     // position, for text inputs) onto the equivalent new element after.
@@ -1181,9 +1268,10 @@
       if (role === 'delete') deleteItem(id);
       else if (role === 'note-toggle') openEditor(id, 'note');
       else if (role === 'aisle-toggle') openEditor(id, 'aisle');
-      // role === 'note-input' / 'aisle-input': no action needed here, just
-      // let the native input handle cursor placement - but still return
-      // below rather than falling through to toggleChecked.
+      else if (role === 'name-toggle') openEditor(id, 'name');
+      // role === 'note-input' / 'aisle-input' / 'name-input': no action
+      // needed here, just let the native input handle cursor placement - but
+      // still return below rather than falling through to toggleChecked.
       return; // nested control handled its own action - do NOT also cross off
     }
     toggleChecked(Number(li.dataset.id)); // tap landed on the row itself
@@ -1196,7 +1284,7 @@
   // Enter) saves it").
   listRoot.addEventListener('keydown', function (e) {
     var nested = e.target.closest && e.target.closest('[data-role]');
-    if (e.key === 'Enter' && nested && (nested.dataset.role === 'note-input' || nested.dataset.role === 'aisle-input')) {
+    if (e.key === 'Enter' && nested && (nested.dataset.role === 'note-input' || nested.dataset.role === 'aisle-input' || nested.dataset.role === 'name-input')) {
       e.preventDefault(); // no default action to run for a bare <input>, but explicit is cheap
       commitEditor();
       return;
@@ -1213,7 +1301,7 @@
   // re-rendering on every keystroke (see updateDraft's own comment).
   listRoot.addEventListener('input', function (e) {
     var role = e.target.dataset && e.target.dataset.role;
-    if (role === 'note-input' || role === 'aisle-input') {
+    if (role === 'note-input' || role === 'aisle-input' || role === 'name-input') {
       updateDraft(e.target.value);
     }
   });
@@ -1249,7 +1337,7 @@
   // prematurely closing) whatever is open now.
   listRoot.addEventListener('focusout', function (e) {
     var role = e.target.dataset && e.target.dataset.role;
-    if (role === 'note-input' || role === 'aisle-input') {
+    if (role === 'note-input' || role === 'aisle-input' || role === 'name-input') {
       var pending = editingField;
       setTimeout(function () {
         if (editingField === pending) commitEditor();
@@ -1280,11 +1368,13 @@
     if (!li) return;
     if (e.target.closest('[data-role]')) return; // nested-control precedence: never arm a pickup from delete/note-toggle/aisle-toggle or an open editor's own input
     var id = Number(li.dataset.id);
-    // QA finding M9: a row with its OWN note/aisle editor currently open
-    // cannot be drag-picked-up at all - a press-and-hold anywhere on that
-    // row is left as ordinary interaction with the open editor, not a drag
-    // attempt. (The data-role check just above already excludes the input
-    // element itself; this additionally excludes the rest of that same
+    // QA finding M9: a row with its OWN note/aisle/name editor currently
+    // open cannot be drag-picked-up at all (S15's name editor is covered by
+    // this exact same `editingField.id === id` check, generic over field
+    // type - no S15-specific change needed here) - a press-and-hold anywhere
+    // on that row is left as ordinary interaction with the open editor, not
+    // a drag attempt. (The data-role check just above already excludes the
+    // input element itself; this additionally excludes the rest of that same
     // row - its item-name text, its blank space - while that row's editor
     // is open.)
     if (editingField && editingField.id === id) return;
