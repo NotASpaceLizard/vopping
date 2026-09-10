@@ -327,21 +327,10 @@ button:disabled {
   color: #e08080;
 }
 
-/* S16 (Locked, 2026-09-08): PO's icon pick (U+2691 ⚑) was specifically
-   because it's a plain monochrome, text-colorable dingbat, so it can
-   inherit the aisle-tag's own accent color rather than looking like a
-   mismatched colored sticker sitting next to it. Scoped to the
-   `aisle-sort-icon` class only - applied in script.js's renderRow() ONLY
-   while sorted By Aisle (see `aisleSortCompact`) - deliberately NOT
-   touching S8's separate, still-neutral "Add aisle" empty-state icon shown
-   in Manual/Alphabetical mode, which keeps its ordinary muted-gray
-   .icon-btn color unchanged. */
-.items .icon-btn.aisle-sort-icon {
-  /* S20: `border-color` here is now dead (no border) - removed; the aisle-sort
-     icon's accent color survives entirely via `color` (still Okabe-Ito-safe:
-     one uniform accent, not per-aisle color-coding). */
-  color: var(--accent);
-}
+/* S22/S16: the icon-only By-Aisle edit affordance (U+2691 ⚑, `.aisle-sort-icon`)
+   is REMOVED - the per-item aisle is now a persistent inline <select> in all
+   sort modes (PO confirmed 2026-09-10, M23), so its dedicated accent-color rule
+   is dead and gone with it. */
 
 /* S7/S8: second-line note/aisle content - LOCKED AC (see script.js's
    renderRow()/openEditor() comments). A row with a non-empty note and/or
@@ -371,7 +360,12 @@ button:disabled {
   flex: 1;
   min-width: 0;
   font: inherit;
-  font-size: 0.82rem;
+  /* S25 (iOS focus-zoom fix): was 0.82rem (~13px), below iOS Safari's 16px
+     focus-zoom threshold - focusing the note (or S24 new-aisle) input zoomed
+     the page and stayed zoomed. Bumped to 1rem (16px), the same cross-cutting
+     >=16px rule this rework applies to every text input. Note behavior is
+     otherwise unchanged (still free-text, same editor infra). */
+  font-size: 1rem;
   padding: 0.15rem 0.4rem;
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -391,16 +385,15 @@ button:disabled {
   -webkit-touch-callout: default;
 }
 
-/* Saved note/aisle display buttons (tap to re-open the editor) - a dashed
-   underline signals "tap to edit" without needing a dedicated icon once a
-   value is set (the icon-btn "add" affordance only shows while that field
-   is still empty - see script.js's renderRow()). No hard character limit is
-   enforced (S7's locked AC) - `min-width: 0` + `overflow-wrap: break-word`
-   on a flex-shrink-only child (no flex-grow) is what lets a long value
-   actually wrap within the row's available width instead of overflowing or
-   clipping unreadably. */
-.note-display,
-.aisle-tag {
+/* Saved note display button (tap to re-open the editor) - a dashed underline
+   signals "tap to edit" without needing a dedicated icon once a value is set
+   (the icon-btn "add" affordance only shows while the note is still empty -
+   see script.js's renderRow()). No hard character limit is enforced (S7's
+   locked AC) - `min-width: 0` + `overflow-wrap: break-word` on a
+   flex-shrink-only child (no flex-grow) is what lets a long value actually
+   wrap within the row's available width instead of overflowing or clipping
+   unreadably. (S22: the aisle no longer uses this - it is a <select> now.) */
+.note-display {
   flex-shrink: 1;
   min-width: 0;
   max-width: 100%;
@@ -419,16 +412,33 @@ button:disabled {
   color: var(--text-muted);
 }
 
-/* Distinct color from a plain note, NOT per-aisle color-coding - every
-   aisle tag gets this SAME accent color regardless of which aisle it is, so
-   this doesn't distinguish one aisle from another and doesn't trigger the
-   Okabe-Ito colorblind-safe-palette requirement (that only applies once/if
-   different aisles are given different colors to visually group them,
-   which this deliberately does not do - see BACKLOG.md's S8 accessibility
-   note; plain text with one uniform accent color already fully satisfies
-   S8's AC as written). */
-.aisle-tag {
-  color: var(--accent);
+/* S22: the passive `.aisle-tag` display button is removed - the aisle is now
+   the always-present `.aisle-select` (styled below), which replaces both the
+   old tag and the old free-text editor. */
+
+/* S22: per-item aisle <select>. font-size >= 16px (1rem) is the iOS
+   focus-zoom guard (belt-and-suspenders alongside the native picker itself);
+   `max-width` + `flex-shrink` keep it inside the row at the narrowest locked
+   widths (M24) - it lives on the wrapping row-meta line, never the primary
+   control line. */
+.aisle-select {
+  font: inherit;
+  font-size: 1rem;
+  max-width: 100%;
+  flex: 0 1 auto;
+  min-width: 0;
+  padding: 0.15rem 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-page);
+  color: var(--text);
+}
+
+/* S24: inline validation message for the new-aisle reveal input. */
+.row-meta-error {
+  flex-basis: 100%;
+  color: #e08080;
+  font-size: 0.78rem;
 }
 
 /* S17 (Locked, 2026-09-08): more visual distinction for By-Aisle sort's
@@ -488,4 +498,140 @@ button:disabled {
   color: var(--text);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
   z-index: 100;
+}
+
+/* ---------------------------------------------------------------------
+   S21: settings menu shell + S23: aisle management. The settings button is
+   an ordinary header control (its ⚙ glyph is a PLACEHOLDER, flagged for the
+   PO's pick). The overlay is a full-screen scrim + a centered panel; it
+   closes via the X control or a tap on the scrim. Phone-first: the panel is
+   width-capped but fluid so it fits 320-390px. Every text input here is
+   font-size >= 16px (iOS focus-zoom guard, same rule as the rest of the
+   rework). --------------------------------------------------------------- */
+.settings-btn {
+  /* inherits the base `button` styling; a hair of extra horizontal room for
+     the glyph so it reads as an icon button, not a text button. */
+  padding: 0.2rem 0.5rem;
+}
+
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.settings-overlay[hidden] {
+  display: none;
+}
+
+.settings-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.settings-panel {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 32rem;
+  max-height: calc(100vh - 2rem);
+  margin: 1rem;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.settings-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.settings-title {
+  font-size: 1.2rem;
+  margin: 0;
+  color: var(--accent);
+}
+
+.settings-close {
+  flex-shrink: 0;
+}
+
+.settings-section-title {
+  font-size: 1rem;
+  margin: 0.5rem 0 0.25rem;
+}
+
+.settings-hint {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin: 0 0 0.75rem;
+}
+
+.aisle-create {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.settings-input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 1rem; /* iOS focus-zoom guard - create + rename fields */
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-page);
+  color: var(--text);
+}
+
+.settings-add-btn {
+  flex-shrink: 0;
+}
+
+.settings-error {
+  color: #e08080;
+  font-size: 0.85rem;
+  margin: 0.25rem 0 0;
+}
+
+.aisle-manage-list {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+}
+
+.aisle-manage-item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--bg-page);
+}
+
+.aisle-manage-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.settings-mini-btn {
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  padding: 0.2rem 0.5rem;
+}
+
+.settings-delete-btn {
+  color: #e08080;
 }

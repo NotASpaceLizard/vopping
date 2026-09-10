@@ -15,6 +15,10 @@
            renamed "checked"/"check" -> "crossed off"/"cross off" - id kept
            stable (internal, not user-visible), only the label text changed. -->
       <button type="button" id="clear-checked-btn" disabled>Clear crossed off</button>
+      <!-- S21: settings entry point. GLYPH IS A PLACEHOLDER (U+2699 GEAR) -
+           plain monochrome Unicode symbol, never a colored emoji; flagged for
+           the PO's final pick, same pattern as S16/S7's icon picks. -->
+      <button type="button" id="settings-btn" class="settings-btn" title="Settings" aria-label="Settings">⚙</button>
     </div>
   </header>
 
@@ -51,10 +55,6 @@
     </select>
   </div>
 
-  <!-- S8: shared datalist for the aisle-edit affordance's suggested+dynamic
-       pool - populated by script.js's renderAisleDatalist(). -->
-  <datalist id="aisle-options"></datalist>
-
   <!-- Row density/interaction - LOCKED, 2026-09-04 (PO's final pick from
        density-picker.html): whole row is the tap target for crossing off,
        no checkbox/dot glyph. Rendered entirely by script.js - see its
@@ -67,6 +67,22 @@
   <!-- S3: brief "Deleted '<item>' — Undo" toast, shown in addition to the
        always-visible Undo control above, not instead of it. -->
   <div id="toast" class="toast" hidden></div>
+
+  <!-- S21: settings menu shell. Hidden by default; opened by #settings-btn.
+       Closes via the explicit X control OR a tap on the scrim/outside the
+       panel (Escape is an optional extra, keyboard-only nav is out of scope).
+       The panel body is populated by script.js's renderSettings() - its first
+       real content is S23's aisle management. -->
+  <div id="settings-overlay" class="settings-overlay" hidden>
+    <div class="settings-scrim" data-role="settings-scrim"></div>
+    <div class="settings-panel" role="dialog" aria-modal="true" aria-label="Settings">
+      <div class="settings-panel-header">
+        <h2 class="settings-title">Settings</h2>
+        <button type="button" class="settings-close" data-role="settings-close" title="Close" aria-label="Close settings">✕</button>
+      </div>
+      <div id="settings-body" class="settings-body"></div>
+    </div>
+  </div>
 
   <script src="script.js"></script>
 </body>

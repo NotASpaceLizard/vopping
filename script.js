@@ -8,8 +8,83 @@
   var STORAGE_KEY = 'vopping-list-state-v1';
   var FREQUENCY_KEY = 'vopping-frequency-v1';
 
+  // ---- S22: aisle set constants -------------------------------------------
+  // Declared up here (not mid-file) specifically because migrateAisles() runs
+  // during loadState() at module init, BEFORE any later `var` assignment would
+  // execute - a `var AISLE_STARTER_LIST = [...]` further down is hoisted but
+  // still `undefined` at migration time. normalize() below is a hoisted
+  // FUNCTION declaration, so it IS callable during migration.
+  //
+  // 'Other' (last entry, S8's original starter list) is intentionally the
+  // LABEL of the intrinsic no-aisle bucket, NOT an assignable aisle - it is
+  // excluded from the seeded assignable set (S22 N11). The rest are the real
+  // starter aisles.
+  var AISLE_STARTER_LIST = ['Produce', 'Dairy', 'Meat/Seafood', 'Bakery', 'Frozen', 'Pantry', 'Beverages', 'Household', 'Other'];
+  // Built-in default label for the no-aisle bucket, and the hard fallback once
+  // the user deletes that label in Settings (S23). Compared against the
+  // LITERAL constant at first migration (state.unassignedLabel does not exist
+  // yet then).
+  var OTHER_LABEL = 'Other';
+  var UNASSIGNED_FALLBACK = 'Unassigned';
+  // S24: the "+ Add new aisle…" sentinel option. VALUE is a reserved internal
+  // token that can never equal a real aisle string (so it never collides);
+  // LABEL is the visible text (S23 additionally rejects creating an aisle whose
+  // normalized name equals this label - N12, belt-and-suspenders).
+  var ADD_AISLE_VALUE = '__VOPPING_ADD_NEW_AISLE__';
+  var ADD_AISLE_LABEL = '+ Add new aisle…';
+  // S23: marker identifying the no-aisle bucket row in the Settings rename
+  // editor (distinct from any normalized real-aisle key).
+  var BUCKET_EDIT_KEY = '__VOPPING_BUCKET_ROW__';
+
   function defaultState() {
-    return { items: [], nextId: 0 };
+    // Seed a fresh state through the same migration path so the aisle set and
+    // bucket label are always present/valid (starters-minus-Other, no items).
+    return migrateAisles({ items: [], nextId: 0 });
+  }
+
+  // ---- S22: aisle-set migration/seeding -----------------------------------
+  // Runs on every load via parseStoredState(); no-ops on an already-seeded
+  // state (NB-7 idempotency: the seed is deterministic, a reload does not
+  // re-mutate items or state.aisles once the field exists). MAP-THEN-SEED
+  // order is load-bearing (see inline note).
+  function migrateAisles(st) {
+    if (typeof st.unassignedLabel !== 'string') {
+      st.unassignedLabel = OTHER_LABEL;
+    }
+    if (Array.isArray(st.aisles)) {
+      return st; // already seeded - AUTHORITATIVE, never re-merged/re-scanned
+    }
+    var otherKey = normalize(OTHER_LABEL);
+    var i;
+    // 1. MAP first: any pre-existing item whose aisle normalizes to the literal
+    //    'Other' becomes the no-aisle bucket ('') - they ARE that bucket now.
+    //    This MUST run before the seed union below, or the union would pull
+    //    those Other-normalizing values straight back into the assignable set.
+    //    (Narrow, deliberate exception to "migration never rewrites items".)
+    for (i = 0; i < st.items.length; i++) {
+      var av = st.items[i] && st.items[i].aisle;
+      if (av && normalize(av) === otherKey) {
+        st.items[i].aisle = '';
+      }
+    }
+    // 2. SEED: real starters (Other excluded) UNION every distinct remaining
+    //    item aisle, deduped case-insensitively (starter casing wins, else
+    //    first-seen item casing) - mirrors S8's original getAislePool order.
+    var seen = {};
+    var aisles = [];
+    for (i = 0; i < AISLE_STARTER_LIST.length; i++) {
+      var sk = normalize(AISLE_STARTER_LIST[i]);
+      if (sk === otherKey) continue; // Other is the bucket label, not assignable
+      if (!seen[sk]) { seen[sk] = true; aisles.push(AISLE_STARTER_LIST[i]); }
+    }
+    for (i = 0; i < st.items.length; i++) {
+      var iv = st.items[i] && st.items[i].aisle;
+      if (!iv) continue;
+      var ik = normalize(iv);
+      if (!seen[ik]) { seen[ik] = true; aisles.push(iv); }
+    }
+    st.aisles = aisles;
+    return st;
   }
 
   // S1 locked AC / QA finding R1 (Developer sanity-check finding,
@@ -36,7 +111,9 @@
     if (typeof parsed.nextId !== 'number') {
       parsed.nextId = parsed.items.length;
     }
-    return parsed;
+    // S22: seed/repair the persisted aisle set + bucket label (no-op if the
+    // state was already seeded on a prior load).
+    return migrateAisles(parsed);
   }
 
   function loadState() {
@@ -59,6 +136,13 @@
   }
 
   var state = loadState();
+  // S22 (N13): persist the seeded aisle set once on first load so it is durable
+  // from the outset. Idempotent - a state that was already seeded serializes
+  // back byte-for-identical, and the Other->'' item remap only runs when
+  // state.aisles was absent, so a reload after migration does not re-mutate
+  // (NB-7 asserts on end-state stability, not this call). Guarded internally
+  // against localStorage being unavailable.
+  saveState();
 
   // ---- S10: frequency counter, a separate/independent storage record -----
   // { "<normalized name>": { count: N, display: "<first-typed casing>" } }.
@@ -482,19 +566,16 @@
   // job, per the PO's explicitly-confirmed icon-pairing.
   var NAME_EDIT_ICON_GLYPH = '✎';
 
-  // 'name' is a THIRD editor field type, added by S15, sharing this exact
-  // same mechanism (mutual exclusivity, cross-row/cross-action commit,
-  // draft-survives-unrelated-render) with S7's 'note' and S8's 'aisle' —
-  // locked AC requirement, not a Developer convenience: "the same mutual-
-  // exclusivity rule already established and tested for S7/S8... extends to
-  // include this story's new name editor as a third editor type in that same
-  // set." Every function below that switches on `editingField.field` (see
-  // commitEditor()) has a name-specific branch; every generic function that
-  // doesn't need to switch (openEditor, updateDraft, the render-time
-  // focus-restore/draft-survival logic) already works for this new field
-  // type for free, by construction, since none of that code names 'note'/
-  // 'aisle' specifically.
-  var editingField = null; // { id, field: 'note'|'aisle'|'name', draft }
+  // Editor field types sharing this one mechanism (mutual exclusivity, cross-
+  // row/cross-action commit, draft-survives-unrelated-render): S7's 'note',
+  // S15's 'name', and S24's 'new-aisle'. NB (S22): 'aisle' is NO LONGER an
+  // editor type - the per-item aisle is a native <select> committing on
+  // `change`, so it was unthreaded from editingField entirely (the largest
+  // structural ripple of the rework). commitEditor() switches on
+  // `editingField.field` (note -> save, new-aisle -> revert, else name); the
+  // generic helpers (openEditor, updateDraft, render-time focus-restore/draft-
+  // survival) work for every type by construction, naming none specifically.
+  var editingField = null; // { id, field: 'note'|'name'|'new-aisle', draft[, error] }
 
   function openEditor(id, field) {
     var idx = findIndexById(id);
@@ -567,9 +648,20 @@
     editingField = null;
     if (current.field === 'note') {
       saveNote(current.id, current.draft);
-    } else if (current.field === 'aisle') {
-      saveAisle(current.id, current.draft);
+    } else if (current.field === 'new-aisle') {
+      // S24 (QA C1, IMPORTANT): an UNRESOLVED new-aisle draft REVERTS - it must
+      // have its OWN explicit branch here or it would fall through the `else`
+      // to saveName() and corrupt the item name (the exact C1 fall-through
+      // bug). Reaching commitEditor for a new-aisle draft means it was
+      // abandoned (blur, or another editor/select opened), so revert-on-blur
+      // wins: never create, just re-render so the select snaps back to the
+      // item's real aisle. The EXPLICIT commit path (Enter / Add) is a
+      // separate function, commitNewAisle(), NOT this one.
+      render();
     } else {
+      // 'name' (S15). NB: 'aisle' no longer routes through editingField - the
+      // per-row native select commits on `change` (see the delegated change
+      // handler), so there is intentionally no 'aisle' branch here anymore.
       saveName(current.id, current.draft);
     }
   }
@@ -591,12 +683,134 @@
   function saveAisle(id, rawValue) {
     var idx = findIndexById(id);
     if (idx === -1) return;
-    // Same whitespace-only-trims-to-empty treatment as notes, extended here
-    // for consistency (not separately restated in S8's own AC text, but the
-    // same underlying precedent applies - an aisle value the user backspaced
-    // to nothing should revert to "Unassigned", not save as literal
-    // whitespace).
+    // S22: rawValue is the chosen <option>'s canonical display string (or ''
+    // for the no-aisle bucket). Storing it CANONICALIZES the item on first edit
+    // - a pre-existing non-canonical value (e.g. 'produce' from free-text S8)
+    // is displayed correctly via normalized-key <option> selection until the
+    // user actively re-picks, at which point it becomes the canonical casing.
+    // trim() is harmless (option values carry no stray whitespace).
     state.items[idx].aisle = String(rawValue).trim();
+    saveState();
+    render();
+  }
+
+  // ---- S23/S24: persisted aisle-set mutations ------------------------------
+  // All matching is by NORMALIZED key (NB-2) so pre-existing non-canonical item
+  // values (which S22 migration deliberately leaves untouched) stay in sync
+  // through renames/deletes instead of being orphaned.
+
+  function validateAisleName(name, excludeKey, isBucket) {
+    var trimmed = String(name).trim();
+    if (!trimmed) return 'Enter a name.';
+    var key = normalize(trimmed);
+    if (key === normalize(ADD_AISLE_LABEL)) return 'That name is reserved.';
+    // Collision with the no-aisle bucket label (skip when renaming the bucket
+    // itself - that is the same entry). Per N11, once Other has been deleted
+    // (bucket falls back to 'Unassigned') a real 'Other' becomes creatable,
+    // because this check compares against the CURRENT bucket label only.
+    if (!isBucket && key === normalize(noAisleLabel())) return 'That name is already in use.';
+    var pool = getAislePool();
+    for (var i = 0; i < pool.length; i++) {
+      var pk = normalize(pool[i]);
+      if (excludeKey != null && pk === excludeKey) continue; // renaming self (M21)
+      if (pk === key) return 'That aisle already exists.';
+    }
+    return null;
+  }
+
+  function addAisle(name) {
+    // Caller validates first. Stores the canonical casing (as typed, trimmed).
+    state.aisles.push(String(name).trim());
+  }
+
+  function renameAisleByKey(oldKey, newName) {
+    var trimmed = String(newName).trim();
+    var i;
+    for (i = 0; i < state.aisles.length; i++) {
+      if (normalize(state.aisles[i]) === oldKey) { state.aisles[i] = trimmed; break; }
+    }
+    // Cascade the new string over every item using that aisle (normalized-key
+    // match, so non-canonical variants are updated too - NB-2).
+    for (i = 0; i < state.items.length; i++) {
+      if (state.items[i].aisle && normalize(state.items[i].aisle) === oldKey) {
+        state.items[i].aisle = trimmed;
+      }
+    }
+    saveState();
+  }
+
+  function deleteAisleByKey(key) {
+    var i;
+    for (i = state.aisles.length - 1; i >= 0; i--) {
+      if (normalize(state.aisles[i]) === key) state.aisles.splice(i, 1);
+    }
+    // Delete-in-use reverts affected items to the no-aisle bucket ('') - it does
+    // NOT block on reassignment (locked AC). Normalized-key match (NB-2).
+    for (i = 0; i < state.items.length; i++) {
+      if (state.items[i].aisle && normalize(state.items[i].aisle) === key) {
+        state.items[i].aisle = '';
+      }
+    }
+    saveState();
+  }
+
+  function renameBucket(newName) {
+    // Renaming the no-aisle bucket relabels it everywhere via state.unassignedLabel
+    // - no item data changes (items already store '' for no-aisle).
+    state.unassignedLabel = String(newName).trim();
+    saveState();
+  }
+
+  function deleteBucket() {
+    // The no-aisle STATE cannot be deleted, only its label - drop the custom
+    // label so the bucket falls back to the built-in 'Unassigned' (S23c).
+    state.unassignedLabel = UNASSIGNED_FALLBACK;
+    saveState();
+  }
+
+  // ---- S24: inline "add new aisle" from the per-item select ----------------
+  // Its OWN editingField type ('new-aisle'), deliberately NOT the removed
+  // 'aisle' path (S22 deleted that). Explicit commit = commitNewAisle();
+  // blur/switch/abandon = revert (handled by commitEditor's 'new-aisle' branch).
+  function openNewAisleEditor(id) {
+    var idx = findIndexById(id);
+    if (idx === -1) return;
+    editingField = { id: id, field: 'new-aisle', draft: '', error: null };
+    render(); // rebuilds the row: the select snaps back to the item's real
+              // aisle (we never saved the sentinel), the name input appears.
+    focusNewAisleInput(id);
+  }
+
+  function focusNewAisleInput(id) {
+    var input = listRoot.querySelector('li[data-id="' + id + '"] [data-role="new-aisle-input"]');
+    if (input) {
+      input.focus();
+      if (typeof input.setSelectionRange === 'function') {
+        var len = input.value.length;
+        input.setSelectionRange(len, len);
+      }
+    }
+  }
+
+  function commitNewAisle() {
+    // EXPLICIT commit only (Enter / a future confirm control). Empty -> revert.
+    // Invalid/collision -> stay open + inline message (S23 NB-3). Valid ->
+    // create + persist + assign + select, all in one atomic save.
+    if (!editingField || editingField.field !== 'new-aisle') return;
+    var id = editingField.id;
+    var trimmed = String(editingField.draft).trim();
+    if (!trimmed) { editingField = null; render(); return; }
+    var err = validateAisleName(trimmed, null, false);
+    if (err) {
+      editingField.error = err;
+      render();
+      focusNewAisleInput(id);
+      return;
+    }
+    addAisle(trimmed);
+    var idx = findIndexById(id);
+    if (idx !== -1) state.items[idx].aisle = trimmed;
+    editingField = null;
     saveState();
     render();
   }
@@ -630,65 +844,22 @@
     render();
   }
 
-  // S8: starter suggestion list (Developer-level content detail per locked
-  // AC - exact wording freely adjustable, not a product requirement).
-  var AISLE_STARTER_LIST = ['Produce', 'Dairy', 'Meat/Seafood', 'Bakery', 'Frozen', 'Pantry', 'Beverages', 'Household', 'Other'];
-
-  // S16 (Locked, 2026-09-08): glyph for the new icon-only "edit aisle"
-  // affordance shown while sorted By Aisle (see renderRow()). FINAL, PO's
-  // pick from s16-aisle-icon-picker.html's candidate comparison, 2026-09-08:
-  // U+2691 BLACK FLAG - chosen specifically because it's a plain monochrome,
-  // text-colorable dingbat (not a colored emoji), so it can inherit the
-  // aisle-tag's own accent color instead of looking like a mismatched
-  // colored sticker (see the `.aisle-sort-icon` color rule in style.css,
-  // scoped narrowly to this icon's aisle-sort-mode rendering specifically -
-  // deliberately NOT applied to S8's separate, still-neutral "Add aisle"
-  // empty-state icon in Manual/Alphabetical mode, to avoid an unintended
-  // side effect there). Still centralized to this one constant so any
-  // future swap stays a one-line change.
-  var AISLE_EDIT_ICON_GLYPH = '⚑';
-
-  // Locked AC, 2026-09-04 (Scrum Master, resolving Tester's testability-check
-  // question): the datalist pool is NOT just the static starter list - it
-  // also includes every distinct free-typed aisle value currently used
-  // somewhere in the live list, deduplicated via the same normalized
-  // (trimmed, case-folded) comparison used for grouping, with whichever
-  // casing was entered chronologically first winning the merge.
-  //
-  // Two Developer-level interpretation choices, disclosed rather than
-  // silently assumed: (1) "used elsewhere in the list" is read as a LIVE
-  // derived scan of state.items' current aisle values, not a separately
-  // persisted permanent history - a custom aisle stops being suggested once
-  // no current item uses it anymore, no new storage key needed for this;
-  // (2) "chronologically first" is approximated as first-occurrence-in-
-  // state.items'-current-array-order rather than a true edit timestamp - a
-  // cosmetic-only tie-break (which casing DISPLAYS in the merged suggestion
-  // entry), never affects what's actually stored on any individual item, so
-  // a rare reordering-perturbs-the-tie-break edge case has no functional
-  // consequence. A static starter-list entry always keeps its own curated
-  // casing even if a later free-typed value only differs by case - only
-  // genuinely new (non-static) values get their casing from first usage.
+  // S22: the assignable aisle set is now the PERSISTED state.aisles (seeded on
+  // first load by migrateAisles(), then authoritative). getAislePool()
+  // collapses to a direct read - it is NO LONGER derived live from starters ∪
+  // items (that logic moved into one-time seeding). AISLE_STARTER_LIST and the
+  // label constants now live at the top of this file (migration needs them
+  // before this point executes). S8's old datalist/free-text pool and its
+  // renderAisleDatalist() are removed.
   function getAislePool() {
-    var seen = {};
-    var pool = [];
-    var i;
-    for (i = 0; i < AISLE_STARTER_LIST.length; i++) {
-      var starterKey = normalize(AISLE_STARTER_LIST[i]);
-      if (!seen[starterKey]) {
-        seen[starterKey] = true;
-        pool.push(AISLE_STARTER_LIST[i]);
-      }
-    }
-    for (i = 0; i < state.items.length; i++) {
-      var aisle = state.items[i].aisle;
-      if (!aisle) continue;
-      var key = normalize(aisle);
-      if (!seen[key]) {
-        seen[key] = true;
-        pool.push(aisle);
-      }
-    }
-    return pool;
+    return state.aisles;
+  }
+
+  // S22: the live label for the intrinsic no-aisle bucket - state.unassignedLabel
+  // (default 'Other'), or the built-in 'Unassigned' fallback once the user has
+  // deleted the Other label in Settings (S23).
+  function noAisleLabel() {
+    return state.unassignedLabel || UNASSIGNED_FALLBACK;
   }
 
   function getAisleDisplayMap() {
@@ -776,8 +947,18 @@
   var toastEl = document.getElementById('toast');
   var toastTimer = null;
   var sortSelect = document.getElementById('sort-select');
-  var aisleDatalist = document.getElementById('aisle-options');
   var suggestionsRoot = document.getElementById('suggestions-root');
+  // S21: settings menu shell.
+  var settingsBtn = document.getElementById('settings-btn');
+  var settingsOverlay = document.getElementById('settings-overlay');
+  var settingsBody = document.getElementById('settings-body');
+  // S21/S23 settings UI state (kept outside `state`, same rationale as
+  // editingField - it is transient view state that must survive the panel's
+  // innerHTML rebuilds).
+  var settingsOpen = false;
+  var settingsEdit = null;        // { key, draft, error } while renaming an aisle/bucket
+  var settingsCreateDraft = '';   // in-progress "New aisle…" text (survives re-render)
+  var settingsCreateError = null; // inline create-field validation message
 
   function escapeHtml(value) {
     return String(value)
@@ -791,10 +972,12 @@
   function renderRow(item, index, total) {
     var safeName = escapeHtml(item.name);
     var noteVal = item.note || '';
-    var aisleVal = item.aisle || '';
     var isEditingNote = !!editingField && editingField.id === item.id && editingField.field === 'note';
-    var isEditingAisle = !!editingField && editingField.id === item.id && editingField.field === 'aisle';
     var isEditingName = !!editingField && editingField.id === item.id && editingField.field === 'name';
+    // S24: the inline "add new aisle" name editor for THIS row (its own editor
+    // type - NOT the removed 'aisle' path). While open, the reveal input shows
+    // in the row-meta line beside the (reverted) select.
+    var isEditingNewAisle = !!editingField && editingField.id === item.id && editingField.field === 'new-aisle';
 
     // S15 (Locked, 2026-09-08): while this row's name editor is open, an
     // <input> takes over the EXACT same primary-line flex slot the passive
@@ -822,33 +1005,11 @@
       ? '<button type="button" class="icon-btn" data-role="note-toggle" title="Add note">' + NOTE_TOGGLE_ICON_GLYPH + '</button>'
       : '';
 
-    // S16 (Locked, 2026-09-08): while sorted By Aisle specifically, the
-    // passive full-text aisle tag on the second line is suppressed (the
-    // group header already conveys the aisle - see renderList()) and
-    // replaced by this SAME icon-only affordance regardless of whether the
-    // item already has a value or is Unassigned (QA finding M13 - one
-    // consistent icon for the whole column in this mode, not two different
-    // icons depending on each row's state). Scoped to non-editing display
-    // only (Developer sanity-check finding) - `isEditingAisle` always wins
-    // below and renders the real editor input exactly as in every other
-    // sort mode, completely unaffected by sortMode; tapping this icon opens
-    // that same editor pre-filled with the item's real current value (or
-    // empty if Unassigned), via the exact same 'aisle-toggle' role/handler
-    // S8 already wires up - no new click-handling code needed.
-    var aisleSortCompact = sortMode === 'aisle' && !isEditingAisle;
-    // Disclosed addition beyond the literal glyph swap (2026-09-08): the PO's
-    // own reasoning for picking this glyph was specifically about color -
-    // "it can inherit the aisle-tag's existing text color instead of
-    // looking like a mismatched colored sticker." That's only true if this
-    // icon actually GETS that color treatment, which nothing did before this
-    // - `aisle-sort-icon` is a class added ONLY in the aisleSortCompact
-    // branch (not S8's separate, still-neutral empty-state "Add aisle" icon
-    // in Manual/Alphabetical mode below), so the accent-color rule in
-    // style.css stays scoped to exactly the context the PO was reasoning
-    // about, without recoloring the unrelated pre-existing icon.
-    var aisleAffordance = (!isEditingAisle && (aisleSortCompact || !aisleVal))
-      ? '<button type="button" class="icon-btn' + (aisleSortCompact ? ' aisle-sort-icon' : '') + '" data-role="aisle-toggle" title="' + (aisleVal ? 'Edit aisle' : 'Add aisle') + '">' + AISLE_EDIT_ICON_GLYPH + '</button>'
-      : '';
+    // S22/S16: the old icon-only aisle affordance (⚑ / "Add aisle") is GONE.
+    // The aisle is now a persistent native <select> rendered on the row-meta
+    // line below, in ALL sort modes including By-Aisle compact (M23, PO
+    // confirmed - the inline select supersedes S16's ⚑). No primary-line aisle
+    // control remains, so the worst-case primary-line icon count drops by one.
 
     // S15 (Locked, 2026-09-08): unlike note/aisle's affordances above, this
     // icon is NOT conditioned on the field being empty (an item's name is
@@ -883,47 +1044,65 @@
         '<button type="button" class="icon-btn" data-role="down" title="Move down"' + (index === total - 1 ? ' disabled' : '') + '>▼</button>';
     }
 
-    // Second line (locked AC, S7/S8): a row with a non-empty note/aisle (or
-    // either editor currently open) may grow to a second line to fit it;
-    // `flex-basis: 100%` (style.css) is what forces this onto its own line
-    // within the wrapping flex row rather than sitting beside the controls.
-    // A row with neither stays exactly as tall as S1/S2's locked single-
-    // line spec - this div simply isn't rendered at all in that case.
-    //
-    // S16: the aisle tag specifically is suppressed here while
-    // `aisleSortCompact` (sorted By Aisle, not currently editing) - it moved
-    // to the icon-only affordance on the primary line above instead. The
-    // outer "does this row need a second line at all" check below must
-    // account for that suppression too, not just check the raw `aisleVal`
-    // flag - otherwise a row with an aisle but no note would still open an
-    // empty `<div class="row-meta">` while sorted By Aisle (content-less but
-    // still occupying a sliver of vertical space via its own margin),
-    // exactly the second-line growth this story exists to avoid.
-    var showsNoteLine = isEditingNote || noteVal;
-    var showsAisleLine = isEditingAisle || (aisleVal && !aisleSortCompact);
-    var secondLine = '';
-    if (showsNoteLine || showsAisleLine) {
-      secondLine += '<div class="row-meta">';
-      if (isEditingNote) {
-        secondLine += '<input type="text" class="row-meta-input" data-role="note-input" placeholder="Note…" value="' + escapeHtml(editingField.draft) + '">';
-      } else if (noteVal) {
-        secondLine += '<button type="button" class="note-display" data-role="note-toggle" title="Edit note">' + escapeHtml(noteVal) + '</button>';
-      }
-      if (isEditingAisle) {
-        secondLine += '<input type="text" class="row-meta-input" list="aisle-options" data-role="aisle-input" placeholder="Aisle…" value="' + escapeHtml(editingField.draft) + '">';
-      } else if (aisleVal && !aisleSortCompact) {
-        secondLine += '<button type="button" class="aisle-tag" data-role="aisle-toggle" title="Edit aisle">' + escapeHtml(aisleVal) + '</button>';
-      }
-      secondLine += '</div>';
+    // Second line (row-meta): S22 makes the per-item aisle <select> ALWAYS
+    // present, so this line now always renders (M24 - a placement re-check at
+    // 320/360/375/390px is required and was run; the select sits on its own
+    // wrapping line, never on the crowded primary control line). It also holds
+    // the note editor/display when applicable, and S24's new-aisle reveal input
+    // while that editor is open.
+    var secondLine = '<div class="row-meta">';
+    if (isEditingNote) {
+      secondLine += '<input type="text" class="row-meta-input" data-role="note-input" placeholder="Note…" value="' + escapeHtml(editingField.draft) + '">';
+    } else if (noteVal) {
+      secondLine += '<button type="button" class="note-display" data-role="note-toggle" title="Edit note">' + escapeHtml(noteVal) + '</button>';
     }
+    secondLine += renderAisleSelect(item);
+    if (isEditingNewAisle) {
+      secondLine += '<input type="text" class="row-meta-input new-aisle-input" data-role="new-aisle-input" placeholder="New aisle name…" autocomplete="off" value="' + escapeHtml(editingField.draft) + '">';
+      if (editingField.error) {
+        secondLine += '<span class="row-meta-error" data-role="new-aisle-error">' + escapeHtml(editingField.error) + '</span>';
+      }
+    }
+    secondLine += '</div>';
 
     return '<li class="' + (item.checked ? 'checked' : '') + '" data-id="' + item.id + '"' +
       ' role="checkbox" tabindex="0" aria-checked="' + (item.checked ? 'true' : 'false') + '" aria-label="' + safeName + '">' +
       nameContent +
-      noteAffordance + aisleAffordance + editButton + reorderButtons +
+      noteAffordance + editButton + reorderButtons +
       '<button type="button" class="icon-btn delete-btn" data-role="delete" title="Delete">✕</button>' +
       secondLine +
       '</li>';
+  }
+
+  // S22: the persistent per-item aisle <select>. Options (NB-1): the no-aisle
+  // bucket FIRST (value '', labeled state.unassignedLabel), then the real
+  // aisles in state.aisles insertion order, then S24's "+ Add new aisle…"
+  // sentinel LAST. The item's current aisle is matched to its option by
+  // NORMALIZED key (not exact string), so a pre-existing non-canonical value
+  // (e.g. 'produce') selects the canonical 'Produce' option rather than
+  // dangling. R15 defensive guard: if no option matches a non-empty stored
+  // value, append it as its own selected option so the select never silently
+  // shows the wrong value (never renders a blank/undefined selection).
+  function renderAisleSelect(item) {
+    var curKey = normalize(item.aisle || '');
+    var matched = (curKey === '');
+    var html = '<select class="aisle-select" data-role="aisle-select" title="Aisle">';
+    html += '<option value=""' + (curKey === '' ? ' selected' : '') + '>' + escapeHtml(noAisleLabel()) + '</option>';
+    var pool = getAislePool();
+    for (var i = 0; i < pool.length; i++) {
+      var optKey = normalize(pool[i]);
+      var sel = (!matched && optKey === curKey);
+      if (sel) matched = true;
+      html += '<option value="' + escapeHtml(pool[i]) + '"' + (sel ? ' selected' : '') + '>' + escapeHtml(pool[i]) + '</option>';
+    }
+    if (!matched && item.aisle) {
+      html += '<option value="' + escapeHtml(item.aisle) + '" selected>' + escapeHtml(item.aisle) + '</option>';
+    }
+    // Sentinel LAST (S24). Detected structurally via data-sentinel (not by its
+    // value string) so it can never be confused with a real aisle.
+    html += '<option value="' + escapeHtml(ADD_AISLE_VALUE) + '" data-sentinel="1">' + escapeHtml(ADD_AISLE_LABEL) + '</option>';
+    html += '</select>';
+    return html;
   }
 
   function renderList() {
@@ -969,7 +1148,13 @@
         var groupKey = item.aisle ? normalize(item.aisle) : '';
         if (groupKey !== lastGroupKey) {
           lastGroupKey = groupKey;
-          var groupLabel = groupKey ? aisleDisplayMap[groupKey] : 'Unassigned';
+          // S9/S22: no-aisle group uses the live bucket label (Other, or the
+          // Unassigned fallback after the label is deleted). R15 invariant: the
+          // real-aisle label lookup flipped from items-derived (can't miss) to
+          // state.aisles-derived (can miss), so ALWAYS resolve with a defensive
+          // fallback to the raw item.aisle string - never render literal
+          // 'undefined' (same posture as parseStoredState's R1 guard).
+          var groupLabel = groupKey ? (aisleDisplayMap[groupKey] || item.aisle) : noAisleLabel();
           html += '<li class="aisle-group-header">' + escapeHtml(groupLabel) + '</li>';
         }
       }
@@ -1014,15 +1199,6 @@
     clearCheckedBtn.disabled = !anyChecked;
   }
 
-  function renderAisleDatalist() {
-    var pool = getAislePool();
-    var html = '';
-    for (var i = 0; i < pool.length; i++) {
-      html += '<option value="' + escapeHtml(pool[i]) + '"></option>';
-    }
-    aisleDatalist.innerHTML = html;
-  }
-
   function renderSuggestions() {
     var suggestions = getSuggestions();
     if (suggestions.length === 0) {
@@ -1042,8 +1218,9 @@
     renderList();
     renderUndoButton();
     renderClearCheckedButton();
-    renderAisleDatalist();
     renderSuggestions();
+    if (settingsOpen) renderSettings(); // keep the open Settings panel in sync
+                                        // with aisle-set / bucket-label changes
     // S19 (QA finding M19): the old `sort-manual` class toggle (S13's, which
     // existed only to switch on the drag `grab` cursor hint) is gone -
     // Up/Down visibility is JS-gated directly in renderRow() by `sortMode`,
@@ -1080,13 +1257,15 @@
       var role = nested.dataset.role;
       if (role === 'delete') deleteItem(id);
       else if (role === 'note-toggle') openEditor(id, 'note');
-      else if (role === 'aisle-toggle') openEditor(id, 'aisle');
       else if (role === 'name-toggle') openEditor(id, 'name');
       else if (role === 'up') moveItem(id, -1); // S19: swap with the neighbor above
       else if (role === 'down') moveItem(id, 1); // S19: swap with the neighbor below
-      // role === 'note-input' / 'aisle-input' / 'name-input': no action
-      // needed here, just let the native input handle cursor placement - but
-      // still return below rather than falling through to toggleChecked.
+      // role === 'note-input' / 'name-input' / 'new-aisle-input': no action
+      // needed here, just let the native input handle cursor placement.
+      // role === 'aisle-select': the native <select> handles its own open/pick;
+      // it commits via the delegated 'change' handler, not here. (The old
+      // 'aisle-toggle' affordance is gone - S22.) Still return below rather
+      // than falling through to toggleChecked.
       return; // nested control handled its own action - do NOT also cross off
     }
     toggleChecked(Number(li.dataset.id)); // tap landed on the row itself
@@ -1099,7 +1278,15 @@
   // Enter) saves it").
   listRoot.addEventListener('keydown', function (e) {
     var nested = e.target.closest && e.target.closest('[data-role]');
-    if (e.key === 'Enter' && nested && (nested.dataset.role === 'note-input' || nested.dataset.role === 'aisle-input' || nested.dataset.role === 'name-input')) {
+    if (e.key === 'Enter' && nested && nested.dataset.role === 'new-aisle-input') {
+      // S24: Enter is the EXPLICIT commit for the new-aisle name (create +
+      // assign, or stay-open-with-message on invalid) - a separate path from
+      // commitEditor (which reverts an abandoned new-aisle draft).
+      e.preventDefault();
+      commitNewAisle();
+      return;
+    }
+    if (e.key === 'Enter' && nested && (nested.dataset.role === 'note-input' || nested.dataset.role === 'name-input')) {
       e.preventDefault(); // no default action to run for a bare <input>, but explicit is cheap
       commitEditor();
       return;
@@ -1116,7 +1303,7 @@
   // re-rendering on every keystroke (see updateDraft's own comment).
   listRoot.addEventListener('input', function (e) {
     var role = e.target.dataset && e.target.dataset.role;
-    if (role === 'note-input' || role === 'aisle-input' || role === 'name-input') {
+    if (role === 'note-input' || role === 'name-input' || role === 'new-aisle-input') {
       updateDraft(e.target.value);
     }
   });
@@ -1150,13 +1337,56 @@
   // `editingField` will have moved on by the time this fires, and this
   // deferred call correctly no-ops rather than wrongly re-committing (or
   // prematurely closing) whatever is open now.
+  // Roles that trigger the deferred editor flush: the text editors (note/name/
+  // new-aisle), AND the aisle <select> (so a picker DISMISSED without choosing
+  // still flushes a pending note/name editor - R14). For a new-aisle draft the
+  // flush is a revert (commitEditor's 'new-aisle' branch); for note/name it is
+  // a commit.
   listRoot.addEventListener('focusout', function (e) {
     var role = e.target.dataset && e.target.dataset.role;
-    if (role === 'note-input' || role === 'aisle-input' || role === 'name-input') {
-      var pending = editingField;
-      setTimeout(function () {
-        if (editingField === pending) commitEditor();
-      }, 0);
+    if (role !== 'note-input' && role !== 'name-input' && role !== 'new-aisle-input' && role !== 'aisle-select') {
+      return;
+    }
+    var pending = editingField;
+    if (!pending) return; // nothing open to flush (e.g. an aisle-select blur with no editor)
+    setTimeout(function () {
+      if (editingField !== pending) return; // already handled by a click/change in between
+      // Skip the flush while focus is STILL on an in-progress editor control in
+      // the list: (a) an aisle <select> whose native picker is open - R14:
+      // committing now would render() it away mid-pick (the seam S13 C1/R13
+      // taught: a picker outlives this setTimeout(0), unlike a click); (b) the
+      // S24 new-aisle reveal input - when commitNewAisle re-renders to show an
+      // inline validation error, that rebuild momentarily blurs+refocuses the
+      // input, and this deferred revert must NOT fire on that transient blur
+      // (it would wrongly close the stay-open editor). A genuine
+      // blur-to-elsewhere lands focus outside this set and still reverts.
+      var ae = document.activeElement;
+      if (ae && ae.dataset && listRoot.contains(ae) &&
+          (ae.dataset.role === 'aisle-select' || ae.dataset.role === 'new-aisle-input')) return;
+      commitEditor();
+    }, 0);
+  });
+
+  // S22 (R14): the per-item aisle <select> commits on `change`. `change` fires
+  // only AFTER the native picker has closed, so render() here is safe.
+  listRoot.addEventListener('change', function (e) {
+    var target = e.target;
+    if (!target.dataset || target.dataset.role !== 'aisle-select') return;
+    var li = target.closest && target.closest('li[data-id]');
+    if (!li) return;
+    var id = Number(li.dataset.id);
+    // Capture id + selection FIRST, before any commit/render detaches the node.
+    var selOpt = target.options[target.selectedIndex];
+    var isSentinel = !!(selOpt && selOpt.dataset && selOpt.dataset.sentinel === '1');
+    var chosen = target.value;
+    // Commit any OPEN text editor first (mirrors openEditor's commit-first
+    // guard) so an in-progress note/name draft on another row is not lost; the
+    // sentinel-reveal path (S24) is covered by this same flush (QA requirement).
+    if (editingField) commitEditor();
+    if (isSentinel) {
+      openNewAisleEditor(id); // S24: "+ Add new aisle…" reveal
+    } else {
+      saveAisle(id, chosen);  // canonical option value (or '' for no-aisle)
     }
   });
 
@@ -1204,6 +1434,191 @@
     var chip = e.target.closest('.suggestion-chip');
     if (!chip) return;
     addSuggestion(chip.dataset.name);
+  });
+
+  // ---- S21/S23: settings menu + aisle management ---------------------------
+  function openSettings() {
+    settingsOpen = true;
+    settingsEdit = null;
+    settingsCreateDraft = '';
+    settingsCreateError = null;
+    settingsOverlay.hidden = false;
+    renderSettings();
+    // Deliberately do NOT auto-focus the create input - avoids popping the
+    // mobile keyboard the instant the panel opens.
+  }
+
+  function closeSettings() {
+    settingsOpen = false;
+    settingsEdit = null;
+    settingsOverlay.hidden = true;
+  }
+
+  function renderSettings() {
+    if (!settingsBody) return;
+    // Capture focus target before the rebuild, same shape as renderList's
+    // focus-preservation - so re-rendering (e.g. after a create) doesn't drop
+    // the caret out of the create field.
+    var active = document.activeElement;
+    var wasCreate = !!(active && active.dataset && active.dataset.role === 'aisle-create-input');
+
+    var html = '<div class="settings-section">';
+    html += '<h3 class="settings-section-title">Aisles</h3>';
+    html += '<p class="settings-hint">Add the sections of your store. Items with no aisle group under &ldquo;' + escapeHtml(noAisleLabel()) + '&rdquo;.</p>';
+    html += '<form class="aisle-create" data-role="aisle-create-form">';
+    html += '<input type="text" class="settings-input" data-role="aisle-create-input" placeholder="New aisle…" autocomplete="off" value="' + escapeHtml(settingsCreateDraft) + '">';
+    html += '<button type="submit" class="settings-add-btn">Add</button>';
+    html += '</form>';
+    if (settingsCreateError) {
+      html += '<p class="settings-error" data-role="create-error">' + escapeHtml(settingsCreateError) + '</p>';
+    }
+    html += '<ul class="aisle-manage-list">';
+    // No-aisle bucket first (rename => relabel; delete => fall back to Unassigned).
+    html += renderAisleManageRow(BUCKET_EDIT_KEY, noAisleLabel(), true);
+    var pool = getAislePool();
+    for (var i = 0; i < pool.length; i++) {
+      html += renderAisleManageRow(normalize(pool[i]), pool[i], false);
+    }
+    html += '</ul>';
+    html += '</div>';
+    settingsBody.innerHTML = html;
+
+    // Focus restore: an open rename editor wins; otherwise keep the create field
+    // focused if it was.
+    if (settingsEdit) {
+      var ri = settingsBody.querySelector('[data-role="aisle-rename-input"]');
+      if (ri) { ri.focus(); if (ri.setSelectionRange) { var rl = ri.value.length; ri.setSelectionRange(rl, rl); } }
+    } else if (wasCreate) {
+      var ci = settingsBody.querySelector('[data-role="aisle-create-input"]');
+      if (ci) { ci.focus(); if (ci.setSelectionRange) { var cl = ci.value.length; ci.setSelectionRange(cl, cl); } }
+    }
+  }
+
+  function renderAisleManageRow(key, display, isBucket) {
+    var editing = settingsEdit && settingsEdit.key === key;
+    var h = '<li class="aisle-manage-item"' + (isBucket ? ' data-bucket="1"' : '') + '>';
+    if (editing) {
+      h += '<input type="text" class="settings-input" data-role="aisle-rename-input" autocomplete="off" value="' + escapeHtml(settingsEdit.draft) + '">';
+      h += '<button type="button" class="settings-mini-btn" data-role="aisle-rename-confirm">Save</button>';
+      if (settingsEdit.error) {
+        h += '<span class="settings-error" data-role="rename-error">' + escapeHtml(settingsEdit.error) + '</span>';
+      }
+    } else {
+      h += '<span class="aisle-manage-name">' + escapeHtml(display) + '</span>';
+      h += '<button type="button" class="settings-mini-btn" data-role="aisle-rename" data-key="' + escapeHtml(key) + '" data-display="' + escapeHtml(display) + '">Rename</button>';
+      h += '<button type="button" class="settings-mini-btn settings-delete-btn" data-role="aisle-delete" data-key="' + escapeHtml(key) + '" title="Delete">Delete</button>';
+    }
+    h += '</li>';
+    return h;
+  }
+
+  function submitCreateAisle() {
+    var trimmed = String(settingsCreateDraft).trim();
+    if (!trimmed) { // empty create is a silent no-op, keep the field as-is
+      settingsCreateError = null;
+      renderSettings();
+      return;
+    }
+    var err = validateAisleName(trimmed, null, false);
+    if (err) {
+      // Explicit invalid commit: keep the field open with the typed text + an
+      // inline message (S23 NB-3).
+      settingsCreateError = err;
+      renderSettings();
+      var ci = settingsBody.querySelector('[data-role="aisle-create-input"]');
+      if (ci) ci.focus();
+      return;
+    }
+    addAisle(trimmed);
+    settingsCreateDraft = '';
+    settingsCreateError = null;
+    saveState();
+    render(); // refresh the list's per-row selects + the panel
+  }
+
+  function commitSettingsRename() {
+    if (!settingsEdit) return;
+    var key = settingsEdit.key;
+    var isBucket = (key === BUCKET_EDIT_KEY);
+    var trimmed = String(settingsEdit.draft).trim();
+    if (!trimmed) { settingsEdit = null; renderSettings(); return; } // empty -> revert
+    var err = validateAisleName(trimmed, isBucket ? null : key, isBucket);
+    if (err) {
+      settingsEdit.error = err;
+      renderSettings();
+      var ri = settingsBody.querySelector('[data-role="aisle-rename-input"]');
+      if (ri) ri.focus();
+      return;
+    }
+    if (isBucket) renameBucket(trimmed); else renameAisleByKey(key, trimmed);
+    settingsEdit = null;
+    render(); // rename cascade over items + refresh panel
+  }
+
+  function deleteSettingsAisle(key) {
+    if (key === BUCKET_EDIT_KEY) deleteBucket(); else deleteAisleByKey(key);
+    render();
+  }
+
+  settingsBtn.addEventListener('click', openSettings);
+
+  settingsOverlay.addEventListener('click', function (e) {
+    var control = e.target.closest && e.target.closest('[data-role]');
+    var role = control && control.dataset.role;
+    if (role === 'settings-scrim' || role === 'settings-close') { closeSettings(); return; }
+    if (role === 'aisle-rename') {
+      settingsEdit = { key: control.dataset.key, draft: control.dataset.display, error: null };
+      renderSettings();
+    } else if (role === 'aisle-rename-confirm') {
+      commitSettingsRename();
+    } else if (role === 'aisle-delete') {
+      deleteSettingsAisle(control.dataset.key);
+    }
+  });
+
+  settingsOverlay.addEventListener('submit', function (e) {
+    var control = e.target.closest && e.target.closest('[data-role]');
+    if (control && control.dataset.role === 'aisle-create-form') {
+      e.preventDefault();
+      submitCreateAisle();
+    }
+  });
+
+  settingsOverlay.addEventListener('input', function (e) {
+    var role = e.target.dataset && e.target.dataset.role;
+    if (role === 'aisle-create-input') {
+      settingsCreateDraft = e.target.value;
+    } else if (role === 'aisle-rename-input' && settingsEdit) {
+      settingsEdit.draft = e.target.value;
+    }
+  });
+
+  settingsOverlay.addEventListener('keydown', function (e) {
+    var role = e.target.dataset && e.target.dataset.role;
+    if (e.key === 'Enter' && role === 'aisle-rename-input') {
+      e.preventDefault();
+      commitSettingsRename();
+    }
+  });
+
+  // Rename-field blur = revert (M22, consistent with S24). Deferred so that a
+  // click on this same editor's Save button (which fires focusout on the input
+  // BEFORE the click) commits first and this revert then no-ops - same seam as
+  // the row editors' focusout, no native picker involved here.
+  settingsOverlay.addEventListener('focusout', function (e) {
+    var role = e.target.dataset && e.target.dataset.role;
+    if (role !== 'aisle-rename-input') return;
+    var pending = settingsEdit;
+    setTimeout(function () {
+      if (settingsEdit === pending && settingsEdit) { settingsEdit = null; renderSettings(); }
+    }, 0);
+  });
+
+  // S21: Escape-to-close is an optional convenience only (keyboard-only nav is
+  // out of scope) - the deterministic close paths are the X control and the
+  // scrim/outside tap above.
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && settingsOpen) closeSettings();
   });
 
   render();

@@ -1566,3 +1566,444 @@ no action required. The substantive verification that must actually happen at S1
 true 6-icon empty-fields row measured at 320px against the no-overflow guardrail, doubling as the
 S7/S8 closure re-measurement — is correctly locked and correctly scoped; nothing to add there.
 Advisory only, as always — the Lock decision is Scrum Master's.
+
+---
+
+## Per-story gate — 2026-09-10 (S21 settings shell; S22 native aisle select / persisted set / migration; S23 aisle CRUD; S24 add-new-aisle from the item dropdown — the "aisle rework")
+
+**Trigger:** per-story gate, per Orchestrator's request — all four stories cleared Scrum-Master +
+Developer sanity-checks and Tester's testability-check (zero blocking; refinements folded
+2026-09-10); about to go to Scrum Master for Lock. First QA review of any of the four.
+
+**Scope/method:** same as every prior pre-Lock gate on this project (S13-S17, S19/S20) and the S13
+post-implementation review — read all four AC rows in full (BACKLOG.md lines 297-300, extracted via
+`node -e` since they're single-line GFM table rows past Read/Grep's line limits), then traced every
+load-bearing claim against the **real live code** (`script.js`, `index.html`, `style.css`), NOT the
+AC prose alone. Primary hunt (per the brief): the S8→S22 commit-model restructure against the S13
+C1/R13 stale-DOM/render-timing hazard — the highest-value place to find a Real finding, since S22
+touches the exact shared editor infra (editingField/openEditor/commitEditor/saveAisle + the four
+delegated listeners) that produced this project's worst bug. Traced: `editingField` (script.js
+line 497), `openEditor` (499-552, incl. its own synchronous commit-existing-editor-first at 524-526),
+`commitEditor` (564-575), `saveAisle`/`saveNote`/`saveName` (577-631), the delegated
+click/keydown/input/focusout listeners (1074/1100/1117/1153, the last with its `setTimeout`-deferred
+`pending === editingField`-guarded commit), `renderList` focus-restore + By-Aisle grouping
+(939-1003, grouping at 968-973, `aisleDisplayMap` at 961/694-701 → `getAislePool` 671-692),
+`renderRow`'s S16 `isEditingAisle`/`aisleSortCompact` logic (795-916), and the `normalize`/migration
+touchpoints (`parseStoredState` 23-40, `normalize` 121). Confirmed the iOS-zoom root cause directly:
+`.row-meta-input` (today's aisle/note editor input) is `font-size: 0.82rem` (~13px, style.css line
+374) — below iOS's 16px focus-zoom floor — while `.add-form input`/`.name-input` inherit 16px, so
+S22's "native select + every new text input >= 16px" premise is real and correctly grounded. Not
+gating on the note-field zoom (reserved S25) per the brief.
+
+---
+
+### REAL
+
+**R14 (S22 — the primary finding: the S8→S22 commit-model restructure reintroduces the C1/R13
+render-timing hazard class in a NEW, un-rescued form).** Opening the per-item aisle `<select>` while
+a note or name editor is still open on a DIFFERENT row destroys the just-opened `<select>` (and its
+open native dropdown/picker) mid-interaction, before the user can pick — so the first tap flashes the
+picker open and closed and the aisle-set silently fails, requiring a second interaction. The AC's
+"**Cross-editor timing to VERIFY... safe, double-render**" note misdiagnoses this as benign; the
+actual hazard is the opposite ordering it doesn't consider.
+
+Traced sequence (ordinary sequential single-finger use — leave a note/name editor open on row B,
+then go set row A's aisle without first tapping away to close the note):
+1. Row B's note/name `<input>` has focus; `editingField = {B, note}`.
+2. User taps row A's aisle `<select>`. Native focus moves to the select → row B's input fires
+   `blur`→`focusout` (bubbles to `listRoot`) → the delegated `focusout` handler (line 1153) captures
+   `pending = editingField` and schedules `setTimeout(commitEditor-if-still-pending, 0)`.
+3. The select's native dropdown/picker opens as the tap's default action. The current task ends.
+4. The `setTimeout(0)` macrotask runs almost immediately (milliseconds), while the picker is still
+   open awaiting the user's pick (seconds). `editingField === pending` is still true (nothing
+   changed it) → `commitEditor()` → `saveNote(B)` → `saveState(); render()`.
+5. `render()` → `renderList()` → `listRoot.innerHTML = html` (line 980) rebuilds the whole list,
+   **destroying and replacing row A's `<select>` while its picker is open** → the picker is
+   dismissed / the pending `change` is lost (the anchor element is gone). No aisle is set.
+
+This is the SAME failure class as the 2026-09-08 focusout fix documented in the shipped code
+(comment at lines 1128-1142: "a tap on one row's aisle-edit affordance while a different field's
+editor was still open never opened the new editor at all on the first tap"). Critically, the fix
+that solved it for the INLINE editors does NOT rescue a native `<select>`: for an inline editor, the
+`click` handler re-opens the editor (openEditor synchronously commits, re-renders, and re-focuses the
+NEW input), so the second render lands the user where they wanted. A native select's opening is a
+browser default action with no handler of ours to re-trigger it — once `render()` destroys the
+select, there is no code path that re-opens the picker. Reachable and reproducible on DESKTOP
+Chromium too (destroying a `<select>` with an open dropdown closes it), so it is NOT solely a
+real-device concern — the desktop formal pass can and should assert it. After the failed first
+attempt the list is stable and `editingField` is null, so the SECOND tap works; net effect is a
+"needs two taps, first silently does nothing" bug — exactly the severity the 2026-09-08 bug carried,
+which this project treated as a genuine pre-Lock fix, not a nitpick.
+
+Recommend: replace the AC's "safe, verify the sequence" characterization with a deterministic,
+DESKTOP-testable requirement — open a note/name editor on row B, open row A's aisle select, assert
+the picker opens AND a chosen value commits (and row B's draft also commits) on the FIRST
+interaction — and add this specific combination to the pre-Lock verification set rather than assuming
+it safe. Exact mitigation is Developer's call (e.g. commit any open editor synchronously on the
+select's own `pointerdown`/`focus` before its dropdown opens — mirroring `openEditor`'s existing
+commit-first pattern — rather than via the deferred `focusout` path; note even that needs real-device
+confirmation that a synchronous re-render on pointerdown doesn't itself suppress the native picker on
+that first tap). This is a Real finding: the AC's own flagged "timing to verify" understates a
+concrete, reachable, already-precedented render-timing bug at the exact seam the brief prioritized.
+
+**R15 (S22 × S9 — a dangling-value case the migration guard does NOT cover: the By-Aisle
+group-header label lookup).** S22's normalized-key dangling-value guard is specified for the per-item
+SELECT only ("the per-item select matches an item's current aisle to its option by NORMALIZED-KEY...
+so pre-existing case/whitespace variants resolve to the seeded canonical option instead of a dangling
+select"). But the same dangling exposure exists in a second place the AC never addresses: S9's
+By-Aisle group-header **label** lookup. Today `renderList()` (line 972) computes the header label as
+`groupKey ? aisleDisplayMap[groupKey] : 'Unassigned'`, and `aisleDisplayMap` is derived from
+`getAislePool()` = starters ∪ **every live item's aisle value** (lines 671-701) — so for any live
+item with a non-empty aisle, its normalized key is ALWAYS present in the map by construction; a
+non-empty missing key is structurally impossible, which is why the fallback only covers the empty
+case. Post-S22, `getAislePool()` "collapses to return `state.aisles`" (AC), so the map becomes
+`state.aisles`-derived, NOT items-derived — and `aisleDisplayMap[groupKey]` for a live item's
+non-empty aisle is now defined only IF that item's normalized key is in `state.aisles`. That
+invariant ("every live item's non-empty normalized aisle key ∈ state.aisles") is real and IS
+maintained by every normal path *if implemented exactly per AC* (migration seeds every distinct
+remaining item value; select-change writes canonical values already in the set; S23 rename cascades
+by normalized key on BOTH sides; S23 delete reverts matching items to '' AND drops the entry; S24
+create+persist+assign). But it is no longer a STRUCTURAL guarantee — it is now an
+implementation-dependent invariant across three separate stories, and the code has no defensive
+fallback for a missing non-empty key: `aisleDisplayMap[groupKey]` would be `undefined` →
+`escapeHtml(undefined)` → a group header rendering the literal text **"undefined."** Reachable if any
+one of S23's/S24's sync steps is implemented one-sided (e.g. a rename that updates `state.aisles` but
+whose item-cascade uses exact-string instead of normalized-key match — the exact orphaning S23's own
+NB-2 exists to prevent), or from an unusual pre-existing/hand-seeded state. Recommend: (a) state the
+cross-path invariant explicitly on S22/S23/S24 as a locked guarantee, and (b) extend the
+existing empty-key fallback in the same spirit as this project's R1/`parseStoredState` defensive
+posture — if a non-empty `groupKey` is absent from the map, fall back to the item's own aisle string
+(`escapeHtml(item.aisle)`) rather than rendering "undefined." Cheap, no PO input. Low normal-op
+reachability if S23/S24 are correct — flagged Real because it is precisely a "dangling value not
+covered by the stated guard" case (the brief's explicit hunt) and the safety net that exists today is
+being silently removed.
+
+---
+
+### MINOR
+
+**M21 (S23 — rename collision check spuriously rejects a no-op / pure-recasing rename of the aisle
+being renamed).** S23's validation: "reject any proposed name that case-insensitively duplicates
+EITHER an existing state.aisles entry OR the current bucket label state.unassignedLabel... the SAME
+normalized rule applies to BOTH create and rename." Read literally, "an existing state.aisles entry"
+includes the very entry being renamed. So renaming `Produce` → `Produce` (no change, e.g. the user
+opens rename and commits without editing) or `Produce` → `produce` (fixing casing) both
+case-insensitively duplicate an existing entry (themselves) and are REJECTED with a "name already
+exists"-style inline message on the user's own aisle — confusing, and it makes pure re-casing
+impossible. Recommend the rename collision set exclude the entry being renamed (compare against all
+OTHER entries + unassignedLabel); a rename whose normalized key equals its own current key is either a
+harmless no-op or a legitimate recase, not a collision. Create is unaffected (nothing to exclude).
+Cheap, no PO input.
+
+**M22 (S24 × S23 — unspecified interaction: a colliding new-aisle name dismissed via blur — does it
+revert (S24) or stay open (S23)?).** S24 routes the reveal-input's creation through "state.aisles via
+S23, same validation," and S23's rejection signal (NB-3) is "the field STAYS OPEN, the create is a
+no-op, a brief inline message is shown." But S24's own revert-on-cancel rule fires on "empty commit,
+explicit cancel, AND blur dismissal." These collide for one reachable case: the user types a
+NON-empty aisle name that collides with an existing aisle, then taps away (blur) instead of
+explicitly cancelling. S23 says stay-open-with-error; S24 says blur reverts to the captured prior
+aisle and closes. The natural resolution (blur always reverts+closes; S23's "stays open" governs an
+explicit commit/Enter rejection, not a blur) is defensible but not stated. Pick one explicitly so
+Tester has a single deterministic target for "colliding name + blur." Cheap, no PO input.
+
+**M23 (S22/S16 — the showPicker() fallback does not actually open a picker, and file:// is a primary
+deployment context).** S22's S16 ripple offers two implementations for the By-Aisle compact
+affordance: (a) icon → `select.showPicker()` with "a graceful fallback to select.focus()", or (b)
+"renders the select inline in compact mode." The AC itself notes `showPicker()` "is unsupported on
+older iOS / some **file://** contexts" — and file:// is an explicit, first-class deployment target for
+this whole app (index.html opened directly off disk). On those contexts, option (a)'s fallback
+`select.focus()` merely focuses the (possibly visually-collapsed) select; it does NOT open a native
+picker (focus ≠ open on iOS), so a user in By-Aisle sort would have no way to change an item's aisle
+without first switching sort modes. Option (b) has no `showPicker` dependency and works everywhere.
+The AC is satisfiable without the bug (choose b), so this is Minor rather than Real — but recommend
+the AC resolve the fork toward a directly-tappable inline select in compact mode (or require option
+(a)'s fallback to expose a tappable select, not just `.focus()`), so a core action isn't left
+unreachable on the app's own documented file:// path. NB-6 already tracks "does showPicker open the
+overlay" as a real-device signal; this is the distinct, un-tracked gap that the FALLBACK is
+inadequate.
+
+**M24 (S22 — a new always-present per-row `<select>` is added after the S19/S20 row-layout gate
+closed, with no placement spec or worst-case-overflow re-check).** S22 describes "a persistent aisle
+select carrying a data-role" per row, replacing today's conditional aisle affordance (an icon on the
+primary line when empty, or a `.aisle-tag` on the second line when set). A `<select>` is materially
+wider than the 19.5px `.icon-btn` it may replace, and "persistent" implies it renders on every row
+regardless of state. This project has an ironclad precedent (R7, M14, M17, and the whole S19/S20
+6-icon re-measurement) that every new per-row control gets an explicit layout cross-reference AND the
+worst-case row re-measured at 320/360/375/390px for horizontal overflow — S22 adds a per-row control
+and says nothing about its placement (primary vs. second line) or whether it reintroduces the
+overflow that gate just closed. Recommend S22 specify the select's row placement and add a worst-case
+overflow re-measurement to its formal pass (same shape as S19 findings (a)+(f)), so a new control
+doesn't quietly regress the layout the S13-S20 saga spent five stories settling. No PO input needed.
+
+---
+
+### NITPICK
+
+**N11 (S22 — "'Other' is EXCLUDED from the assignable set" reads as an invariant but is conditional).**
+S22 states 'Other' "is EXCLUDED from the assignable set so there is never both a real Other aisle AND
+the intrinsic bucket." That holds only while `state.unassignedLabel === 'Other'`. S23(c) explicitly
+allows deleting the Other label (bucket falls back to built-in 'Unassigned') and then re-creating a
+real 'Other' aisle — after which 'Other' IS assignable and IS a real entry in state.aisles, with the
+no-aisle bucket now labeled 'Unassigned'. The two stories are temporally consistent (S22 describes the
+default t=0 state; S23 the post-deletion state) and there's no real contradiction — the anti-collision
+mechanism is S23's validation (reject a create/rename colliding with the CURRENT unassignedLabel), not
+a permanent ban on the string 'Other'. But S22's flat wording could lead Tester to assert "'Other' can
+never be a real assignable aisle" as an invariant, which S23(c) violates by design. One-line
+reconciliation ("...excluded while it remains the unassignedLabel; re-creatable per S23(c) once the
+label is deleted") removes the trap.
+
+**N12 (S24 — the sentinel option needs a reserved value, or creating an aisle named exactly like it
+must be rejected).** S24's "+ Add new aisle…" sentinel is dispatched on `change`. If it is identified
+by its display label/value and a user creates (S23) or types (S24) an aisle literally named
+"+ Add new aisle…", that real aisle's option would collide with the sentinel and selecting it would
+wrongly trigger the add-new flow. Near-zero reachability, but cheap to close deterministically:
+specify the sentinel is matched by a reserved value/attribute that no trimmed user aisle string can
+equal (not by its label), and/or that S23/S24 validation rejects a name matching the sentinel label.
+
+**N13 (S22 — confirm migration persists state.aisles, or that first-mutation persistence is
+sufficient for the idempotency assertion).** The AC's idempotency test is end-state stability ("a
+reload after migration does NOT re-mutate state.aisles or items"), correctly not call-count. If
+migration does not itself `saveState()`, it re-runs on every load until the first real mutation
+persists `state.aisles` — deterministic and idempotent in RESULT (same seed each time), so the stated
+assertion still passes, and the "deleted-starter-must-not-resurrect" guarantee holds regardless
+because any S23 delete persists the pruned set (making the migration guard skip on the next load). So
+there's no functional bug either way — flagged only so the implementer consciously chooses (persist at
+migration is the cleaner choice) rather than leaving idempotency resting on an unstated assumption.
+
+---
+
+### Confirmed sound (reviewed against real code, no gap found)
+
+- **Migration map-then-seed order is correct and its rationale holds against the real code.** Verified
+  the ordering matters exactly as the AC says: pre-existing items CAN carry `aisle === 'Other'` today
+  (AISLE_STARTER_LIST at line 635 includes 'Other', and it's offered in the S8 datalist), so remapping
+  Other-normalizing values to '' BEFORE the union is genuinely load-bearing — otherwise the union
+  would re-add 'Other'. Comparing against the hardcoded 'Other' constant (not state.unassignedLabel,
+  which doesn't exist at first migration) is correct. `normalize` (trim+toLowerCase, line 121) is the
+  right dedup key and matches every other call site. Implementation note (not a finding, AC already
+  says "Other EXCLUDED"): AISLE_STARTER_LIST currently ends in 'Other' — the seed must drop it.
+- **No data loss from the Other→'' remap.** An item that was 'Other' becomes '' which is LABELED
+  'Other' by default (state.unassignedLabel), so it still displays under 'Other' — semantically
+  preserved, not lost. It does MERGE the previously-distinct S9 groups 'Other' (a real value) and
+  'Unassigned' (no aisle) into one bucket, but that merge is the explicit intent ("there is never both
+  a real Other aisle AND the intrinsic bucket"), consistent with the PO's Other==catch-all model.
+- **The per-item normalized-key SELECT guard is correct and sufficient for its own scope.** Every
+  distinct remaining item.aisle is seeded, so every live non-empty aisle has a matching option by
+  normalized key; case/whitespace variants (produce, trailing-space Bakery) resolve to the canonical
+  option with no item rewrite, and the change-handler canonicalizes on first edit. Exact-string
+  selection was correctly rejected. (The gap is only the GROUP-LABEL lookup — see R15.)
+- **The data-integrity invariant is maintained by every normal path when built to AC** — migration,
+  select-change, S23 rename (cascade + entry update, normalized-key), S23 delete (revert-to-'' +
+  entry removal, normalized-key), S24 create+assign. Items store aisle by-value (string), so S23
+  rename cascades over items, as the AC states.
+- **The persistent select integrates with focus-restore without special-casing** — `renderList`'s
+  restore re-focuses by `data-role` and guards `setSelectionRange` to INPUT/TEXTAREA (lines 988), so a
+  restored SELECT is focused but not range-set; the AC's claim here is accurate. (This does NOT rescue
+  R14 — focusing a select ≠ re-opening its picker.)
+- **S16's suppression logic degrades correctly once `isEditingAisle` disappears** — with the aisle
+  editingField type removed, `isEditingAisle` is permanently false, so `aisleSortCompact` collapses to
+  `sortMode === 'aisle'` and `showsAisleLine` to `aisleVal && sortMode !== 'aisle'`; the second-line
+  aisle-tag suppression under By-Aisle sort still holds structurally. The affordance branch (849-851)
+  and the click handler's `aisle-toggle → openEditor(id,'aisle')` (1083) are exactly the code that
+  must be re-pointed at the select mechanism (per S22's "genuine RENDERING rework, not a glyph swap") —
+  the AC correctly identifies this as the largest structural ripple.
+- **S24's new-aisle mechanism genuinely stands alone.** Requiring its own `new-aisle` editingField
+  type / dedicated handlers (NOT the removed 'aisle' path) is right; a fresh type re-uses the
+  still-present note/name text-editor infra (openEditor/commitEditor/the input/focusout/keydown
+  branches) cleanly, and `commitEditor` (564-575) already forks by field, so adding a `new-aisle`
+  branch is additive. The sanity-check fix that explicitly forbids reusing the deleted 'aisle' path is
+  well-placed: if left on 'aisle', a field='aisle' editingField would fall through commitEditor's
+  else to `saveName` after S22 removes the aisle branch — the fix pre-empts exactly that.
+- **S24 revert-on-cancel covers the reachable dismissals** — capturing the prior aisle before the
+  sentinel changes select.value, and reverting on empty-commit / explicit-cancel / blur, is the right
+  set (the only residual ambiguity is the colliding-name-on-blur case, M22).
+- **Option order is internally coherent across S22 and S24** — no-aisle FIRST (labeled
+  unassignedLabel), real aisles in insertion order, S24 sentinel ALWAYS LAST; explicitly and
+  correctly distinct from S9's by-aisle GROUP sort (no-aisle bucket LAST).
+- **iOS >= 16px guards are grounded in the real defect** — `.row-meta-input` at 0.82rem (~13px) is
+  today's zoom trigger; the native select + >=16px on the select and every new S21/S23/S24 text input
+  is the correct fix. (Note edits keep using `.row-meta-input` at 0.82rem, i.e. still zoom — correctly
+  out of scope here as reserved S25.)
+- **S21 is a clean greenfield shell** — no existing settings code; header (index.html 10-19) has room;
+  the panel/scrim/X-close mechanism is separate from `listRoot` and doesn't touch the render/editor
+  pipeline; S21 itself introduces no text inputs (its >=16px clause is vacuously satisfied — S23's
+  create/rename fields are where it bites). Close-via-X-or-scrim (Escape optional) is consistent with
+  the project's out-of-scope keyboard-nav decision. No finding.
+- **Undo scope unchanged** — aisle selection stays outside S6's buffer (S22), consistent with S8; S23's
+  aisle create/rename/delete undo-eligibility is correctly left as the logged, non-blocking OPEN PO
+  question (delete-in-use being the one genuinely destructive new action) — not re-flagging it, it's
+  already tracked in QUESTIONS.md with a testable working default.
+
+---
+
+### Verdict (per-story Lock recommendation)
+
+- **S21 — CLEAR.** No Real/Minor/Nitpick findings. Clean shell; recommend Scrum Master lock as drafted.
+- **S22 — HOLD FOR REAL FINDING.** Two Real findings: **R14** (the commit-model/render-timing hazard —
+  the primary catch, desktop-testable, same class as the C1/R13 and 2026-09-08 focusout bugs, not
+  rescued by the existing fix) and **R15** (the dangling group-label lookup — the migration guard
+  covers the select but not S9's By-Aisle header label). Both are "technical-shape, no PO input"
+  category (like R9/R11), fold-in-then-re-read pattern. Minors M23 (showPicker fallback / file://) and
+  M24 (new per-row select placement + overflow re-check) and Nitpicks N11/N13 ride along on S22.
+  Recommend fold R14+R15+M23+M24 in one pass, then one more QA re-read (this file's own history shows a
+  single pass rarely catches everything).
+- **S23 — CLEAR WITH CHEAP FOLDS.** No Real findings. One Minor (**M21**, rename self-collision) — cheap,
+  no PO input; recommend folding before Lock or tracking as a non-blocking follow-up.
+- **S24 — CLEAR WITH CHEAP FOLDS.** No Real findings. One Minor (**M22**, colliding-name-on-blur vs
+  S23's stays-open) + one Nitpick (**N12**, sentinel reserved value) — both cheap, no PO input.
+
+Advisory only, as always — the Lock decision is Scrum Master's. Note S22's R14 is the one item where
+"assumed safe" and "verified safe" genuinely diverge, and the divergence sits exactly on this
+project's most-repeated failure seam.
+
+---
+
+## Lock-gate re-read — 2026-09-10 (S21-S24, all findings folded; whole-AC coherence pass before Lock)
+
+**Trigger:** Orchestrator relayed that Scrum Master folded ALL gate findings (R14, R15, M21-M24,
+N11-N13) into S21-S24, and the PO confirmed the M23 by-aisle-compact decision as the inline `<select>`
+(final, superseding S16's ⚑). Asked for the S13/S15-precedent Lock-gate re-read: (1) confirm each
+finding is genuinely resolved as folded — R14 especially, traced against the REAL
+editingField/commitEditor/focusout/render code, confirming it closes the render-timing hazard WITHOUT
+opening a new one (no path leaving an editor permanently un-committed, no change-commit ordering that
+strands a draft); (2) whole-AC coherence with everything layered in plus the inline-select
+supersession; (3) final per-story Lock rec. S25 (note-field zoom) is a stage behind and NOT part of
+this re-read.
+
+**Method:** re-extracted the folded S21-S24 rows (BACKLOG.md 297-300 via `node -e`; S21 byte-identical
+= unchanged, S22 7469→10430, S23 3948→4548, S24 2748→3393). Traced R14's three-part mitigation against
+the real code — the delegated `focusout` listener + its `setTimeout`/`pending === editingField` guard
+(script.js 1153-1161), `commitEditor` (564-575, which nulls `editingField` BEFORE dispatching to
+save*), `openEditor`'s own commit-first guard (524-526), `saveAisle`'s re-derive-by-id (591-602), and
+`renderList`'s focus-restore (982-998, `setSelectionRange` guarded to INPUT/TEXTAREA). Then traced
+every folded rule against every other for a new contradiction, same as S13's six-round layering pass.
+
+---
+
+### Finding-by-finding resolution check
+
+**R14 — CONFIRMED RESOLVED; traced against real code; closes the hazard without opening a blocking
+one.** The folded mitigation is three coordinated pieces, all sound:
+- *The `activeElement` gate is correctly placed at commit FIRE-time, not schedule-time.* When row B's
+  note input blurs to row A's aisle select, focus moves synchronously (`document.activeElement` =
+  select A) DURING the tap's event dispatch — before the scheduled `setTimeout(0)` macrotask runs. So
+  at fire-time the gate sees the open picker (activeElement = an aisle select inside `listRoot`) and
+  skips commit/render. The select is therefore NEVER destroyed mid-picker — directly closing the
+  original R14 mechanism. This is strictly more robust than reasoning about schedule-time state.
+- *The `change`-handler ordering is stale-DOM-safe.* Capture id+value (primitives) FIRST → `commitEditor()`
+  (commits B's note; its `render()` destroys select A, but we already hold id+value) → `saveAisle(A, value)`
+  which re-derives the index via `findIndexById` (line 592). No DOM reference is carried across a render
+  (the exact C1/R13 lesson). B's note commits from the input-synced `editingField.draft`, not stranded.
+  Verified the "change fires only after the picker closes" premise holds: the gate keeps the picker alive
+  until the user picks, so `change` is what drives the commit — deterministic.
+- *Mechanism 3 (aisle-select role added to the focusout SCHEDULING branch) handles dismiss-without-choosing.*
+  When the select later loses focus, a deferred commit flushes any still-open note/name editor, guarded by
+  `editingField === pending`; the tap-another-control path is already covered by `openEditor`'s own
+  synchronous commit-first (524-526), so no double-commit and no errant commit (a focusout firing during
+  a render where `editingField` is already null schedules a no-op `commitEditor`).
+- *The rejected alternative is correctly rejected* — committing synchronously on the select's
+  pointerdown/mousedown would `render()` away the very select being tapped (the mirror of the 2026-09-08
+  bug); the AC names and rejects it.
+- *Real-device dependency correctly flagged:* the gate assumes iOS keeps the `<select>` as
+  `document.activeElement` while its native picker is open. The AC adds a scripted real-device step
+  holding a picker open ~2s to exercise exactly this against a long-lived picker (Playwright's
+  `selectOption` being the durable desktop regression guard). Right call — this is the one assumption
+  desktop automation can't fully prove, and it's routed to real-device confirmation per NB-6 discipline.
+
+  *One narrow NON-blocking residual, reported per the Orchestrator's explicit ask ("any path where the
+  gate leaves an editor permanently un-committed"):* if the user has a note editor open, taps another
+  row's aisle select, DISMISSES the picker without choosing, and then ABANDONS the session (no further
+  interaction, closes/refreshes the app), the note draft stays uncommitted — mechanism 3 only flushes it
+  on the NEXT interaction (a subsequent blur/change), which the abandon case never produces. This is NOT
+  a regression in confirmed data: `editingField`/its draft are already in-memory-only and transient by
+  design (a note editor left open and abandoned loses its draft on refresh TODAY, pre-S22), and the
+  editor remains visibly open and recoverable by any single further tap. So it's the pre-existing
+  transient-draft semantics with a slightly wider "I walked away mid-edit" window, not a new committed-data
+  loss. Does not block Lock; worth one line in the S22 test notes so Tester doesn't mis-read it as a
+  defect if they hit it.
+
+**R15 — CONFIRMED RESOLVED.** S22 now carries the explicit cross-story invariant ("the header label
+ALWAYS resolves") plus a defensive fallback to the raw `item.aisle` string, "same posture as R1 /
+parseStoredState," so a missing key can never render the literal "undefined." Exactly the fix asked for.
+
+**M21 — CONFIRMED RESOLVED.** S23 now states the rename collision check "MUST EXCLUDE the entry being
+renamed... so a no-op or pure-recasing rename (e.g. Dairy → dairy) is not spuriously rejected." Clean.
+
+**M22 — CONFIRMED RESOLVED, and consistent on BOTH sides.** S23: explicit-invalid-commit → field stays
+open + inline message; blur dismissal → revert wins, state unchanged. S24 mirrors it verbatim in intent
+(blur — including empty OR colliding — → revert wins; only an explicit commit of a colliding name
+surfaces S23 NB-3's stay-open). No contradiction between the two rows; the fork is resolved the same way
+on each. Clean.
+
+**M23 — the DECISION is coherent and introduces no new contradiction; one doc-state note.** The inline
+persistent select in By-Aisle compact mode (superseding S16's ⚑) is internally consistent: the same
+persistent select renders in every sort mode, and the `aisleSortCompact`/second-line-suppression logic
+(renderRow 838/903) is correctly flagged as needing a genuine rendering rework, not an element swap,
+once `isEditingAisle` disappears. No conflict with S17's group-header styling or the 2026-09-09
+`--accent` latent-bookkeeping note (that note is about per-state color-coding policy, unaffected by
+removing the ⚑). *Doc-state note (not a contradiction):* the S22 row text still literally reads "WORKING
+DEFAULT (M23... PROVISIONAL — PENDING PO CONFIRMATION)" — the Orchestrator has confirmed the PO made it
+FINAL and that the flip provisional→confirmed (plus the S8/S9/S16 reciprocal supersession notes) happens
+at Lock. So the only gap between current text and reality is that pending edit, which the Orchestrator
+already owns; the AC content is coherent for Lock once flipped.
+
+**M24 — CONFIRMED RESOLVED.** S22 requires a specified row placement for the now-always-present select
+(exact position delegated to Developer) AND a worst-case-row overflow re-check at 320/360/375/390px, "per
+the R7/M14/M17/S19 precedent." Correct locked verification requirement, same shape S19 used.
+
+**N11 — CONFIRMED RESOLVED, bidirectional.** S22 states the Other exclusion is CONDITIONAL (only while
+Other is the bucket label; re-creatable per S23 once it isn't); S23(c) cross-references "(per S22 N11,
+Other becomes assignable again once it is no longer the bucket label)." Both sides agree.
+
+**N12 — CONFIRMED RESOLVED, bidirectional.** S24's sentinel carries a RESERVED non-aisle value distinct
+from any real aisle name (matched by value, not label); S23 additionally rejects creating an aisle whose
+normalized name equals the sentinel label. Both belt-and-suspenders, consistent across the two rows.
+
+**N13 — CONFIRMED RESOLVED.** S22 states persisting the seeded set immediately after migration via one
+saveState is a conscious choice, with idempotency holding either way (deterministic re-derivation). Clean.
+
+---
+
+### Whole-AC coherence — new contradictions introduced by the fold?
+
+Traced every folded rule against the others (R14 gate vs mechanism 3; change-handler commit-first vs
+S24's sentinel-reveal; M22's blur-revert vs R14's focusout-flush; N11 vs S23 validation; N12 vs
+migration/option-order; M24 always-present select vs the inline-select compact mode vs the S19/S20 layout
+gate). **No new blocking contradiction.** The gate and mechanism 3 coexist cleanly (the gate defers a
+commit while focus sits on any select; it always commits once focus lands on a non-select or a `change`
+fires — no infinite-deferral that loses committed data, only the same transient-draft window noted under
+R14). N11↔S23, N12↔S23/S24, and M22↔S23/S24 are each mutually consistent.
+
+**Three NON-blocking implementation/cleanup verify-items** (flagged for Developer/Tester, none a Lock
+blocker — same category as S13's M9/M10 wording nitpicks that didn't hold Lock):
+1. *`commitEditor` must gain a `new-aisle` branch* (if S24 uses a dedicated `editingField` type): its
+   fork is `if note … else if aisle … else saveName` (564-575), and S22 REMOVES the `aisle` branch, so a
+   `new-aisle` type with no branch would fall through the `else` to `saveName` — the exact "shared
+   machinery + a forgotten branch" class as C1. S24's "dedicated mechanism, named explicitly" covers the
+   intent; worth Tester asserting a new-aisle commit never writes item.name.
+2. *The `change` handler's "commit any open editor FIRST" must apply to the sentinel-reveal branch too*,
+   not only the real-value/saveAisle branch — otherwise picking "+ Add new aisle…" while a note editor is
+   open on another row could strand that note's draft. The AC pieces support it; the combined sequence
+   just isn't spelled out in one place.
+3. *Dead-code cleanup from the inline-select supersession:* S16's ⚑ (`AISLE_EDIT_ICON_GLYPH`),
+   `.aisle-sort-icon`, and `.aisle-tag` (plus the already-noted `renderAisleDatalist`/datalist) become
+   dead once the persistent select replaces the tag/affordance in all modes — fold into the S16
+   supersession note, same removal-completeness discipline as M19/M20 on S19/S20.
+
+---
+
+### Verdict (final per-story Lock recommendation)
+
+- **S21 — CLEAR.** Unchanged since the gate (byte-identical row); was clear, stays clear.
+- **S22 — CLEAR (for the QA Lock-gate).** Both Real findings (R14, R15) are confirmed genuinely resolved
+  against the real code; R14 closes the render-timing hazard without opening a new blocking one (one
+  narrow, non-blocking transient-draft residual, consistent with existing semantics). M24/N11/N13 (and the
+  M23 decision) all resolved. The ONLY remaining step before Lock is the doc edit the Orchestrator already
+  owns — flip M23 provisional→confirmed and add the S8/S9/S16 reciprocal supersession notes. No QA
+  objection to Locking once that edit lands.
+- **S23 — CLEAR.** M21 and M22 resolved; validation (M21 self-exclude, N12 sentinel-label reject) coherent.
+- **S24 — CLEAR.** M22 (blur→revert) and N12 (reserved sentinel value) resolved and consistent with S23.
+
+No new Real findings on this re-read. The three verify-items above are non-blocking Developer/Tester
+implementation notes, not Lock conditions. Advisory only — the Lock decision (and the pending M23 flip)
+is the Scrum Master's / Orchestrator's.
