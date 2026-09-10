@@ -1394,6 +1394,79 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   flagged to the Orchestrator that the active queue has now emptied to
   parked-only).
 
+## Sprint 4 — aisle rework (settings menu + persisted, managed aisles), 2026-09-10
+
+- **Goal:** the PO's aisle rework, driven by a real iOS bug — the per-item aisle
+  field was an open text `<input>`, so Mobile Safari zoomed on focus and stayed
+  zoomed. Switching it to a native `<select>` fixes the zoom and, per the PO's
+  confirmed design, turns aisles into a deliberate, persisted, user-managed set
+  with a settings menu to manage them.
+- **Story set (drafted this session, S21-S25):** the PO's request started narrow
+  ("a way to add aisles") and expanded, over several relayed clarifications, into a
+  full rework. Decomposed into four stories plus a small ride-along: **S21**
+  (settings-menu shell / reusable "real estate"), **S22** (persisted `state.aisles`
+  set + per-item native `<select>` — the iOS zoom fix, migration/seed, Other/
+  no-aisle semantics), **S23** (create/rename/delete aisles in Settings), **S24**
+  (add-a-new-aisle from the item dropdown), and **S25** (fix the note field's
+  identical iOS zoom, PO green-lit mid-session — note stays free-text, font-size
+  >= 16px). Decomposition reasoning is captured in the BACKLOG rows themselves.
+- **Full doc pipeline, all in one session:** scrum-master sanity-check → Developer
+  feasibility spike (resolved S24's inline-vs-fallback fork to the sentinel-option
+  `+ Add new aisle…` pattern; recommended the `state.aisles`-in-existing-state data
+  model, no new localStorage key) → Developer sanity-check (8 AC-precision fixes,
+  none needing PO input) → Tester testability-check (zero blocking criteria; 7
+  non-blocking refinements folded: NB-1 option order, NB-2 normalized-key cascade,
+  NB-3 rejection signal, NB-5 close mechanism, NB-6 real-device-vs-desktop-pass
+  line, NB-7 result-idempotency) → consolidated pre-Lock fold (R14 cross-editor
+  commit safety + deterministic tests, R15 group-label invariant, M21 rename-
+  collision-excludes-self, M22 blur-reverts, M24 always-present-select placement +
+  worst-case overflow re-check, N11 conditional-Other, N12 reserved sentinel value,
+  N13 conscious-persist) → QA per-story gate + a clean Lock-gate re-read (zero Real
+  findings) → **S21-S24 Locked 2026-09-10.**
+- **One PO visual pick (M23):** the Developer recommended the persistent inline
+  `<select>` also replace S16's hand-picked icon-only ⚑ in By-Aisle compact mode
+  (showPicker() is fragile on our `file://` deployment). Per the S15 do-not-guess-
+  twice-on-a-visual rule this was drafted provisional and routed to the PO, who
+  **confirmed** it — flipped provisional → CONFIRMED at Lock.
+- **Cross-story supersession (S19→S13 convention — old stories STAY Done):** S22/S24
+  supersede the MECHANISM of Done stories **S8** (free-text input+datalist → native
+  select over `state.aisles`), **S9** (Unassigned label → `state.unassignedLabel`;
+  items-derived → state-derived label lookup with a defensive fallback), and **S16**
+  (⚑ compact affordance → inline select, with ⚑ / `.aisle-sort-icon` / `.aisle-tag`
+  dead-code cleanup). Reciprocal dated notes added to all three Done rows at Lock;
+  their intent and shipped delivery stay Done, only the mechanism moved.
+- **Implementation + formal pass, 2026-09-10 (relayed by Orchestrator):** Developer
+  implemented in build order (S22+S21 → S23 → S24, S25 riding along). Tester's
+  independent formal pass landed — **268/269 assertions**, the new canonical
+  regression baseline in REGRESSION_LOG.md. The **222→209 total-count delta is
+  BY-DESIGN net-supersession**, not lost coverage: S8/S9/S16's free-text-input /
+  datalist / ⚑ checks were retrofit to the new select / persisted-set mechanism
+  (same convention as S13→S5, S19→S13). **S21, S22, S24, S25 → Done** (each cites
+  this formal pass).
+- **One Minor defect, D1 — PARKED to next session (not fixed now):** the single
+  269th assertion, on S23 (17/18). An explicit invalid/colliding RENAME commit in
+  the Settings aisle manager reverts+closes instead of staying open with an inline
+  error (violating NB-3/M22's stay-open-on-explicit-invalid-commit rule). The rename
+  is still correctly REJECTED — no bad rename applied, no data-loss risk — only the
+  stay-open+inline-error affordance is missing; it behaves like a blur-dismiss. Known
+  one-line fix: add the `activeElement` guard the row-editor's `focusout` already has
+  (~script.js:1608 vs the row-editor guard ~1363-1365), then a TC23.10 re-verify.
+  **S23 held at "In Review," NOT Done**, pending that fix + re-verify. Logged as the
+  lead item in QUESTIONS.md too, so it can't be lost.
+- **Outcome:** aisle rework shipped and Done for S21/S22/S24/S25 — the settings menu,
+  native-select aisle picker (iOS zoom fixed), persisted user-managed aisle set,
+  add-from-dropdown, and the note-field zoom fix are all live and formally verified.
+  S23 is one known one-line fix away from Done. All BACKLOG/QUESTIONS edits this
+  session grep-verified as single well-formed GFM lines; BACKLOG now 25 story rows
+  (S1-S25, +5 this rework), zero malformed.
+- **Carryover — FIRST TASK NEXT SESSION:** fix D1 (the S23 Settings rename-error
+  `activeElement` guard, ~script.js:1608) + Tester TC23.10 re-verify, then flip
+  **S23 → Done**. After that the whole backlog is Done except parked S11/S18. Open
+  non-blocking QUESTIONS stay at their working defaults (aisle delete-in-use safety
+  net — silent revert, not undo-eligible; S9 Other-bucket sorts-last). Doc changes
+  this session are committed+pushed by the Orchestrator (nothing owed by me there).
+  Console sync (S21-S25 statuses; S8/S9/S16 supersession) — Orchestrator.
+
 ## Parked / unscheduled
 
 - **S11** (recipe-paste alternate ingest mode) — explicitly not sequenced into
