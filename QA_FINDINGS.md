@@ -2007,3 +2007,308 @@ blocker — same category as S13's M9/M10 wording nitpicks that didn't hold Lock
 No new Real findings on this re-read. The three verify-items above are non-blocking Developer/Tester
 implementation notes, not Lock conditions. Advisory only — the Lock decision (and the pending M23 flip)
 is the Scrum Master's / Orchestrator's.
+
+---
+
+## Per-story gate — 2026-09-11 (S26 — icon-gate the always-present per-item aisle select, restore single-line density)
+
+**Trigger:** per-story gate, per Orchestrator's request — S26 cleared Scrum-Master + Developer
+sanity-checks and Tester's testability-check (testable, zero blocking; 3 non-blocking clarifications
+folded); about to go to Scrum Master for Lock. First QA review of S26. (S27, the paired icon-sizing
+story, is being testability-checked in parallel and is NOT part of this gate.)
+
+**Scope/method:** same as every prior pre-Lock gate on this project (S13-S17, S19/S20, S21-S24) and
+the S13 post-implementation review — read S26's full AC row (BACKLOG.md, extracted via `node -e`
+since it's a single-line GFM table row past Read/Grep's line limits), then traced every load-bearing
+claim against the **real shipped `script.js`/`style.css`/`index.html`** (the S21-S25 aisle-rework code
+S26 modifies), NOT the AC prose alone. Primary hunt (per the brief and this project's own R14/C1/R13
+history): does Option C — keep the native `<select>` always-present + always-openable, S22's exact
+R14-safe model, and only RELOCATE it to the primary line + collapse it to an icon footprint via CSS —
+genuinely inherit S22's R14 safety with ZERO commit/guard changes and introduce NO new render/commit
+seam and no path for a `render()` to fire while a native picker is open. Traced: the delegated
+`change` handler (script.js 1372-1391), the deferred-`focusout` `activeElement` guard (1345-1368, the
+guard proper at 1363-1365), `saveAisle` (683-695), `commitEditor`/`openEditor` (605-667), `renderRow`
++ `renderAisleSelect` (972-1106, the `.row-meta` block at 1053-1066), `renderList`'s focus-restore
+(1167-1187) + By-Aisle grouping (1147-1160), and the delegated `click`/`input`/`keydown` listeners
+(1251/1304/1279). Confirmed every AC line-reference is accurate against the real file. NB-6 respected
+throughout: the native picker opening on a tap-through of the glyph overlay is treated as a
+real-device signal, NOT asserted in Chromium — only the structural proxies are gated.
+
+---
+
+### REAL
+
+**None.** The primary hunt — the highest-value place to find a Real finding, per the brief — came up
+**clean, and that clean result is itself the load-bearing finding of this gate.** Traced against the
+real code, Option C genuinely inherits S22's R14 safety:
+
+- **The commit path and the guard can, and do, stay byte-for-byte untouched.** The `change` handler
+  (1372) matches on `data-role === 'aisle-select'` and re-derives the row via
+  `target.closest('li[data-id]')`; the focusout guard (1363-1365) keys only off
+  `document.activeElement`'s `data-role` and `listRoot.contains(ae)`. Neither reads the select's
+  position within the `<li>` or its CSS. Relocating the select from `.row-meta` (a child `<div>`) to a
+  direct primary-line child of the `<li>`, and collapsing it via `appearance:none`/fixed width, changes
+  neither `closest('li[data-id]')`'s result nor which element becomes `activeElement` on focus — CSS
+  never affects focus eligibility. So the AC's "zero JS commit/guard changes" claim is precise and
+  correct (only `renderRow` markup + CSS change — a rendering rework, not a commit/guard change, exactly
+  the distinction the AC draws).
+- **No new render/commit seam is introduced, and no `render()` can fire while a picker is open.** The
+  R14 hazard class (C1/R13, and the 2026-09-08 focusout bug) is destroying/recreating the element the
+  user is interacting with, mid-interaction, via an un-guarded `render()`. Option C keeps the `<select>`
+  ALWAYS-PRESENT (never destroyed/recreated to reveal it) and adds no new JS — no new event handler, no
+  new `render()` trigger. The only deferred render on this project (the focusout `setTimeout(0)`) is
+  the one already guarded by the `activeElement === aisle-select` check, unchanged. Re-traced the full
+  cross-row scenario (row B note editor open → tap row A's collapsed aisle select → focusout schedules a
+  deferred commit → picker opens, `activeElement` = select A → the `setTimeout` fires, sees the open
+  picker, SKIPS commit/render → user picks → `change` captures id+value first, commits B's note, then
+  `saveAisle(A)`): identical to S22's already-Lock-verified flow, because the select is the same
+  `data-role="aisle-select"` element with the same handlers. The mirror-image hazard is avoided
+  STRUCTURALLY (the select was there all along), not merely re-guarded — exactly as the AC's R14
+  invariant states.
+- **The Developer's key insight is correct against the code:** the density defect was the select being
+  full-width ON A SECOND LINE (`renderAisleSelect` unconditionally appended into the always-emitted
+  `.row-meta`, script.js 1053-1066), NOT its being always-present. Keeping it always-present therefore
+  costs nothing for R14 safety while shrink-and-relocate alone fixes density.
+- **The one assumption Option C rests on is unchanged from S22 and correctly NB-6-scoped:** the guard
+  needs the `<select>` to be `document.activeElement` while its native picker is open. That was already
+  the accepted real-device-confirmed assumption for the shipped S21-S25 build; `appearance:none` +
+  collapse does not newly jeopardize it (focus ≠ visual styling). Tester's clarification C1 correctly
+  labels the tap-through-opens-the-picker behavior a non-blocking real-device signal, gating only the
+  desktop structural proxies (select present on the primary line at the icon footprint, glyph overlay
+  `pointer-events:none`, `change`-commit works, NO reveal-render, select persists across renders).
+
+Also confirmed clean: the glyph overlay's `pointer-events:none` tap-through does not disturb
+nested-control precedence (a tap resolves to the `<select>`, which carries `data-role="aisle-select"`
+→ the delegated `click` handler at 1251 hits the `data-role` guard and `return`s before
+`toggleChecked`, so it never crosses the item off); CSS-hiding the option text cannot affect the
+select's `.value`/`change` payload (`saveAisle` reads `target.value`, untouched by styling); and
+S24's sentinel path is unaffected (the sentinel is detected by `selOpt.dataset.sentinel === '1'`, not
+by geometry — `openNewAisleEditor` still reveals the new-aisle input in `.row-meta`, a transient
+editing second line, not the always-present density cost).
+
+---
+
+### MINOR
+
+**M25 (S26 — the "6-icon layout S19 already measured, fits cleanly" equivalence is imprecise: the 6th
+control is a `<select>`, not an `.icon-btn`, so the prior measurement does not transfer 1:1, and the
+deferred combined re-check must measure the SELECT's real footprint rather than assume icon-btn
+parity).** The AC's overflow argument is: S26 moves the worst-case primary-line count 5→6, "exactly the
+6-icon layout S19 already measured fitting CLEANLY at 320/360/375/390px (222/222)." Traced against real
+code, the COUNT is accurate (current aisle-less/note-less Manual row = note-toggle + name-toggle + Up +
+Down + delete = 5 primary-line `.icon-btn`s with the select on the second line; S26 adds the aisle
+control back to the primary line → 6). But S19's 6th control was a `<button class="icon-btn">`
+(the pre-S22 aisle-toggle), governed by `.items .icon-btn { width/height/min-width: 19.5px }`
+(style.css 271-302). S26's 6th control is a `<select>`, which is NOT class `.icon-btn` and will NOT
+inherit those sizing rules — and a native `<select>` under `appearance:none` does not reliably collapse
+to an arbitrary declared width across engines (intrinsic min-inline-size / reserved arrow-region
+behavior is engine-dependent), so its rendered footprint is not guaranteed identical to a button's even
+at the same declared `width`. The AC does say "collapse it to an `.icon-btn`-sized footprint... fixed
+icon width," which covers the INTENT, but leans on the S19 measurement for its feasibility claim as
+though the element type were interchangeable. Non-blocking — the required combined re-check (deferred to
+after the S26→S27 pair, correct per the S13→S14 precedent) plus the established flex-wrap-not-overflow
+guardrail are the real safety nets — but recommend one line: the collapsed select needs its own explicit
+~19.5px sizing (it is not `.icon-btn`) AND the combined re-check must specifically measure the collapsed
+`<select>`'s rendered footprint at the four widths, not certify by icon-btn parity. Cheap, no PO input.
+
+---
+
+### NITPICK
+
+**N14 (S26 — the empty `.row-meta` height trap: the density fix depends on an aisle-less/note-less row
+NOT contributing any second-line height, and the current markup emits `.row-meta` unconditionally).**
+`renderRow` today always builds `secondLine = '<div class="row-meta">' + ... + renderAisleSelect(item)
++ ...` (script.js 1053-1066), and `.row-meta` carries `flex-basis: 100%; margin-top: 0.15rem; display:
+flex` (style.css 347-353) — so once the select relocates off it, an aisle-less/note-less row that still
+emits an EMPTY `<div class="row-meta">` would force a wrap line plus ~2.4px of top margin, i.e. NOT the
+single-line height the story guarantees. The Developer must either not emit `.row-meta` when it has no
+content, or add `.row-meta:empty { display: none }`. Flagged only for completeness: Tester's C2 pins the
+density signal to a deterministic height-equality assertion "robust whether or not an empty `.row-meta`
+div is emitted," which catches this exact trap either way — so it is already covered, not a gap.
+
+**N15 (S26 — accessibility of the collapsed select + glyph overlay, to settle with the deferred glyph
+pick).** With the select's option text clipped/transparent and the visible glyph supplied by a
+`pointer-events:none` overlay span, the overlay should be `aria-hidden="true"` and the `<select>` should
+retain an accessible name (today `renderAisleSelect` gives it `title="Aisle"`; an explicit `aria-label`
+is sturdier). No functional risk — a `<select>` still exposes its accessible name and selected option to
+AT regardless of the visual clip — and this rides naturally on the post-Lock set-aisle-presentation +
+glyph mockup that is already deferred, so no action needed at Lock.
+
+---
+
+### Confirmed sound (reviewed against real code, no gap found)
+
+- **Density path is correctly specified and correctly tested.** The single-line guarantee is scoped to
+  aisle-less items only ("a row that HAS an aisle set MAY be two lines"), Tester's C2 pins it to a
+  height-equality assertion, and the mechanism (relocate the select off `.row-meta`, emit `.row-meta`
+  only for real second-line content) is the correct fix for the traced defect. No path leaves an empty
+  second line contributing height once N14's emission/CSS detail is handled (which C2 verifies).
+- **By-Aisle / S9 / S16 coherence holds.** The current code applies NO sort-mode suppression to the
+  select (`renderAisleSelect` is called unconditionally regardless of `sortMode`), so S26 removes no
+  suppression and creates no dead code; the aisle icon staying present in ALL modes including By-Aisle
+  honors S16's own hard-won edit-in-every-sort-mode lesson (the exact self-contradiction S16 caught),
+  and the previously-redundant full-width select under a group header simply becomes the compact icon.
+  No contradiction with S17's group-header styling or the By-Aisle grouping/label logic (R15 guard
+  untouched).
+- **Cross-story coherence with S22/S24 is intact.** S24's `+ Add new aisle…` sentinel + inline-create
+  flow works unchanged through the collapsed select (sentinel detected structurally via
+  `data-sentinel`, not geometry; the reveal input still renders in `.row-meta` as a transient editing
+  line); the `change`-handler's commit-first step, `saveAisle`, migration/`state.aisles`,
+  normalized-key matching, the R15 fallback, and the `Other`/no-aisle bucket are all KEPT — S26 is a
+  presentation-only change and does not reopen any S22/S24 functionality.
+- **The deferred set-aisle-presentation + glyph mockup does not jeopardize the locked mechanism.** For an
+  aisle-LESS item the mechanism is fully determined (collapsed always-present select showing the add
+  affordance glyph → single line). Whichever way the post-Lock mockup resolves tag-vs-inline for a SET
+  aisle, the always-present select + R14 safety is preserved (a tag adds a second-line display beside
+  the still-present collapsed edit affordance; an inline treatment un-clips the same select) — so the
+  deferral is a genuine, coherent presentation-only open item, not a latent contradiction with what is
+  being Locked now. The AC correctly flags the tag-vs-inline↔mechanism coupling as the "S16 moving-target
+  trap" and defers accordingly.
+- **The overflow re-check deferral is correctly scoped** (one combined re-check after the S26→S27 pair,
+  S13→S14 precedent; S27 only shrinks glyph size within fixed boxes so it cannot worsen horizontal fit)
+  — subject only to M25's precision note about measuring the select's own footprint.
+- **The iOS focus-zoom guard is preserved and does not conflict with the collapse.** The select keeps
+  `font-size >= 16px` (style.css `.aisle-select` 424-435, to be restyled); since the visible icon is the
+  overlay glyph and the select's own (now clipped/transparent) option text does not drive the visible
+  size, the 16px belt-and-suspenders can stay without affecting the ~19.5px footprint. A native select
+  does not trigger focus-zoom regardless (S22's whole premise), so this is unchanged.
+
+---
+
+### Verdict (per-story Lock recommendation)
+
+**S26 — CLEAR (with one cheap fold recommended).** No Real findings — and the R14/C1/R13-hazard hunt,
+the brief's designated highest-value target, came up genuinely clean when traced against the real code:
+Option C inherits S22's R14 safety structurally (always-present select, byte-for-byte-untouched
+commit/guard, no new render/commit seam, no `render()` reachable while a picker is open). One Minor
+(**M25**, the select-vs-icon-btn footprint precision on the overflow claim) — cheap, no PO input;
+recommend folding one line before Lock or tracking it as a non-blocking follow-up on the combined
+re-check. Two Nitpicks (**N14** empty-`.row-meta` height, already covered by Tester's C2; **N15** glyph
+overlay a11y, rides on the deferred mockup) — no action required at Lock. The set-aisle presentation +
+glyph deferral to a single post-Lock PO mockup is correctly scoped and does not block. Advisory only, as
+always — the Lock decision is Scrum Master's.
+
+---
+
+## Per-story gate — 2026-09-11 (S27 — equalize row-icon glyph rendered heights up to the note glyph via per-glyph font-size, glyph-only within the fixed ~19.5px boxes)
+
+**Trigger:** per-story gate, per Orchestrator's request — S27 (the companion sizing story to S26)
+cleared Developer's sanity-check (the sharp finding that redefined the AC: every row icon already
+renders at the identical box size, the note only LOOKS bigger due to heavier glyph metrics, so a
+uniform bump is a no-op and per-glyph tuning is required) and the PO validated the "match" definition
+via screenshot; Tester's testability-check just cleared (zero blocking). First QA review of S27.
+
+**Scope/method:** read S27's full AC row (BACKLOG.md, extracted via `node -e` — single-line GFM table
+row), then traced every load-bearing claim against the **real shipped `style.css` + `script.js`**, NOT
+the AC prose alone: the `.items .icon-btn` box/glyph rules (style.css 271-322), S20's own in-box-
+containment reasoning (the 290-294 comment), the `:hover`/`:active`/`:disabled` states (312-322), and
+the six glyph hosts in script.js — `NOTE_TOGGLE_ICON_GLYPH` U+1F5CB (558), `NAME_EDIT_ICON_GLYPH`
+U+270E (567), Up ▲ / Down ▼ (1043-1044), delete ✕ (1072), and S26's still-deferred aisle glyph. NB-6
+respected: the on-device visual match to the note glyph is a real-device signal, NOT asserted in
+Chromium — only the structural proxies are gated.
+
+---
+
+### REAL
+
+**None.** Traced against the real CSS, S27's load-bearing overflow-safety constraint holds:
+
+- **The fixed ~19.5px box is preserved and the row cannot grow.** `.items .icon-btn` sets explicit
+  `width/height/min-width: 19.5px` (style.css 277-279); `font-size` does not participate in the box's
+  layout size (globally `box-sizing: border-box`, `padding: 0`, no border). As a flex ITEM of
+  `.items li` (which is `align-items: center`, not stretch), the icon-btn's cross size is its explicit
+  19.5px and a taller glyph overflows visually — it does NOT expand the row — because the flex
+  `min-*:auto` content-minimum applies only to the MAIN (horizontal) axis for a row-direction
+  container, not the cross axis. This is exactly S20's already-stated reasoning ("`line-height:1` + the
+  fixed height + inline-flex centering keep the enlarged glyph in-box, so the row does not grow
+  taller"), which S27 correctly inherits. So enlarging glyph font-size per-glyph keeps both the box
+  footprint (horizontal fit) and the row height unchanged — the whole point of the fixed-box constraint.
+- **It is genuinely CSS-only — no JS, no data model, no behavioral surface.** Each of the five
+  icon-btn glyphs carries a distinct `data-role` already (note-toggle/name-toggle/up/down/delete), so
+  per-glyph `font-size` is achievable purely via `.items .icon-btn[data-role="…"]` selectors with zero
+  `script.js` change; the glyph string constants, `state`, S6's undo buffer, and every event handler
+  are untouched. Confirmed no behavioral/interaction surface is exposed.
+- **The desktop pass/fail line is correctly the structural proxy, not a parity-to-the-note-glyph
+  check.** The AC pins the desktop pass to "per-glyph font-sizes applied, boxes unchanged" and routes
+  the actual visual match to on-device confirmation, explicitly because U+1F5CB is the exact glyph S7
+  found renders differently on the PO's own machine (device-unstable). This is textbook NB-6 discipline,
+  consistent with S7's device caveat and S13/S22's precedent — asserting pixel-parity on desktop would
+  be the wrong gate, and the AC does not make that mistake.
+- **Coherence with S20's frameless model is clean.** S27 works entirely within S20's fixed-box /
+  glyph-fills model (it changes only font-size, leaving border:none/background:transparent and the
+  `:hover`/`:active scale(0.82)`/`:disabled opacity` states intact) and legitimately SUPERSEDES S20's
+  "renders slightly unevenly — accepted" note — S20 accepted the unevenness as the tradeoff of ONE
+  uniform size; S27 removes that tradeoff via per-glyph sizing. That is a proper cross-story refinement
+  (reciprocal note to S20 at Lock, per the AC), not a contradiction.
+
+---
+
+### MINOR
+
+**M26 (S27 × S26 — S27's `.icon-btn`-box framing does not cleanly cover S26's aisle glyph, which does
+NOT live on an `.icon-btn`; and its SIZE ownership is split between S27 and S26's deferred glyph
+mockup).** S27 explicitly lists "S26's new aisle glyph" among the glyphs it equalizes "GLYPH-ONLY
+within the fixed ~19.5px `.icon-btn` boxes." But per S26's chosen Option C, the aisle affordance is a
+collapsed native `<select>` with its glyph supplied by a separate `pointer-events:none` OVERLAY SPAN —
+that glyph is not an `.icon-btn` text glyph and its host is not an `.icon-btn` box (see this file's M25:
+the collapsed `<select>` is not class `.icon-btn` and won't inherit its sizing). So two gaps: (1)
+precision — S27's "within the `.icon-btn` boxes" is literally inapplicable to the aisle glyph; tuning it
+means targeting the overlay span's own `font-size`, with the collapsed select's ~19.5px footprint as its
+box, not an `.icon-btn`; (2) ownership — S26 DEFERS the aisle glyph itself (and the set-aisle
+presentation it's coupled to) to a single post-Lock PO mockup, so the glyph does not even exist when
+S27 would tune it, and it is more natural for that same mockup to settle the aisle glyph's SIZE than for
+S27 to tune a glyph the mockup will produce. Same cross-story-boundary shape as M14/M17 (a new per-row
+icon introduced across a story seam, its sizing/cross-reference not synced). Non-blocking — the aisle
+glyph is not on S27's critical path (it's deferred, and the one combined M24/R7 overflow re-check runs
+after the S26→S27 pair regardless) — but recommend one line: either scope the aisle-glyph sizing to the
+overlay element explicitly (not "the `.icon-btn` boxes"), or hand the aisle glyph's size to S26's
+already-deferred glyph mockup and drop it from S27's enumerated target list. Cheap, no PO input.
+
+---
+
+### NITPICK
+
+**N16 (S27 — keep a base `.icon-btn` font-size as the fallback when the single uniform value is
+replaced by per-glyph rules).** Today `.items .icon-btn` carries one `font-size: 1.15rem` (style.css
+295) that every icon-btn shares. When S27 introduces per-glyph overrides, it should retain a sensible
+base `font-size` on `.items .icon-btn` (not remove it in favor of five per-role rules only), so any
+icon-btn without an explicit per-glyph rule — a future control, or one added by a later story — still
+renders at a deliberate size rather than dropping to the browser-default button font-size. Trivial
+housekeeping, no functional stakes; flagged only so the refactor doesn't accidentally leave the base
+unset.
+
+---
+
+### Confirmed sound (reviewed against real code, no gap found)
+
+- **The Developer's redefinition of the AC is correct against the real CSS.** There is genuinely no
+  note-specific size rule anywhere — all six controls share `.items .icon-btn`'s single `font-size:
+  1.15rem`; the note only looks bigger because U+1F5CB has fuller/taller metrics than the thin line
+  glyphs at the same size. So a uniform bump IS a no-op for "match," and per-glyph tuning IS the
+  required mechanism. The PO's screenshot validation of this (glyph-metrics, not box-size) is consistent
+  with what the code shows.
+- **No horizontal-overflow risk is introduced by S27.** S27 adds no controls and changes no box widths,
+  so it cannot worsen the 320px fit; the AC's "the S26 6-icon worst-case still fits, fixed boxes are
+  what keep it" is accurate, and deferring the single combined re-check to after the pair (S13→S14
+  precedent) is correctly scoped. (S26's own M25 nuance about measuring the collapsed select's footprint
+  carries into that same combined re-check.)
+- **Scope stays in its lane** — S27 touches only the icon-btn GLYPH sizing, not `.note-display` /
+  `.item-name` / aisle text (the same boundary S14/S20 already drew), so there's no collision with the
+  locked single-line/truncation specs.
+- **Sequencing (S26 then S27) is coherent** — finalizing icon size once against S26's final primary-line
+  layout mirrors the S13→S14 mechanism-then-sizing split the AC cites; the only residual is M26's
+  aisle-glyph ownership question.
+
+---
+
+### Verdict (per-story Lock recommendation)
+
+**S27 — CLEAR (with one cheap fold recommended).** No Real findings — the load-bearing constraint
+(fixed ~19.5px boxes, glyph-only enlargement, no box resize, no row growth, no horizontal-fit change)
+holds against the real CSS, S27 is genuinely CSS-only with no data-model/undo/behavioral surface, it
+coheres cleanly with S20's frameless model (which it legitimately supersedes), and the desktop pass/fail
+line correctly rests on structural proxies with on-device match as the NB-6 real-device signal. One
+Minor (**M26**, the aisle-glyph host-element / size-ownership coherence with S26) — cheap, no PO input;
+recommend folding one line before Lock or tracking as a non-blocking follow-up. One Nitpick (**N16**,
+retain a base icon-btn font-size fallback) — no action required at Lock. Advisory only, as always — the
+Lock decision is Scrum Master's.

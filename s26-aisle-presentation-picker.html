@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grocery List — S26 Aisle Presentation + Icon Picker</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :root {
+    --bg-page: #1a1a1a;
+    --bg-card: #2a2a2a;
+    --border: #555;
+    --text: #ddd;
+    --text-muted: #999;
+    --accent: #4da6ff;
+  }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg-page);
+    color: var(--text);
+    max-width: 40rem;
+    margin: 0 auto;
+    padding: 1.25rem 1rem 4rem;
+    line-height: 1.45;
+  }
+  h1 { color: var(--accent); font-size: 1.3rem; margin: 0 0 0.25rem; }
+  h2 { font-size: 1.05rem; margin: 1.6rem 0 0.2rem; color: var(--accent); }
+  h3 { font-size: 0.95rem; margin: 0; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+  .intro, .note { color: var(--text-muted); font-size: 0.88rem; }
+  .intro { margin-bottom: 0.9rem; }
+  code { background: var(--bg-card); padding: 0.05rem 0.3rem; border-radius: 4px; font-size: 0.85em; }
+  .decision-box {
+    border: 1px solid #3a6b4a; border-radius: 10px; background: #1e2a22;
+    padding: 0.8rem 1rem; margin: 0.6rem 0 1.4rem; font-size: 0.9rem;
+  }
+  .decision-box b { color: #9ad9b4; }
+
+  /* Simulated phone content column. Width == real device CSS width; padding
+     1rem replicates the app's own body padding, so the list sits in the true
+     on-device content width (e.g. a 320px phone -> ~288px of list width). */
+  .device {
+    border: 1px dashed #666; border-radius: 8px;
+    background: var(--bg-page);
+    padding: 1rem;
+    margin: 0.5rem 0 1.1rem;
+  }
+  .device.w360 { width: 360px; max-width: 100%; }
+  .device.w320 { width: 320px; max-width: 100%; }
+  .device-label {
+    font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--text-muted); margin: 0 0 0.35rem;
+  }
+
+  .status-pill {
+    font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.03em;
+    padding: 0.12rem 0.45rem; border-radius: 4px; font-weight: 700;
+  }
+  .status-pill.ok { background: #1f4a2e; color: #7fd6a4; }
+  .status-pill.tofu { background: #5a1f1f; color: #f0a0a0; }
+  .status-pill.mine-tag { background: #1f3a4a; color: #7fc4e6; }
+
+  /* ---- Real row markup/styling, taken from the CURRENT shipped style.css
+     (post-S14 shrink + S20 frameless glyph-fill: 19.5px box, border:none,
+     transparent background, 1.15rem glyph). This is exactly what an S26 row
+     would render as today - not an approximation. Only the aisle affordance's
+     shape (pure icon vs. second-line tag vs. inline value) and the aisle glyph
+     vary per section below. ---- */
+  .items { list-style: none; margin: 0; padding: 0; }
+  .items li {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem;
+    padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--bg-card);
+    cursor: pointer; user-select: none;
+  }
+  .items li:last-child { border-bottom: none; }
+  .items .item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .items .icon-btn {
+    flex-shrink: 0; width: 19.5px; height: 19.5px; min-width: 19.5px;
+    border: none; background: transparent; color: var(--text-muted);
+    font-size: 1.15rem; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 0; cursor: pointer;
+  }
+  .items .icon-btn.delete-btn { color: #e08080; }
+  /* the aisle icon carries the accent tint, matching S16's prior ⚑ treatment */
+  .items .icon-btn.aisle-icon { color: var(--accent); }
+
+  .row-meta { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.15rem; }
+  .note-display {
+    flex-shrink: 1; min-width: 0; max-width: 100%; overflow-wrap: break-word;
+    border: none; background: transparent; font: inherit; font-size: 0.78rem;
+    color: var(--text-muted); padding: 0.1rem 0.2rem; cursor: pointer;
+    text-align: left; border-bottom: 1px dashed var(--border);
+  }
+
+  /* Option 1: compact second-line aisle TAG, only rendered when an aisle is
+     set. A full-border pill (distinct from the note's dashed underline) so the
+     two second-line chips are visually tellable-apart. Tap to edit. */
+  .aisle-tag-set {
+    flex-shrink: 1; min-width: 0; max-width: 100%;
+    border: 1px solid var(--border); border-radius: 4px;
+    background: transparent; font: inherit; font-size: 0.78rem;
+    color: var(--accent); padding: 0.05rem 0.4rem; cursor: pointer;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* Option 2: the collapsed select widens to show its value INLINE on the
+     primary line (a small bordered chip + caret, mimicking a native select's
+     resting look). flex: 0 1 auto + a cap so it competes with the name for
+     width - the name (flex:1, min-width:0) is what truncates first. */
+  .aisle-inline {
+    flex: 0 1 auto; min-width: 0; max-width: 55%;
+    display: inline-flex; align-items: center; gap: 0.15rem;
+    border: 1px solid var(--border); border-radius: 4px;
+    background: var(--bg-page); font: inherit; font-size: 0.85rem;
+    color: var(--text); padding: 0.05rem 0.35rem; cursor: pointer;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .aisle-inline .caret { flex-shrink: 0; font-size: 0.7rem; color: var(--text-muted); }
+
+  .legend { font-size: 0.82rem; color: var(--text-muted); margin: 0.1rem 0 0.4rem; }
+  .win { color: #9ad9b4; }
+</style>
+</head>
+<body>
+
+<h1>S26 — Aisle presentation + aisle icon</h1>
+<p class="intro">
+  S26 moves the per-item aisle off its always-present second-line <code>&lt;select&gt;</code> (which
+  currently forces EVERY row to two lines, even aisle-less ones) onto an icon in line with the other
+  per-row icons. Two things need your eye. Rows below use the REAL current row markup/CSS (the
+  post-S14/S20 frameless 19.5px icons), rendered at true on-device widths.
+</p>
+<div class="decision-box">
+  <b>The core fix is fixed, not a choice:</b> an item with NO aisle set stays a SINGLE line either way
+  (see the <span class="win">Bread</span> row). What you're picking is only how an item that HAS an
+  aisle set should show it.
+</div>
+
+<h2>(a) Set-aisle presentation — pick ONE</h2>
+<p class="intro">
+  Same 5-item list in both options. Note vs. aisle: a set NOTE always shows on the second line (that's
+  unchanged from today). The only thing that differs between the two options is where a set AISLE goes.
+</p>
+
+<h3>Option 1 — Tag when set (aisle icon stays on the primary line; the value drops to a compact second-line tag only when set)</h3>
+<p class="legend">
+  Roomy, uncluttered primary line; a set aisle costs a second line (like a set note already does).
+  Aisle-less rows stay single-line.
+</p>
+<p class="device-label">360 px device</p>
+<div class="device w360" data-render="tag"></div>
+<p class="device-label">320 px device (narrowest supported)</p>
+<div class="device w320" data-render="tag"></div>
+
+<h3>Option 2 — Inline (the value shows on the primary line; the collapsed control widens to show it)</h3>
+<p class="legend">
+  A set aisle stays on ONE line (no second row) — but the value competes with the item name for width,
+  so long names truncate sooner, especially at 320px.
+</p>
+<p class="device-label">360 px device</p>
+<div class="device w360" data-render="inline"></div>
+<p class="device-label">320 px device (narrowest supported)</p>
+<div class="device w320" data-render="inline"></div>
+
+<h2>(b) Aisle icon glyph — pick ONE (or send your own codepoint)</h2>
+<p class="intro">
+  Plain monochrome Unicode symbols only, no colored emoji (your standing preference). Each is rendered
+  as a real character via <code>String.fromCodePoint()</code> at the actual 19.5px footprint, sitting
+  in a full real row beside the other icons (note <span id="note-glyph-inline"></span>, edit, up, down,
+  delete) so you can judge weight/consistency in context. U+2691 (⚑) is S16's prior aisle flag.
+</p>
+<p class="intro">
+  Each carries an automated tofu check: the glyph is drawn to an offscreen canvas and compared
+  pixel-for-pixel against a guaranteed-unassigned codepoint. A match flags a likely missing-glyph box
+  in <em>this test browser</em> — worth double-checking directly on your phone, since obscure
+  codepoints are font-dependent.
+</p>
+<div id="glyph-root"></div>
+
+<p class="note" style="margin-top:1rem;">
+  Tell me: (a) Tag-when-set or Inline, and (b) which glyph codepoint (or your own). I'll then implement
+  S26 against your pick, followed by S27 (icon sizing). Nothing here is wired into the real app.
+</p>
+
+<script>
+  // Real app glyphs, reproduced faithfully via codepoint (NOT re-typed emoji):
+  var NOTE_GLYPH = String.fromCodePoint(0x1F5CB); // note-toggle (app's real glyph)
+  var EDIT_GLYPH = String.fromCodePoint(0x270E);  // pencil (S15)
+  var UP_GLYPH   = String.fromCodePoint(0x25B2);  // up
+  var DOWN_GLYPH = String.fromCodePoint(0x25BC);  // down
+  var DEL_GLYPH  = String.fromCodePoint(0x2715);  // delete
+  var CARET      = String.fromCodePoint(0x25BE);  // small down-triangle for the inline select
+  var PLACEHOLDER_AISLE_GLYPH = String.fromCodePoint(0x2691); // ⚑, placeholder for part (a)
+
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function iconBtn(glyph, title, extraClass) {
+    return '<button type="button" class="icon-btn ' + (extraClass || '') + '" title="' +
+      esc(title) + '">' + glyph + '</button>';
+  }
+
+  // The 5 sample rows exercise every case: single-line win, aisle-set (x2, the
+  // differentiator), note-only (2 lines but aisle stays a pure icon), and the
+  // worst content row (note AND aisle both set).
+  var items = [
+    { name: 'Bread',                aisle: '',       note: '' },
+    { name: 'Bananas',              aisle: 'Produce', note: '' },
+    { name: 'Extra virgin olive oil', aisle: 'Pantry', note: '' },
+    { name: 'Chicken thighs',       aisle: '',       note: '2 lbs, bone-in' },
+    { name: 'Greek yogurt',         aisle: 'Dairy',   note: 'plain, full-fat' }
+  ];
+
+  // mode: 'tag' (Option 1) or 'inline' (Option 2). aisleGlyph == the aisle icon.
+  function rowHtml(item, mode, aisleGlyph) {
+    var primary = '<span class="item-name">' + esc(item.name) + '</span>';
+    // note affordance icon shows only while the note is empty (real behavior)
+    if (!item.note) primary += iconBtn(NOTE_GLYPH, 'Add note');
+    // aisle control
+    if (mode === 'inline' && item.aisle) {
+      primary += '<button type="button" class="aisle-inline" title="Edit aisle">' +
+        esc(item.aisle) + '<span class="caret">' + CARET + '</span></button>';
+    } else {
+      primary += iconBtn(aisleGlyph, item.aisle ? 'Edit aisle' : 'Set aisle', 'aisle-icon');
+    }
+    primary += iconBtn(EDIT_GLYPH, 'Edit item');
+    primary += iconBtn(UP_GLYPH, 'Move up');
+    primary += iconBtn(DOWN_GLYPH, 'Move down');
+    primary += iconBtn(DEL_GLYPH, 'Delete', 'delete-btn');
+
+    var meta = '';
+    if (item.note) meta += '<button type="button" class="note-display">' + esc(item.note) + '</button>';
+    if (mode === 'tag' && item.aisle) {
+      meta += '<button type="button" class="aisle-tag-set" title="Edit aisle">' + esc(item.aisle) + '</button>';
+    }
+    var metaHtml = meta ? '<div class="row-meta">' + meta + '</div>' : '';
+
+    return '<li>' + primary + metaHtml + '</li>';
+  }
+
+  function listHtml(mode, aisleGlyph) {
+    var html = '<ul class="items">';
+    for (var i = 0; i < items.length; i++) html += rowHtml(items[i], mode, aisleGlyph);
+    return html + '</ul>';
+  }
+
+  var frames = document.querySelectorAll('.device[data-render]');
+  for (var f = 0; f < frames.length; f++) {
+    frames[f].innerHTML = listHtml(frames[f].getAttribute('data-render'), PLACEHOLDER_AISLE_GLYPH);
+  }
+
+  // Show the real note glyph inline in the (b) intro sentence.
+  document.getElementById('note-glyph-inline').textContent = NOTE_GLYPH;
+
+  // ---- (b) glyph candidates -------------------------------------------------
+  var candidates = [
+    { cp: 0x2691, hex: '2691', nameGuess: 'BLACK FLAG', theme: 'S16\'s prior aisle flag — solid monochrome, heavier weight.', mine: false },
+    { cp: 0x2690, hex: '2690', nameGuess: 'WHITE FLAG', theme: 'Outline flag — lighter weight, closer to the thin ✎/✕ glyphs.', mine: true },
+    { cp: 0x2316, hex: '2316', nameGuess: 'POSITION INDICATOR', theme: 'Reads as a location / place marker (a plain, non-emoji "pin" stand-in).', mine: true },
+    { cp: 0x25A4, hex: '25A4', nameGuess: 'SQUARE WITH HORIZONTAL FILL', theme: 'Shelf / section / label look — this was S8\'s original empty-state aisle icon.', mine: true },
+    { cp: 0x2261, hex: '2261', nameGuess: 'IDENTICAL TO (three bars)', theme: 'Three stacked bars — reads like aisle rows / a list of store sections.', mine: true }
+  ];
+
+  function isLikelyTofu(ch) {
+    var referenceChar = String.fromCodePoint(0x10FFFD); // guaranteed-unassigned PUA codepoint
+    var fonts = ['system-ui', 'sans-serif', 'monospace'];
+    function render(c, font) {
+      var canvas = document.createElement('canvas');
+      canvas.width = 48; canvas.height = 48;
+      var ctx = canvas.getContext('2d');
+      ctx.font = '32px ' + font;
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = '#000';
+      ctx.clearRect(0, 0, 48, 48);
+      ctx.fillText(c, 2, 2);
+      return canvas.toDataURL();
+    }
+    for (var i = 0; i < fonts.length; i++) {
+      if (render(ch, fonts[i]) === render(referenceChar, fonts[i])) return true;
+    }
+    return false;
+  }
+
+  var glyphRoot = document.getElementById('glyph-root');
+  candidates.forEach(function (c) {
+    var glyph = String.fromCodePoint(c.cp);
+    var tofu = isLikelyTofu(glyph);
+
+    var section = document.createElement('div');
+    section.className = 'device w360';
+    section.style.maxWidth = '100%';
+
+    var header = document.createElement('h3');
+    header.innerHTML = 'U+' + c.hex + ' (decimal ' + c.cp + ')' +
+      (c.mine ? ' <span class="status-pill mine-tag">Developer suggestion</span>' : '') +
+      (tofu ? ' <span class="status-pill tofu">Possible tofu in this browser</span>'
+            : ' <span class="status-pill ok">Renders as a real glyph here</span>');
+    section.appendChild(header);
+
+    var meta = document.createElement('p');
+    meta.className = 'legend';
+    meta.textContent = c.nameGuess + ' — ' + c.theme;
+    section.appendChild(meta);
+
+    // One aisle-set row (Option-1 style) so the candidate shows both as the
+    // primary-line icon AND against its own second-line tag.
+    section.insertAdjacentHTML('beforeend',
+      '<ul class="items"><li>' +
+        '<span class="item-name">Cheddar cheese</span>' +
+        iconBtn(glyph, 'Edit aisle', 'aisle-icon') +
+        iconBtn(EDIT_GLYPH, 'Edit item') +
+        iconBtn(UP_GLYPH, 'Move up') +
+        iconBtn(DOWN_GLYPH, 'Move down') +
+        iconBtn(DEL_GLYPH, 'Delete', 'delete-btn') +
+        '<div class="row-meta"><button type="button" class="aisle-tag-set">Dairy</button></div>' +
+      '</li>' +
+      '<li>' +
+        '<span class="item-name">Bananas (aisle unset)</span>' +
+        iconBtn(NOTE_GLYPH, 'Add note') +
+        iconBtn(glyph, 'Set aisle', 'aisle-icon') +
+        iconBtn(EDIT_GLYPH, 'Edit item') +
+        iconBtn(UP_GLYPH, 'Move up') +
+        iconBtn(DOWN_GLYPH, 'Move down') +
+        iconBtn(DEL_GLYPH, 'Delete', 'delete-btn') +
+      '</li></ul>');
+
+    glyphRoot.appendChild(section);
+  });
+</script>
+
+</body>
+</html>

@@ -1522,7 +1522,72 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   added; S23 → Done; QUESTIONS D1 entry resolved + one new non-blocking S26 visual
   question logged. All BACKLOG/QUESTIONS/SPRINT_LOG edits kept as single well-formed
   GFM lines. Reported the S26/S27 framing + flagged questions back to the
-  Orchestrator. Draft only — Developer sanity-check on S26/S27 not yet started.
+  Orchestrator.
+- **Developer sanity-check on S26/S27 landed same session, 2026-09-11 — FEASIBLE, folded
+  into the AC (no PO input needed now; mockup deferred post-Lock):** **S26** R14-safe
+  mechanism RESOLVED as **Option C** — keep the native `<select>` ALWAYS-PRESENT (S22's
+  exact R14-safe model; `change`-commit handler + `focusout` `activeElement` guard stay
+  BYTE-FOR-BYTE untouched) but move it off the second line onto the primary line and
+  collapse it to an `.icon-btn` footprint via CSS (`appearance:none` + glyph overlaid as
+  a `pointer-events:none` span so a tap falls through and opens the native picker, one
+  tap, no `showPicker()`); the density problem was the select being full-WIDTH on a
+  second LINE, not its being always-present. R14 invariant recorded (no `render()` while
+  a picker is open; select never destroyed/recreated). Option A (icon + transient
+  reveal-render, two taps) documented as the iOS fallback. By-Aisle RESOLVED — the icon
+  shows in ALL sort modes; do NOT suppress it in By-Aisle (S16's lesson: hiding the only
+  edit affordance breaks S9's edit-in-every-mode guarantee). Set-aisle-presentation +
+  glyph DEFERRED to ONE post-Lock PO mockup. Testable line: only aisle-LESS items must
+  stay single-line; a SET aisle MAY be two lines. Overflow: 5→6 primary-line icons =
+  the same 6-icon row S19 measured clean (222/222). **S27** sharp finding: "match the
+  note icon" is a GLYPH-METRICS illusion — all icons already share the `.icon-btn`
+  1.15rem/~19.5px box; the note (U+1F5CB) just has fuller glyph metrics. So a uniform
+  bump is a no-op; matching needs PER-GLYPH font-size tuning, GLYPH-ONLY (fixed boxes,
+  S20 model → overflow fit preserved). Supersedes S20's accepted-unevenness note;
+  device-dependent (verified on the PO's phone, not pixel-identical on desktop).
+  **S26: sanity-check CLEARED → Tester testability-check CLEARED same day (TESTABLE, zero
+  blocking; 3 non-blocking clarifications folded — C1 NB-6 real-device label on the
+  tap-through-opens-picker behavior + desktop-proxy list; C2 canonical density signal =
+  aisle-less+note-less row height EQUALS the single-line reference; C3 fallback heads-up
+  that Option A's reveal-render would re-open the R14/focusout test design) → now READY for
+  the QA per-story gate.** **S27: initially held provisional pending a PO screenshot, then
+  UN-HELD same day — the PO's screenshot (2026-09-11) VALIDATED the Developer's
+  glyph-metrics finding (note glyph renders taller than the thin edit/up/down/delete glyphs
+  at the SAME button box), confirming "match the note icon" = per-glyph HEIGHT equalization
+  of the other glyphs toward U+1F5CB, glyph-only within the fixed ~19.5px boxes (Developer
+  tunes the values, PO confirms on-device). AC final → Tester testability-check CLEARED
+  same day (TESTABLE, zero blocking; 3 non-blocking clarifications folded — C1 pins the
+  desktop pass/fail to G1–G4 [boxes stay ~19.5px, non-note glyph sizes no longer all-equal
+  to the old uniform 1.15rem, each tuned size >= baseline, no row-height growth] with
+  rendered-height parity as LOOSE corroboration only [U+1F5CB is device-unstable per S7];
+  C3 records the after-S26 dependency + that S27's coverage is GLYPH-AGNOSTIC so it does
+  not depend on S26's deferred glyph pick) → now READY for the QA per-story gate.**
+- **QA per-story gate + LOCK, 2026-09-11 — BOTH S26 and S27 gated CLEAN (zero Real findings)
+  and LOCKED the same day; NO QA re-read (clean gate, one-line folds only — S14/S17
+  precedent, not the S13/S15 re-read case):** the R14/C1 hazard hunt on S26 came up GENUINELY
+  clean — Option C truly inherits S22's R14 safety with ZERO JS changes, confirmed against the
+  real change-commit handler + focusout guard. Cheap folds: S26 — M25 (the deferred overflow
+  re-check must MEASURE the collapsed `<select>`'s real footprint, not assume `.icon-btn`
+  parity, since the 6th control is a select, not an icon-btn), N14 (do not emit an empty
+  `.row-meta`), N15 (glyph-overlay a11y rides the deferred mockup); S27 — M26 (the fixed-box
+  constraint scopes to the 4 real tuned `.icon-btn`s; the aisle glyph lives on a
+  `pointer-events:none` OVERLAY, its sizing scoped to the overlay / S26's deferred mockup),
+  N16 (retain a base `.icon-btn` font-size fallback). **Reciprocal supersession notes added at
+  Lock (all STAY Done):** S22 (PRESENTATION superseded; forward-ref note flipped to Locked),
+  S16 (compact affordance further superseded — ⚑ → inline select → primary-line icon-footprint
+  select, icon NOT suppressed in By-Aisle), S9 (by-aisle aisle-affordance rendering adjusted),
+  S20 (accepted glyph-unevenness refined by S27's per-glyph height equalization within the same
+  fixed boxes).
+- **Outcome:** the S26/S27 pair is drafted, fully pipelined (Scrum-Master sanity-check →
+  Developer sanity-check → PO "match"-definition confirm [S27] → Tester testability-check → QA
+  per-story gate) and LOCKED 2026-09-11 — clear for Developer implementation (S26 then S27; one
+  combined M24/R7 overflow re-check after the pair ships). One open post-Lock PO item remains:
+  S26's single tag-vs-inline + aisle-glyph decision-tool mockup (Developer builds it, PO picks,
+  then it folds into implementation). S22 forward-ref note added; S23 → Done; QUESTIONS D1
+  resolved. Nothing owed by me on commits (Orchestrator commits+pushes).
+  S22 forward-reference note added; S23 → Done; QUESTIONS D1 resolved + the S26 visual-pick
+  entry updated to the post-Lock single-mockup path. No PO input pending on S26/S27 now
+  (S26's tag-vs-inline + glyph mockup comes after Lock; S27's "match" definition is
+  PO-confirmed). Nothing owed by me on commits (Orchestrator commits+pushes).
 
 ## Parked / unscheduled
 
