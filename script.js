@@ -610,6 +610,9 @@
   // covers that transition there) and is scoped tightly to this fragile window,
   // so R14's picker-dismiss flush and S24's genuine abandon=revert (both of
   // which fire long after the window) are untouched.
+  // S27 (2026-09-11): the same deferred flush now also COMMITS a non-empty valid
+  // new-aisle name on blur (iOS "Go" saves it) rather than always reverting - see
+  // the focusout handler's S27 note for the full three-case rule.
   var newAisleOpenedAt = 0;
   var NEW_AISLE_OPEN_GRACE_MS = 400;
 
@@ -1452,18 +1455,50 @@
       var ae = document.activeElement;
       if (ae && ae.dataset && listRoot.contains(ae) &&
           (ae.dataset.role === 'aisle-select' || ae.dataset.role === 'new-aisle-input')) return;
-      // S26 iOS fix (see newAisleOpenedAt): during the just-opened window,
-      // iOS Safari's focus/scroll for the reveal input has not settled and
-      // activeElement is transiently <body>, so the activeElement guard above
-      // misses. Do NOT revert a new-aisle editor that was focused within the
-      // grace window - this is the iOS open-transition churn (the torn-down
-      // <select>'s blur and/or the input's bounce-blur), never a genuine
-      // abandon. A real blur-to-elsewhere lands well after the window and still
-      // reverts, so S24's abandon=revert and R14's picker-dismiss flush (both
-      // late) are preserved. Desktop is unaffected (its focus lands
-      // synchronously, so the activeElement guard already returned above).
-      if (pending.field === 'new-aisle' &&
-          (Date.now() - newAisleOpenedAt) < NEW_AISLE_OPEN_GRACE_MS) return;
+      // S27 iOS commit-on-blur fix (2026-09-11). On iOS Safari, tapping the
+      // keyboard's "Go"/return BLURS the reveal input instead of (or before)
+      // firing a catchable Enter keydown on the input, so the synchronous
+      // Enter->commitNewAisle() path (see the keydown handler) never runs; this
+      // deferred flush is all that fires. Pre-S27 that flush ALWAYS routed a
+      // new-aisle draft through commitEditor()'s REVERT branch, so the name the
+      // PO had just typed was silently discarded ("the text disappears instead
+      // of populating the aisle"). Fix: decide the new-aisle flush on the LIVE
+      // input value read straight off the DOM element (never a possibly-stale
+      // `draft` a render could have cleared), in three cases:
+      //
+      //   1. NON-EMPTY and VALID  -> COMMIT via commitNewAisle() (create+assign+
+      //      persist), regardless of the grace window. THIS is the iOS fix: Go/
+      //      blur now saves a valid typed name. commitNewAisle() nulls
+      //      editingField, so there is no re-render/refocus loop, and it is the
+      //      single create+assign path (no logic duplicated here).
+      //   2. within the open-transition grace window (typically still empty)
+      //      -> SKIP (S26's first fix: protect the just-opened field while iOS's
+      //      async focus/scroll settles and activeElement is transiently <body>).
+      //   3. otherwise (empty past the window, or a non-empty-but-INVALID name
+      //      past the window) -> fall through to commitEditor()'s REVERT branch:
+      //      genuine abandon (S24). An invalid name can never be created anyway,
+      //      and reverting it on blur is exactly the pre-S27 baseline behavior -
+      //      the inline "stay open with the error message" affordance remains on
+      //      the EXPLICIT Enter/commit path (commitNewAisle in the keydown
+      //      handler), so nothing regresses and no invalid-name flush loops.
+      //
+      // Desktop is unchanged: Enter commits synchronously (editingField is null
+      // by the time this fires -> the `editingField !== pending` guard returns);
+      // a desktop blur-with-a-typed-name now also commits (an improvement). The
+      // aisle-<select> path (role 'aisle-select', pending.field !== 'new-aisle')
+      // is untouched - it still flushes a pending note/name via commitEditor()
+      // below (R14), with its activeElement picker-open guard intact above.
+      if (pending.field === 'new-aisle') {
+        var liveInput = listRoot.querySelector('li[data-id="' + pending.id + '"] [data-role="new-aisle-input"]');
+        var liveVal = liveInput ? liveInput.value : pending.draft;
+        var trimmedLive = liveVal == null ? '' : String(liveVal).trim();
+        if (trimmedLive && !validateAisleName(trimmedLive, null, false)) {
+          pending.draft = liveVal; // commit the freshest live value, not a stale draft
+          commitNewAisle();
+          return;
+        }
+        if ((Date.now() - newAisleOpenedAt) < NEW_AISLE_OPEN_GRACE_MS) return;
+      }
       commitEditor();
     }, 0);
   });
