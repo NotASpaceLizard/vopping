@@ -588,6 +588,31 @@
   // survival) work for every type by construction, naming none specifically.
   var editingField = null; // { id, field: 'note'|'name'|'new-aisle', draft[, error] }
 
+  // S26 iOS regression fix (2026-09-11). The sentinel -> new-aisle reveal path
+  // (change handler -> openNewAisleEditor -> render() -> focusNewAisleInput) is
+  // byte-for-byte the same as pre-S26, but S26 moved the always-present aisle
+  // <select> OFF the (previously always-emitted) second line onto the primary
+  // line, making .row-meta conditional. So on an aisle-less row, opening this
+  // editor now GROWS the row from one line to two (a brand-new .row-meta
+  // appears). On iOS Safari that layout growth collides with the programmatic
+  // input.focus(): iOS begins its async scroll-into-view + keyboard raise (the
+  // PO's "screen bumps up and down"), but does NOT settle focus synchronously,
+  // so `document.activeElement` is transiently <body> - NOT the reveal input.
+  // The pre-existing deferred focusout flush (from the torn-down <select>, and
+  // then from the input's own bounce-blur) therefore misses its activeElement
+  // guard and runs commitEditor()'s 'new-aisle' REVERT branch, render()-ing the
+  // just-opened editor away ("doesn't do anything"). Desktop never hit this
+  // because there the focus lands synchronously so the activeElement guard
+  // already skips. The guard below adds an OPEN-TRANSITION grace window: a
+  // deferred flush must not revert a new-aisle editor that was focused within
+  // the last NEW_AISLE_OPEN_GRACE_MS, i.e. while iOS's focus/scroll is still
+  // settling. It changes NOTHING on desktop (the activeElement guard already
+  // covers that transition there) and is scoped tightly to this fragile window,
+  // so R14's picker-dismiss flush and S24's genuine abandon=revert (both of
+  // which fire long after the window) are untouched.
+  var newAisleOpenedAt = 0;
+  var NEW_AISLE_OPEN_GRACE_MS = 400;
+
   function openEditor(id, field) {
     var idx = findIndexById(id);
     if (idx === -1) return;
@@ -795,6 +820,13 @@
   function focusNewAisleInput(id) {
     var input = listRoot.querySelector('li[data-id="' + id + '"] [data-role="new-aisle-input"]');
     if (input) {
+      // S26 iOS fix: arm the open-transition grace window at the exact moment we
+      // (re)focus the reveal input - both the initial sentinel reveal
+      // (openNewAisleEditor) and the stay-open-on-invalid re-focus
+      // (commitNewAisle) route through here, so both are protected from the
+      // deferred focusout flush during iOS's async focus/scroll settling. See
+      // the newAisleOpenedAt declaration and the focusout handler.
+      newAisleOpenedAt = Date.now();
       input.focus();
       if (typeof input.setSelectionRange === 'function') {
         var len = input.value.length;
@@ -1420,6 +1452,18 @@
       var ae = document.activeElement;
       if (ae && ae.dataset && listRoot.contains(ae) &&
           (ae.dataset.role === 'aisle-select' || ae.dataset.role === 'new-aisle-input')) return;
+      // S26 iOS fix (see newAisleOpenedAt): during the just-opened window,
+      // iOS Safari's focus/scroll for the reveal input has not settled and
+      // activeElement is transiently <body>, so the activeElement guard above
+      // misses. Do NOT revert a new-aisle editor that was focused within the
+      // grace window - this is the iOS open-transition churn (the torn-down
+      // <select>'s blur and/or the input's bounce-blur), never a genuine
+      // abandon. A real blur-to-elsewhere lands well after the window and still
+      // reverts, so S24's abandon=revert and R14's picker-dismiss flush (both
+      // late) are preserved. Desktop is unaffected (its focus lands
+      // synchronously, so the activeElement guard already returned above).
+      if (pending.field === 'new-aisle' &&
+          (Date.now() - newAisleOpenedAt) < NEW_AISLE_OPEN_GRACE_MS) return;
       commitEditor();
     }, 0);
   });
