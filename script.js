@@ -566,6 +566,17 @@
   // job, per the PO's explicitly-confirmed icon-pairing.
   var NAME_EDIT_ICON_GLYPH = '✎';
 
+  // S26 (Locked, 2026-09-11): the per-item aisle affordance glyph - the PO's
+  // pick from the post-Lock set-aisle/glyph mockup (s26-aisle-presentation-
+  // picker.html), U+2316 POSITION INDICATOR (⌖). A plain monochrome Unicode
+  // symbol glyph that inherits CSS `color` (NOT a colored emoji, per the PO's
+  // standing icon preference). It is overlaid on the COLLAPSED aisle <select>
+  // via a pointer-events:none, aria-hidden span (renderAisleSelect), so a tap
+  // falls THROUGH to the native <select> and opens the picker directly (one
+  // tap, no showPicker()). S27 sizes THIS glyph via the overlay span's own
+  // font-size - it is NOT an .icon-btn box (M26).
+  var AISLE_ICON_GLYPH = '⌖';
+
   // Editor field types sharing this one mechanism (mutual exclusivity, cross-
   // row/cross-action commit, draft-survives-unrelated-render): S7's 'note',
   // S15's 'name', and S24's 'new-aisle'. NB (S22): 'aisle' is NO LONGER an
@@ -1005,11 +1016,19 @@
       ? '<button type="button" class="icon-btn" data-role="note-toggle" title="Add note">' + NOTE_TOGGLE_ICON_GLYPH + '</button>'
       : '';
 
-    // S22/S16: the old icon-only aisle affordance (⚑ / "Add aisle") is GONE.
-    // The aisle is now a persistent native <select> rendered on the row-meta
-    // line below, in ALL sort modes including By-Aisle compact (M23, PO
-    // confirmed - the inline select supersedes S16's ⚑). No primary-line aisle
-    // control remains, so the worst-case primary-line icon count drops by one.
+    // S26 (Locked, 2026-09-11): the per-item aisle affordance is a COLLAPSED
+    // native <select> on the PRIMARY line, in line with the other row icons, in
+    // ALL sort modes INCLUDING By-Aisle. Do NOT suppress the CONTROL in By-Aisle
+    // - hiding the only edit affordance would break S9's edit-in-every-sort-mode
+    // guarantee (the exact self-contradiction S16 caught). It is ALWAYS present
+    // (S22's exact R14-safe model - never destroyed/recreated to reveal it),
+    // collapsed to an ~19.5px icon footprint purely via CSS with the PO's glyph
+    // overlaid as a pointer-events:none span (see renderAisleSelect +
+    // .aisle-control CSS). Moving it OFF the always-emitted second line is the
+    // density fix: an aisle-less AND note-less row now emits NO .row-meta and
+    // stays single-line. The change-commit handler and the focusout
+    // activeElement guard are UNCHANGED (R14 safety inherited byte-for-byte).
+    var aisleControl = renderAisleSelect(item);
 
     // S15 (Locked, 2026-09-08): unlike note/aisle's affordances above, this
     // icon is NOT conditioned on the field being empty (an item's name is
@@ -1044,31 +1063,45 @@
         '<button type="button" class="icon-btn" data-role="down" title="Move down"' + (index === total - 1 ? ' disabled' : '') + '>▼</button>';
     }
 
-    // Second line (row-meta): S22 makes the per-item aisle <select> ALWAYS
-    // present, so this line now always renders (M24 - a placement re-check at
-    // 320/360/375/390px is required and was run; the select sits on its own
-    // wrapping line, never on the crowded primary control line). It also holds
-    // the note editor/display when applicable, and S24's new-aisle reveal input
-    // while that editor is open.
-    var secondLine = '<div class="row-meta">';
+    // Second line (.row-meta): S26 emits it ONLY when it has real content (N14 -
+    // never emit an empty .row-meta, or its flex-basis:100% + margin-top would
+    // reintroduce the very second line the density fix removes; a
+    // belt-and-suspenders `.row-meta:empty { display:none }` also guards this in
+    // CSS). Content it may hold: an open note editor, a saved note-display, the
+    // set-aisle TAG (S26 "Tag-when-set", the PO's Option-1 pick - shown when the
+    // item HAS an aisle set, EXCEPT under By-Aisle sort where the group header
+    // already labels the aisle, so a per-row tag would be redundant - S16's
+    // redundant-tag lesson; the collapsed aisle CONTROL itself still renders on
+    // the primary line in every mode), and S24's new-aisle reveal input/error.
+    // An aisle-less AND note-less row emits none of these -> no second line ->
+    // single-line row (Tester's C2 canonical density signal).
+    var aisleVal = item.aisle || '';
+    var metaParts = '';
     if (isEditingNote) {
-      secondLine += '<input type="text" class="row-meta-input" data-role="note-input" placeholder="Note…" value="' + escapeHtml(editingField.draft) + '">';
+      metaParts += '<input type="text" class="row-meta-input" data-role="note-input" placeholder="Note…" value="' + escapeHtml(editingField.draft) + '">';
     } else if (noteVal) {
-      secondLine += '<button type="button" class="note-display" data-role="note-toggle" title="Edit note">' + escapeHtml(noteVal) + '</button>';
+      metaParts += '<button type="button" class="note-display" data-role="note-toggle" title="Edit note">' + escapeHtml(noteVal) + '</button>';
     }
-    secondLine += renderAisleSelect(item);
+    if (aisleVal && sortMode !== 'aisle') {
+      // Passive display of the set aisle (canonical casing, mirroring the
+      // select). data-role keeps a tap on the tag from falling through to the
+      // whole-row cross-off (same nested-control-precedence carve-out
+      // note-display uses); it maps to no action branch, so tapping it is inert
+      // - the primary-line collapsed select is THE edit affordance.
+      metaParts += '<span class="aisle-tag-set" data-role="aisle-tag">' + escapeHtml(aisleDisplayLabel(aisleVal)) + '</span>';
+    }
     if (isEditingNewAisle) {
-      secondLine += '<input type="text" class="row-meta-input new-aisle-input" data-role="new-aisle-input" placeholder="New aisle name…" autocomplete="off" value="' + escapeHtml(editingField.draft) + '">';
+      metaParts += '<input type="text" class="row-meta-input new-aisle-input" data-role="new-aisle-input" placeholder="New aisle name…" autocomplete="off" value="' + escapeHtml(editingField.draft) + '">';
       if (editingField.error) {
-        secondLine += '<span class="row-meta-error" data-role="new-aisle-error">' + escapeHtml(editingField.error) + '</span>';
+        metaParts += '<span class="row-meta-error" data-role="new-aisle-error">' + escapeHtml(editingField.error) + '</span>';
       }
     }
-    secondLine += '</div>';
+    var secondLine = metaParts ? ('<div class="row-meta">' + metaParts + '</div>') : '';
 
     return '<li class="' + (item.checked ? 'checked' : '') + '" data-id="' + item.id + '"' +
       ' role="checkbox" tabindex="0" aria-checked="' + (item.checked ? 'true' : 'false') + '" aria-label="' + safeName + '">' +
       nameContent +
-      noteAffordance + editButton + reorderButtons +
+      noteAffordance + aisleControl + editButton + reorderButtons +
       '<button type="button" class="icon-btn delete-btn" data-role="delete" title="Delete">✕</button>' +
       secondLine +
       '</li>';
@@ -1086,7 +1119,17 @@
   function renderAisleSelect(item) {
     var curKey = normalize(item.aisle || '');
     var matched = (curKey === '');
-    var html = '<select class="aisle-select" data-role="aisle-select" title="Aisle">';
+    // S26: the <select> is COLLAPSED to an icon footprint and lives inside a
+    // positioned .aisle-control wrapper; its own option text is CSS-clipped
+    // (color:transparent) and the visible affordance is the pointer-events:none
+    // overlay glyph below. The select KEEPS data-role="aisle-select" (the
+    // change-commit handler AND the focusout activeElement guard both match on
+    // it - byte-for-byte untouched) and an accessible name via aria-label (N15
+    // - sturdier than the old title; title kept too, for a desktop hover
+    // tooltip). Option set / values / NB-1 order / R15 dangling-value guard /
+    // S24 sentinel are ALL UNCHANGED - this is a presentation-only rework.
+    var html = '<span class="aisle-control">';
+    html += '<select class="aisle-select" data-role="aisle-select" aria-label="Aisle" title="Aisle">';
     html += '<option value=""' + (curKey === '' ? ' selected' : '') + '>' + escapeHtml(noAisleLabel()) + '</option>';
     var pool = getAislePool();
     for (var i = 0; i < pool.length; i++) {
@@ -1102,7 +1145,21 @@
     // value string) so it can never be confused with a real aisle.
     html += '<option value="' + escapeHtml(ADD_AISLE_VALUE) + '" data-sentinel="1">' + escapeHtml(ADD_AISLE_LABEL) + '</option>';
     html += '</select>';
+    // S26: the visible glyph, overlaid on the collapsed <select>. aria-hidden
+    // (N15 - the <select>'s aria-label carries the accessible name); the CSS
+    // makes it pointer-events:none so a tap falls through to the <select>.
+    html += '<span class="aisle-glyph" aria-hidden="true">' + AISLE_ICON_GLYPH + '</span>';
+    html += '</span>';
     return html;
+  }
+
+  // S26: canonical display label for a SET aisle value (the second-line tag),
+  // mirroring the <select>'s normalized-key option matching so the tag shows the
+  // same canonical casing as the select and the By-Aisle group header, falling
+  // back to the raw stored string for a non-canonical value never re-picked
+  // (same R15 posture the select itself uses).
+  function aisleDisplayLabel(rawAisle) {
+    return getAisleDisplayMap()[normalize(rawAisle)] || rawAisle;
   }
 
   function renderList() {

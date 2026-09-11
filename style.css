@@ -287,11 +287,19 @@ button:disabled {
   border: none;
   background: transparent;
   color: var(--text-muted);
-  /* S20: glyph scaled up to fill the 19.5px footprint. One uniform size across
-     the mixed glyph set (🗋 ⚑ ✎ ✕ ▲ ▼) renders slightly unevenly - accepted
-     per the AC. Font-size does NOT change layout width (the box stays a fixed
-     19.5px), and line-height:1 + the fixed height + inline-flex centering keep
-     the enlarged glyph in-box, so the row does not grow taller. */
+  /* S20: glyph scaled up to fill the 19.5px footprint. Font-size does NOT
+     change layout width (the box stays a fixed 19.5px), and line-height:1 + the
+     fixed height + inline-flex centering keep the enlarged glyph in-box, so the
+     row does not grow taller.
+     S27 (Locked, 2026-09-11) reciprocal note: S20 accepted that ONE uniform
+     size renders the mixed glyph set slightly UNEVENLY - the note glyph 🗋
+     (U+1F5CB) looks taller only because it has heavier/fuller metrics, not a
+     bigger box. S27 REFINES (supersedes) that accepted unevenness: this value
+     stays the BASE/fallback (N16 - so any icon-btn without its own per-glyph
+     rule still renders at a deliberate size), and the four thin glyphs get
+     per-glyph font-size overrides below to equalize their RENDERED height
+     toward the note glyph's, GLYPH-ONLY within these same fixed 19.5px boxes
+     (box unchanged -> row height + horizontal fit both unchanged). */
   font-size: 1.15rem;
   line-height: 1;
   display: inline-flex;
@@ -327,29 +335,64 @@ button:disabled {
   color: #e08080;
 }
 
+/* S27 (Locked, 2026-09-11): per-glyph font-size overrides that equalize each
+   thin row-icon glyph's RENDERED height toward the note glyph's (🗋 U+1F5CB -
+   the height REFERENCE, deliberately NOT overridden, so it keeps the 1.15rem
+   base above). GLYPH-ONLY: the fixed 19.5px box (width/height/min-width above)
+   is UNCHANGED, so the row height and the horizontal fit are both preserved
+   (box-enlargement is the overflow risk this AVOIDS). The note glyph looks
+   taller only because of heavier glyph metrics, so a uniform bump could not
+   match it - per-glyph tuning is required (Developer's sanity-check finding,
+   PO-confirmed via screenshot). Each value is enlarged (>= the 1.15rem base,
+   never down - G3) and tuned toward the note glyph; Up/Down legitimately share
+   a size (G2). The exact pixel "match" is device-dependent (U+1F5CB is
+   device-unstable - the S7 caveat) and is confirmed on the PO's PHONE, not
+   asserted pixel-identical on desktop (NB-6) - these are the initial tuned
+   values, PO to confirm the final look on-device. NB: S26's aisle glyph is NOT
+   an .icon-btn (it is the .aisle-glyph overlay span) - its own sizing lives
+   with .aisle-glyph below, per M26. */
+.items .icon-btn[data-role="name-toggle"] {
+  font-size: 1.35rem;
+}
+.items .icon-btn[data-role="up"],
+.items .icon-btn[data-role="down"] {
+  font-size: 1.28rem;
+}
+.items .icon-btn[data-role="delete"] {
+  font-size: 1.35rem;
+}
+
 /* S22/S16: the icon-only By-Aisle edit affordance (U+2691 ⚑, `.aisle-sort-icon`)
    is REMOVED - the per-item aisle is now a persistent inline <select> in all
    sort modes (PO confirmed 2026-09-10, M23), so its dedicated accent-color rule
    is dead and gone with it. */
 
-/* S7/S8: second-line note/aisle content - LOCKED AC (see script.js's
-   renderRow()/openEditor() comments). A row with a non-empty note and/or
-   aisle (or either editor currently open) may grow to a second line to fit
-   it; `flex-basis: 100%` is what forces this div onto its own new line
-   within the already-flex-wrapping `.items li` above, rather than sitting
-   beside the primary-line controls. A row with neither note nor aisle never
-   renders this div at all, so it stays exactly as tall as the locked
-   single-line spec. Structure validated against a real worst-case two-field
-   mock in density-picker.html (QA finding R7, 2026-09-08) before landing
-   here - this is that same structure, reusing the project's own CSS
-   variables instead of density-picker.html's necessarily-standalone raw
-   hex values (that file has no shared style.css to pull from). */
+/* S7/S8/S26: second-line content - LOCKED AC (see script.js's renderRow()).
+   Holds a saved/edited note, S26's set-aisle TAG (shown when an aisle is set,
+   except under By-Aisle sort where the group header already labels it), and
+   S24's new-aisle reveal input. `flex-basis: 100%` forces this div onto its own
+   new line within the already-flex-wrapping `.items li` above, rather than
+   sitting beside the primary-line controls.
+   S26 density fix (N14): renderRow emits .row-meta ONLY when it has real
+   content, so a row with no note AND no aisle (the common case) renders NO
+   second line and stays exactly as tall as the locked single-line spec. The
+   `:empty` rule below is a belt-and-suspenders guard against any code path that
+   ever emits an empty div - it must NOT contribute the flex-basis:100% +
+   margin-top height that would reintroduce the second line the density fix
+   removes. NB: the per-item aisle CONTROL no longer lives here - S26 moved it to
+   the primary line as a collapsed icon (.aisle-control). Structure validated
+   against a real worst-case two-field mock in density-picker.html (QA finding
+   R7, 2026-09-08). */
 .row-meta {
   flex-basis: 100%;
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
   margin-top: 0.15rem;
+}
+
+.row-meta:empty {
+  display: none;
 }
 
 /* The open note/aisle editor's own text input - a smaller, secondary-field
@@ -412,26 +455,112 @@ button:disabled {
   color: var(--text-muted);
 }
 
-/* S22: the passive `.aisle-tag` display button is removed - the aisle is now
-   the always-present `.aisle-select` (styled below), which replaces both the
-   old tag and the old free-text editor. */
+/* S26 (Locked, 2026-09-11): the per-item aisle affordance is a COLLAPSED native
+   <select> on the PRIMARY line, sized to an ~19.5px icon footprint. It is NOT an
+   .icon-btn and does NOT inherit .icon-btn's sizing (M25) - it gets its OWN
+   explicit ~19.5px sizing here. The <select>'s own option text is clipped
+   (color:transparent) and the visible affordance is the .aisle-glyph overlay;
+   because the overlay is pointer-events:none, a tap falls THROUGH to the
+   <select> and opens the native picker directly (one tap, no showPicker()). The
+   commit-on-`change` model + focusout activeElement guard are UNCHANGED (R14).
+   M25 caveat: a native <select> under appearance:none does not reliably collapse
+   to an arbitrary declared width across engines, so the <select> is absolutely
+   positioned + min-width:0 inside this fixed 19.5px wrapper (its own transparent
+   option text, being out of flow, cannot widen the wrapper or its siblings), and
+   the combined overflow re-check MEASURES this control's REAL rendered footprint
+   rather than assuming .icon-btn parity. */
+.aisle-control {
+  position: relative;
+  flex-shrink: 0;
+  width: 19.5px;
+  height: 19.5px;
+  min-width: 19.5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
 
-/* S22: per-item aisle <select>. font-size >= 16px (1rem) is the iOS
-   focus-zoom guard (belt-and-suspenders alongside the native picker itself);
-   `max-width` + `flex-shrink` keep it inside the row at the narrowest locked
-   widths (M24) - it lives on the wrapping row-meta line, never the primary
-   control line. */
 .aisle-select {
-  font: inherit;
-  font-size: 1rem;
-  max-width: 100%;
-  flex: 0 1 auto;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   min-width: 0;
-  padding: 0.15rem 0.3rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  /* Clip the selected option's own text - the visible glyph is the overlay.
+     Options get an explicit color below so the OPEN native picker list still
+     renders readably (some engines inherit the select's color into options). */
+  color: transparent;
+  font: inherit;
+  /* iOS focus-zoom guard retained (>= 16px). The select's own (transparent)
+     option text does not drive the visible footprint, so 16px is free here; a
+     native <select> does not trigger focus-zoom regardless (S22's premise). */
+  font-size: 1rem;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.aisle-select::-ms-expand {
+  display: none;
+}
+
+.aisle-select option {
+  color: var(--text);
+  background: var(--bg-page);
+}
+
+/* S26: the visible aisle glyph (U+2316), overlaid on the collapsed <select>.
+   pointer-events:none so a tap falls through to the <select> (opens the picker).
+   aria-hidden in markup (N15) - the <select>'s aria-label carries the accessible
+   name. Accent tint matches the PO-approved mockup (s26-aisle-presentation-
+   picker.html, echoing S16's prior aisle-icon accent). S27 sizes THIS glyph via
+   its own font-size (M26 - it is NOT an .icon-btn box; the fixed-box overflow
+   constraint applies to the real .icon-btns, this glyph's height-match is scoped
+   to this overlay element), enlarged toward the note glyph's rendered height
+   under the same device-confirmed discipline. */
+.aisle-glyph {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  color: var(--accent);
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+/* S26: the set-aisle TAG (the PO's Option-1 "Tag-when-set" pick) - a passive
+   second-line display of an item's set aisle, only rendered when an aisle is set
+   AND not under By-Aisle sort (the group header already labels it there; see
+   renderRow). Styling matches the approved mockup's .aisle-tag-set: a full-
+   border accent pill (distinct from .note-display's dashed underline, so the two
+   second-line chips read as different things), single-line with ellipsis. It is
+   display-only (data-role="aisle-tag" maps to no action - editing is the
+   primary-line collapsed select), so it does not cross the row off on tap. */
+.aisle-tag-set {
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 100%;
   border: 1px solid var(--border);
   border-radius: 4px;
-  background: var(--bg-page);
-  color: var(--text);
+  background: transparent;
+  font: inherit;
+  font-size: 0.78rem;
+  color: var(--accent);
+  padding: 0.05rem 0.4rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* S24: inline validation message for the new-aisle reveal input. */
