@@ -1,9 +1,13 @@
 # Test Plan — S23: create / rename / delete aisles in Settings
 
-**STATUS: FORMAL PASS EXECUTED 2026-09-10 — 17/18 PASS, 1 Minor defect OPEN (D1). NOT Done —
-S23's Done-flip is blocked pending the D1 fix + re-verify.** Citation of record:
+**STATUS: DONE — formally executed 2026-09-11, PASS (18/18), 0 open defects. D1 (the sole prior
+Minor defect) is FIXED and re-verified green — S23 is clear for its Done-flip.** Citation of record:
 `c:\tmp\pw-test\vopping-tests-tester-s1-s25-formal.js` (Part 8). Full transcript:
-`c:\tmp\pw-test\s1-s25-run2.log`. Independent Tester formal pass against pushed sha `027672a`.
+`c:\tmp\pw-test\s1-s25-run3-d1fix.log`. D1 re-verify independently corroborated by the multi-delay
+probe `c:\tmp\pw-test\vop-probe-rename.js` (transcript `c:\tmp\pw-test\vop-probe-rename-d1fix.log`).
+Independent Tester re-pass against the local working-tree code carrying the D1 fix (uncommitted at
+re-verify time — expected; the Orchestrator commits after this re-verify). Prior state was the
+2026-09-10 pass against pushed sha `027672a` (17/18, D1 open) — see the resolved-defect note below.
 
 **Story:** As a user, I want to create, rename, and delete aisles from the settings menu, so that my
 aisle list matches the store I'm actually shopping in.
@@ -50,37 +54,49 @@ both create and rename. No blocking testability gaps at Lock.
 | TC23.14 | undo-neutral (NB-4) | CRUD not undo-eligible, does not clobber a pending undo target |
 
 ## Results
-**17/18 PASS, 1 Minor defect (D1) — TC23.10 FAILS.**
+**18/18 PASS — D1 CLOSED (re-verified 2026-09-11). No open defects.**
 
 All create/delete/bucket outcomes, NB-2 normalized cascade, M21 exclude-self, M22 rename-blur-revert,
 authoritative-set-no-resurrect, font-size proxies, and undo-neutrality pass. Create-side validation
 (TC23.6/23.7/23.8) passes including the correct stay-open + inline message on an explicit invalid
-create commit.
+create commit. **TC23.10 now PASSES**: an EXPLICIT commit (Enter/Save) of an invalid/colliding rename
+STAYS OPEN (rename input present, `renInputOpen=1`), shows the inline error ("That aisle already
+exists.", `renErr=1`), and leaves state unchanged (`state.aisles` still has "DAIRY", no duplicate
+"Bakery"). This now matches the create-side behavior — the asymmetry that pinned D1 is resolved.
 
-**DEFECT D1 (Minor, OPEN) — TC23.10:** On an EXPLICIT commit (Enter/Save) of an invalid/colliding
-**rename**, the rename editor does NOT stay open with an inline message — it closes immediately and
-reverts, contradicting NB-3 ("explicit invalid commit → field open + state unchanged"). The rename
-is still correctly REJECTED (state unchanged, no data corruption), so impact is a missing user-facing
-error message on the rename path only. **Asymmetry that pins it:** the CREATE flow correctly stays
-open with its message ("That aisle already exists.") on the same class of invalid commit (TC23.6
-passes) — so this is an unintended rename-path gap, not a deliberate design choice.
-**Root cause (diagnosed):** the Settings `focusout` revert handler (M22, script.js ~1608) lacks the
-`activeElement` guard that the row-level editor's `focusout` handler has (script.js ~1363–1365). When
-`commitSettingsRename()` re-renders to show the error and re-focuses the fresh rename-input, the OLD
-input's removal fires a `focusout` that schedules the deferred M22 revert; because `settingsEdit` is
-still the same object (only `.error` was mutated), the deferred revert nulls it and re-renders
-without the editor — the blur-revert races and wins over the stay-open. Confirmed deterministically
-via `c:\tmp\pw-test\vop-probe-rename.js`: at +10ms already `renameInput=0, renameError=0`; state
-stays correctly unchanged; create-side error correctly persists for contrast.
-**Suggested fix:** add the same `activeElement`/`role`-in-list guard to the Settings `focusout`
-handler (skip the deferred revert while focus is still on a `aisle-rename-input`), mirroring the
-row-editor fix that makes S24's TC24.7 pass. Routed to Developer via Orchestrator.
+Adjacent-path no-regression re-confirmed in the same run: TC23.6 CREATE-invalid still stays open with
+its message; TC23.2/TC23.9 VALID rename commits + closes + cascades over items by normalized key;
+TC23.11 (M22) blur-DISMISS of a rename still reverts and closes with no rename; TC23.4 delete-in-use
+still reverts affected items to the no-aisle bucket (`''`) and removes the entry without blocking.
 
-**Overall verdict: 17/18, 1 Minor defect (D1) open — S23 NOT Done until D1 is fixed and TC23.10
-re-verifies green.** Everything else in the aisle rework is clean (S21/S22/S24/S25 all pass). Full
-suite: 268/269 — see `REGRESSION_LOG.md` 2026-09-10 row, script `vopping-tests-tester-s1-s25-formal.js`.
+**DEFECT D1 (Minor) — RESOLVED 2026-09-11 (was OPEN as of the 2026-09-10 pass).** Prior failure: on
+an EXPLICIT commit of an invalid/colliding **rename**, the rename editor did not stay open with an
+inline message — it closed immediately and reverted, contradicting NB-3 ("explicit invalid commit →
+field open + state unchanged"). Rejection itself was always correct (state unchanged, no data
+corruption); the gap was a missing user-facing error on the rename path only. **Root cause (confirmed
+against the fix):** the Settings `focusout` revert handler (M22) lacked the `activeElement` guard the
+row-level editor's `focusout` handler has. When `commitSettingsRename()` re-rendered to show the error
+and re-focused the fresh rename-input, the OLD input's removal fired a `focusout` scheduling the
+deferred M22 revert; because `settingsEdit` was the same object (only `.error` mutated), the deferred
+revert nulled it and re-rendered without the editor — the blur-revert raced and won over the stay-open.
+**Fix (Developer, uncommitted at re-verify — script.js ~1614-1622):** the Settings `focusout` handler
+now skips the deferred revert while `document.activeElement` is still an `aisle-rename-input` inside
+the settings overlay, mirroring the row-editor guard at script.js ~1363-1365. A genuine
+blur-to-elsewhere still lands focus outside that control and reverts (M22 preserved — TC23.11 still
+passes). **Re-verify evidence:** multi-delay probe `c:\tmp\pw-test\vop-probe-rename.js` now reports
+`renameInput=1, renameError=1, errorText="That aisle already exists.", active=aisle-rename-input` at
+ALL sampled delays (+10/+30/+60/+120/+250ms) — vs pre-fix `renameInput=0, renameError=0` already at
++10ms — with final aisles unchanged; the create-side error persists for contrast. Transcript:
+`c:\tmp\pw-test\vop-probe-rename-d1fix.log`.
+
+**Overall verdict: 18/18 PASS, 0 open defects — S23 is clear for its Done-flip.** Everything in the
+aisle rework is clean (S21/S22/S24/S25 all pass). Full suite: 269/269 — see `REGRESSION_LOG.md`
+2026-09-11 row, script `vopping-tests-tester-s1-s25-formal.js`.
 
 ## Commands run and output
-`node vopping-tests-tester-s1-s25-formal.js` → `c:\tmp\pw-test\s1-s25-run2.log` (Part 8). Defect D1
-isolated + confirmed via `c:\tmp\pw-test\vop-probe-rename.js`. Zero console/page errors, zero dialogs,
-zero non-`file://` network requests.
+`node vopping-tests-tester-s1-s25-formal.js` → `c:\tmp\pw-test\s1-s25-run3-d1fix.log` (Part 8, 269/269).
+D1 re-verify corroborated via `c:\tmp\pw-test\vop-probe-rename.js` → `c:\tmp\pw-test\vop-probe-rename-d1fix.log`.
+TC23.10's assertion was strengthened in place to explicitly require the rename input to remain present
+(`renInputOpen === 1`), not just the inline error span — so the "STAYS OPEN" clause is asserted
+directly, not merely inferred. Zero console/page errors, zero dialogs, zero non-`file://` network
+requests across the entire run.

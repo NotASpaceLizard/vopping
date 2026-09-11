@@ -1467,6 +1467,63 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   this session are committed+pushed by the Orchestrator (nothing owed by me there).
   Console sync (S21-S25 statuses; S8/S9/S16 supersession) — Orchestrator.
 
+## Sprint 4 (continued) — real-device presentation follow-up + D1 close-out, 2026-09-11
+
+- **Context:** team re-spawned fresh after overnight wind-down. Two threads this
+  session: (1) draft the PO's real-device feedback on the shipped S21–S25 aisle
+  rework into new stories; (2) close out S23's parked D1 defect once the Developer's
+  fix + Tester's re-verify landed.
+- **S23 D1 CLOSED — S23 → Done, 2026-09-11:** the parked one-line fix (the
+  `activeElement` guard the row-editor's `focusout` already had, mirrored into the
+  Settings rename-commit path) landed and Tester independently re-verified — TC23.10
+  now passes (an explicit invalid/colliding RENAME stays open + shows the inline
+  error + `state.aisles` unchanged, per NB-3/M22; blur still reverts), full suite
+  **269/269**, zero open defects; `test-plans/S23-aisle-crud-settings.md` → 18/18
+  DONE, REGRESSION_LOG → 269/269 canonical row. Flipped S23's BACKLOG row to Done
+  and marked the D1 QUESTIONS entry RESOLVED. Code fix + S23 Done docs are
+  committed+pushed by the Orchestrator (nothing owed by me there). **The entire
+  backlog is now Done except parked S11/S18 and the newly-drafted S26/S27.**
+- **New PO feedback (verbatim, from trying the shipped build on their real phone):**
+  (a) "the functionality of the dropdown is good but i'd like it to be hidden behind
+  an icon in line with the other icons. currently it's creating a second row for each
+  item whether i want it to have an aisle or not, effectively reducing screen space
+  for items by half." (b) "also let's make the icons a bit bigger. the size of the
+  notes icon is good, make the other icons match it."
+- **Decomposition (drafted this session, DRAFT ONLY — no sanity-check started):**
+  **S26** — change the per-item aisle affordance's PRESENTATION from S22's
+  always-present second-line `<select>` to an ICON-GATED reveal on the primary line,
+  so an aisle-less item stays a SINGLE line (no forced second row). Cross-story
+  supersession per playbook (S19→S13 convention): S26 supersedes only S22's
+  PRESENTATION — S22 STAYS Done, all its FUNCTIONALITY kept (persisted `state.aisles`
+  set + migration, native `<select>` editor + commit-on-`change`, S24 add-flow, iOS
+  focus-zoom fix, normalized-key matching / R15 guard, `Other`/no-aisle bucket).
+  Added the reciprocal forward-reference note to S22's Done row. **S27** — normalize
+  ALL per-row icons UP to match the note icon's size (PO's target). Kept S27 SEPARATE
+  from S26 (not folded in), mirroring the S13-mechanism / S14-sizing split, and
+  sequenced AFTER S26 so icon size finalizes ONCE against S26's final primary-line
+  layout with one combined worst-case overflow re-check.
+- **Flagged for the Developer's sanity-check (NOT resolved — left to the Developer):**
+  (1) S26 CENTRAL feasibility — HOW the icon reveals/opens the `<select>` WITHOUT
+  reintroducing the R14 render-timing hazard just fixed (a tap-to-reveal gating the
+  select behind `editingField` needs its own R14-class analysis; a reveal-`render()`
+  could destroy/recreate the select — the mirror of S13 C1/R13 and the 2026-09-08
+  focusout seam; `showPicker()` already rejected as fragile on `file://`). (2) S26
+  By-Aisle / S9 / S16-M23 reconciliation — the inline select currently also serves
+  By-Aisle compact mode (superseded S16's ⚑); icon-gating must be reconciled there.
+  (3) S27 — reconcile "match the note icon" against S20 (frameless ~1.15rem) + S14
+  (~25% shrink), plus the M24/R7 worst-case overflow re-check at 320/360/375/390px.
+- **Routed to the PO (via Developer-built decision-tool mockup, per S15's
+  "don't guess twice on a visual pick"):** the set-aisle presentation (compact
+  S8-style second-line tag only-when-set vs. inline on the primary line) — logged
+  non-blocking in QUESTIONS.md, contingent on the R14 feasibility answer. The aisle
+  ICON glyph is also a PO pick (plain monochrome Unicode, never emoji), placeholder
+  now, same decision-tool path as S16's ⚑ — carried in-row.
+- **Outcome:** S26/S27 drafted and cross-referenced; S22 forward-reference note
+  added; S23 → Done; QUESTIONS D1 entry resolved + one new non-blocking S26 visual
+  question logged. All BACKLOG/QUESTIONS/SPRINT_LOG edits kept as single well-formed
+  GFM lines. Reported the S26/S27 framing + flagged questions back to the
+  Orchestrator. Draft only — Developer sanity-check on S26/S27 not yet started.
+
 ## Parked / unscheduled
 
 - **S11** (recipe-paste alternate ingest mode) — explicitly not sequenced into

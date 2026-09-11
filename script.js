@@ -1610,7 +1610,18 @@
     if (role !== 'aisle-rename-input') return;
     var pending = settingsEdit;
     setTimeout(function () {
-      if (settingsEdit === pending && settingsEdit) { settingsEdit = null; renderSettings(); }
+      if (settingsEdit !== pending || !settingsEdit) return; // already committed/handled in between
+      // D1: skip the revert while focus is STILL on the in-editor rename input.
+      // On an explicit INVALID rename commit, commitSettingsRename sets
+      // settingsEdit.error and re-renders to show the inline message, which
+      // momentarily blurs+refocuses this input; that transient blur must NOT
+      // fire the stay-open editor away (same seam, and same guard, as the row
+      // editor's focusout handler for the new-aisle reveal input). A genuine
+      // blur-to-elsewhere lands focus outside this control and still reverts (M22).
+      var ae = document.activeElement;
+      if (ae && ae.dataset && settingsOverlay.contains(ae) && ae.dataset.role === 'aisle-rename-input') return;
+      settingsEdit = null;
+      renderSettings();
     }, 0);
   });
 
