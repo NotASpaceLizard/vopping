@@ -1692,6 +1692,22 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   Scrum Master per the Orchestrator's go; console files untouched. Reported the story list
   back to the Orchestrator; standing by — each story enters Developer sanity-check → Tester
   testability-check → QA Lock gate after the PO answers Q1/Q2/Q3.
+- **Update, 2026-09-14 (PO answers landed, same session):** all three questions answered
+  (QUESTIONS.md rows marked Answered) and the five ACs finalized to the decisions. **Q1 = YES**
+  — S31's list-wide run is ONE undoable action (new undo type snapshotting `{id, prevAisle}` for
+  the touched empty-only items, displaces the single last-action slot; per-item Auto-detect stays
+  NON-undoable). **Q2 = NO** — S30 learns NON-EMPTY hand picks only; a manual clear is not recorded
+  as an override. **Q3 = RENAME-MIGRATION** — the PO's OVERRIDE of the (A) pure-union default I'd
+  recommended: S28's one-time versioned migration RENAMES `Dairy`→`Dairy & Eggs` and
+  `Household`→`Household & Cleaning` AND one-time re-tags the items carrying those old strings (a
+  deliberate, narrow exception to "never re-map," matched by normalized key, merge-not-duplicate),
+  KEEPS old `Meat/Seafood` as a custom aisle while ADDING `Meat`+`Seafood` as new starters (no
+  Meat/Seafood item split), preserves custom aisles (union), and keeps N13 no-resurrect for
+  genuinely new starters — QA to scrutinize the two-aisle item re-tag for data safety at S28's Lock
+  gate. Separately, the `lemon`→`"difficult"` alias is KEPT as an intentional easter egg (PO) —
+  S29's data-integrity test WHITELISTS it, no fix. Docs re-committed/pushed. Next: per-story
+  Developer sanity-check → Tester testability-check → QA Lock gate → build, in
+  S28→S29→S30→(S31,S32) order.
 
 ## Parked / unscheduled
 
