@@ -1727,6 +1727,30 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   zero-eligible) + `setLastAction` before `showToast`; S32 top-option (index 0), no ghost-tap guard
   needed, N17 undo-asymmetry FYI. Docs re-committed/pushed. Next: QA's R16 re-read on S29; on clean →
   Lock S28-S32 → Dev builds S28 first.
+- **Lock landed — S28-S32 all → Locked, 2026-09-14 (same session, continued; SM re-spawn
+  after a token-expiry 403 killed the prior fleet mid-flip):** QA's R16 re-read on S29 came
+  back CLEAN — the runtime degrade-gracefully fix (dictionary-load/lookup-build never throws;
+  console.warn+skip on a malformed entry; first-write-wins on a canonical collision; HARD
+  fail-fast scoped to the dev/test data-integrity gate only) satisfies R16, closing S29's last
+  open finding. With all three PO questions already answered and every per-story gate now
+  clear, **S28, S29, S30, S31, S32 → Locked** in BACKLOG.md, each in the standard Lock format
+  with an inline Lock note; the whole Auto-Aisle set is now clear for Developer implementation
+  in S28→S29→S30→(S31,S32) order. **Resume-state note (fresh re-spawn, verified from
+  git/files, not memory):** the prior SM died WHILE flipping these — the working tree carried
+  an uncommitted, PARTIAL flip (only S28's row had been flipped to Locked; HEAD still
+  `c85102e`, the flip uncommitted). Verified via `git diff` that exactly one BACKLOG.md line
+  (S28) differed from HEAD and SPRINT_LOG.md was untouched, then PRESERVED that S28 edit and
+  FINISHED S29-S32 rather than re-doing from a clean slate. On S29 also lifted the two
+  now-stale present-tense R16 HOLD/HOLDS mentions (the intro clause + the mid-row gate-note
+  heading) so a Locked row isn't self-contradictory, and synced the top-of-file Priority Queue
+  Sprint-5 summary (was still "Not Started with Locks HELD / S29 HOLDS on R16"). Verified after:
+  five `| Locked | 5 |` rows, zero `| Not Started | 5 |`, zero residual hold text, each S28-S32
+  still a single physical GFM line. **Commit scope — BACKLOG.md + SPRINT_LOG.md ONLY:** excluded
+  the console files (`status.js`/`backlog-status.js`, local-only), the dictionary draft
+  (`AISLE_DICTIONARY.draft.js` + `AISLE_DICTIONARY_REVIEW.md` — graduate into the app at S29, not
+  now), and `QA_FINDINGS.md` (per this sprint's convention). **Next:** Developer is building
+  increment 1 (S28+S29) in parallel; stories flip to Done only after their formal passes, same
+  gate every story on this project has gone through.
 
 ## Parked / unscheduled
 
