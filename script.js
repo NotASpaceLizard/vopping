@@ -1290,18 +1290,48 @@
     if (focusedId !== null) {
       var newLi = listRoot.querySelector('li[data-id="' + focusedId + '"]');
       if (newLi) {
-        var toFocus = focusedRole ? newLi.querySelector('[data-role="' + focusedRole + '"]') : newLi;
-        if (toFocus) {
-          toFocus.focus();
-          if (typeof toFocus.setSelectionRange === 'function' && (toFocus.tagName === 'INPUT' || toFocus.tagName === 'TEXTAREA')) {
-            var len = toFocus.value.length;
-            toFocus.setSelectionRange(len, len); // cursor to end, not just "focused somewhere"
-          }
+        // S29 iOS aisle-picker RE-OPEN fix (2026-09-14, round 4 - CONFIRMED
+        // broader than the sentinel path rounds 1-3 chased). NEVER
+        // programmatically re-focus the per-item aisle <select> after a rebuild.
+        // Mechanism: the <select>'s own `change` commit calls saveAisle() ->
+        // render(), which reaches here with the just-interacted <select> as
+        // document.activeElement (a native <select> fires `change` while still
+        // focused). The pre-S29 code recorded focusedRole 'aisle-select' and
+        // called .focus() on the freshly-rebuilt <select> - and on iOS Safari
+        // focusing a native <select> at that instant RE-OPENS its picker ("pops
+        // up again"). This fires for ANY selection (existing aisle, no-aisle,
+        // OR a just-created new aisle), which is exactly the device-confirmed
+        // defect; it is NOT sentinel-specific. The chosen value is already
+        // committed AND rendered by the time we get here, so there is no
+        // in-progress interaction to preserve - deliberately leave focus where
+        // the rebuild left it (the old focused node was just detached, so
+        // activeElement falls to <body>), which keeps the picker CLOSED. Desktop
+        // is unaffected: a <select> does not re-open on programmatic focus there
+        // (NB-6), which is why this was iOS-only and invisible in automation
+        // except as this activeElement proxy. Scope is exactly this one role;
+        // every OTHER previously-focused control (note/name/new-aisle inputs,
+        // Up/Down, delete, or the <li> itself) still restores focus as before,
+        // so the mid-edit draft-survival / focus-preservation guarantees for
+        // S1/S2/S5/S7/S15/S24 are untouched. NB: this removes the programmatic-
+        // refocus re-open; S28's change-handler re-entry guard is retained for
+        // the DISTINCT real-touch "ghost tap" that fires a genuine second
+        // `change` (a synthetic event this focus fix cannot influence).
+        if (focusedRole === 'aisle-select') {
+          // intentionally no focus restore for this role - see the note above
         } else {
-          // Previously-focused nested control no longer applies (e.g. focus
-          // was on Up and this row is now first) - fall back to the row
-          // itself rather than dropping focus entirely.
-          newLi.focus();
+          var toFocus = focusedRole ? newLi.querySelector('[data-role="' + focusedRole + '"]') : newLi;
+          if (toFocus) {
+            toFocus.focus();
+            if (typeof toFocus.setSelectionRange === 'function' && (toFocus.tagName === 'INPUT' || toFocus.tagName === 'TEXTAREA')) {
+              var len = toFocus.value.length;
+              toFocus.setSelectionRange(len, len); // cursor to end, not just "focused somewhere"
+            }
+          } else {
+            // Previously-focused nested control no longer applies (e.g. focus
+            // was on Up and this row is now first) - fall back to the row
+            // itself rather than dropping focus entirely.
+            newLi.focus();
+          }
         }
       }
       // If newLi itself is gone (e.g. this row was just deleted), there's
@@ -1557,6 +1587,11 @@
       // to the committed aisle and DON'T re-open the reveal (which would leave
       // "the menu" open after the aisle is already populated). Long after the
       // window, or on any other row, this is a genuine re-open and runs normally.
+      // RETAINED alongside S29 (the renderList focus-restore fix): S29 stops the
+      // PROGRAMMATIC re-focus of this <select> from re-opening the picker on any
+      // commit; this guard is a separate defense for a genuine second `change`
+      // event dispatched by a real re-fired touch, which no focus change can
+      // prevent - so the two are complementary, not redundant.
       if (id === newAisleCommittedId && (Date.now() - newAisleCommittedAt) < NEW_AISLE_REENTRY_GUARD_MS) {
         render();
         return;
