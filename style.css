@@ -629,6 +629,30 @@ button:disabled {
   z-index: 100;
 }
 
+/* The toast's advertised "Undo" is a REAL control (script.js showToast) - a
+   toast that only SAID "Undo" but did nothing on tap was the on-device defect
+   (delete -> tap the toast's Undo -> nothing restored). Frameless accent
+   text-button so it reads as the tappable word it always claimed to be; the
+   padding keeps it a comfortable phone tap target. Deliberately NOT display:flex
+   on .toast itself - that would beat the UA `[hidden]{display:none}` (author >
+   UA) and keep a hidden toast visible; the message span + this inline button
+   flow inline fine. */
+.toast-undo {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  padding: 0.2rem 0.4rem;
+  cursor: pointer;
+}
+
+.toast-undo:hover {
+  background: rgba(128, 128, 128, 0.15);
+  border-radius: 4px;
+}
+
 /* ---------------------------------------------------------------------
    S21: settings menu shell + S23: aisle management. The settings button is
    an ordinary header control (its ⚙ glyph is a PLACEHOLDER, flagged for the

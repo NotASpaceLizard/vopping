@@ -408,7 +408,10 @@
     // Resolved 2026-09-04 (QA finding R2, PO Option A): brief toast at the
     // moment of deletion, IN ADDITION TO the always-visible Undo control -
     // purely a UI surfacing, not a new undo-eligibility rule.
-    showToast('Deleted "' + entry.item.name + '" — Undo');
+    // Message is the descriptive half ONLY - showToast() appends the em-dash +
+    // the REAL Undo <button> (so the toast's own "Undo" word actually undoes;
+    // see showToast). Toast textContent stays exactly 'Deleted "X" — Undo'.
+    showToast('Deleted "' + entry.item.name + '"');
   }
 
   // ---- S12: clear all checked items in one atomic action ------------------
@@ -426,7 +429,9 @@
     render();
     // Does NOT touch S10's frequency counter in either direction - true by
     // construction, this function never reads/writes that storage key.
-    showToast('Cleared ' + entries.length + ' item' + (entries.length === 1 ? '' : 's') + ' — Undo');
+    // Descriptive half only - showToast() appends the em-dash + real Undo button
+    // (textContent stays exactly 'Cleared N items — Undo').
+    showToast('Cleared ' + entries.length + ' item' + (entries.length === 1 ? '' : 's'));
   }
 
   // ---- S19: Up/Down reorder buttons (restores S5's mechanism; supersedes
@@ -513,6 +518,10 @@
     clearLastAction();
     saveState();
     render();
+    // Dismiss any lingering delete/clear toast: the action it advertised has now
+    // been undone, so its own Undo affordance would be stale (fires whether undo
+    // came from the header button OR the toast itself).
+    hideToast();
   }
 
   // ---- S7: notes / S8: aisles ------------------------------------------------
@@ -1023,6 +1032,10 @@
   var pasteInput = document.getElementById('paste-input');
   var toastEl = document.getElementById('toast');
   var toastTimer = null;
+  // The single-slot action this toast's own Undo affordance is bound to (bound at
+  // show-time). If a later mutating action clobbers the buffer while the toast
+  // lingers, the toast-Undo no-ops rather than undoing that unrelated action.
+  var toastAction = null;
   var sortSelect = document.getElementById('sort-select');
   var suggestionsRoot = document.getElementById('suggestions-root');
   // S21: settings menu shell.
@@ -1380,13 +1393,34 @@
     // so there's nothing left for a body/container class to drive here.
   }
 
+  // S3/S12 delete-moment toast. The toast advertises "Undo" IN ITS OWN TEXT, so
+  // that word must be a REAL, working control - a plain-text toast that merely
+  // SAID "Undo" but did nothing on tap was the exact on-device defect the PO hit
+  // (delete, tap the toast's "Undo", nothing comes back). This is a SECOND, in-
+  // context entry point to the SAME single-slot performUndo() the header
+  // #undo-btn drives - NOT a new undo rule or a second buffer. `message` is the
+  // descriptive half only (no " — Undo"); showToast appends the em-dash separator
+  // and the real Undo <button>, so the toast's textContent is still exactly
+  // "<message> — Undo" (unchanged for existing text assertions). The message is
+  // escaped explicitly - it can carry an arbitrary item name, and unlike the old
+  // textContent assignment, innerHTML does not escape for us.
   function showToast(message) {
     if (toastTimer) clearTimeout(toastTimer);
-    toastEl.textContent = message;
+    toastAction = lastAction; // bind the toast's Undo to the current action
+    toastEl.innerHTML =
+      '<span class="toast-msg">' + escapeHtml(message) + ' — </span>' +
+      '<button type="button" class="toast-undo" data-role="toast-undo">Undo</button>';
     toastEl.hidden = false;
     toastTimer = setTimeout(function () {
-      toastEl.hidden = true;
+      hideToast();
     }, 4000);
+  }
+
+  function hideToast() {
+    if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
+    toastEl.hidden = true;
+    toastEl.innerHTML = '';
+    toastAction = null;
   }
 
   // Event delegation (Developer sanity-check decision, see TEAM_LOG/report):
@@ -1626,6 +1660,23 @@
 
   undoBtn.addEventListener('click', function () {
     performUndo();
+  });
+
+  // The toast's own in-context Undo control (S3/S12). Fires the SAME single-slot
+  // performUndo() as the header button - it is the affordance the toast text has
+  // always advertised, now actually wired up. Guarded to the action the toast was
+  // shown for: if a newer mutating action has since clobbered the single-slot
+  // buffer, this no-ops (the toast label would be stale) instead of undoing the
+  // wrong thing; either way the toast is dismissed. performUndo() itself also
+  // calls hideToast().
+  toastEl.addEventListener('click', function (e) {
+    var btn = e.target.closest && e.target.closest('[data-role="toast-undo"]');
+    if (!btn) return;
+    if (lastAction && lastAction === toastAction) {
+      performUndo();
+    } else {
+      hideToast();
+    }
   });
 
   clearCheckedBtn.addEventListener('click', function () {
