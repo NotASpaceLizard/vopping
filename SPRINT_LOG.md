@@ -1582,12 +1582,83 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   per-story gate) and LOCKED 2026-09-11 — clear for Developer implementation (S26 then S27; one
   combined M24/R7 overflow re-check after the pair ships). One open post-Lock PO item remains:
   S26's single tag-vs-inline + aisle-glyph decision-tool mockup (Developer builds it, PO picks,
-  then it folds into implementation). S22 forward-ref note added; S23 → Done; QUESTIONS D1
-  resolved. Nothing owed by me on commits (Orchestrator commits+pushes).
-  S22 forward-reference note added; S23 → Done; QUESTIONS D1 resolved + the S26 visual-pick
-  entry updated to the post-Lock single-mockup path. No PO input pending on S26/S27 now
-  (S26's tag-vs-inline + glyph mockup comes after Lock; S27's "match" definition is
-  PO-confirmed). Nothing owed by me on commits (Orchestrator commits+pushes).
+  then it folds into implementation). S22 forward-reference note added; S23 → Done; QUESTIONS D1
+  resolved + the S26 visual-pick entry updated to the post-Lock single-mockup path. No PO input
+  pending on S26/S27 now (S26's tag-vs-inline + glyph mockup comes after Lock; S27's "match"
+  definition is PO-confirmed). Nothing owed by me on commits (Orchestrator commits+pushes).
+- **S26 + S27 implemented and → Done; the iOS add-aisle fix saga + a latent undo-toast bug
+  fixed along the way; the ENTIRE ACTIVE BACKLOG is now Done (milestone), 2026-09-14 (relayed
+  by Orchestrator):** Developer implemented S26 then S27 against their Locked AC, the PO's single
+  combined post-Lock decision-tool mockup resolved BOTH of S26's deferred visual picks, and
+  Tester's FINAL combined formal pass landed green — **308/308 per REGRESSION_LOG.md's 2026-09-14
+  `afcd725` row (script `vopping-tests-tester-s1-s27-formal.js`), zero defects; S26 = 11/11
+  (Part 12), S27 = 7/7 / G1-G4 (Part 13)** — the citation of record, superseding the Locked state
+  per the independent-formal-pass rule. **Both flipped to Done** in BACKLOG.md with that exact
+  citation; the reciprocal supersession notes on S22/S16/S9/S20 are preserved and all four STAY
+  Done (S26/S27 moved presentation and glyph sizing only, never functionality).
+  - **S26 (icon-gate the per-item aisle):** shipped as the Locked Option C mechanism — the native
+    `<select>` stays always-present and R14-safe (its `change`-commit handler + `focusout`
+    `activeElement` guard byte-for-byte untouched), moved onto the PRIMARY line and CSS-collapsed
+    to a MEASURED 19.5×19.5px icon footprint behind a `pointer-events:none` glyph overlay. The
+    PO's combined mockup picked **set-aisle presentation = TAG-WHEN-SET** (Option 1 — a compact
+    S8-style aisle tag on a second line ONLY when an aisle is set; inert/display-only, shown in
+    Manual/Alpha, suppressed in By-Aisle; editing stays via the primary-line select) and **aisle
+    glyph = ⌖ (U+2316)**, a plain monochrome Unicode symbol (no emoji, per the standing glyph
+    preference). Density fix confirmed: an aisle-less + note-less row is a SINGLE line again
+    (~36px, C2), and the 6-control worst-case row fits with zero horizontal overflow at
+    320/360/375/390px per the separate targeted closure `vopping-worst-case-row-s26-s27-closure.js`
+    (9/9, Tester-owned).
+  - **S27 (row-icon glyph-height match):** per-glyph height equalization shipped GLYPH-ONLY within
+    S20's fixed ~19.5px `.icon-btn` boxes (note-toggle 1.15rem height reference unchanged; edit +
+    delete 1.35rem; Up + Down 1.28rem shared; S26's aisle overlay glyph 1.35rem) — no box resize
+    (G1), no row-height growth (G4), base `.icon-btn` fallback retained (N16); on-device "match the
+    note icon" look PO-confirmed (NB-6, device-dependent per the S7 U+1F5CB caveat).
+  - **Add-aisle iOS fix saga — 4 rounds, ALL device-only (NB-6), ALL PO-confirmed on-device
+    (recorded for the permanent record, since a green desktop suite could never have surfaced any
+    of them):** the collapsed native `<select>`'s add-a-new-aisle flow misbehaved on real iOS
+    Safari across four successive fixes — **round 1** (open grace window: the reveal box appears
+    and STAYS instead of instantly dismissing); **round 2** (deferred-flush commit-on-blur: a valid
+    typed aisle name now SAVES on blur / the iOS "Go" key, not only on Enter); **round 3**
+    (`a2c5f61` — post-commit sentinel re-entry guard: a `change` re-fired on the same row within the
+    400ms post-create window does NOT re-open the reveal, time+row scoped, never a permanent block);
+    **round 4** (`028150c` — THE real fix: `renderList`'s focus-restore no longer re-focuses
+    `data-role="aisle-select"` — re-focusing the collapsed native `<select>` on iOS was RE-OPENING
+    the picker after every single commit, so every aisle change re-opened the dropdown). Rounds 3/4
+    landed after `7f6a327`; Part 16 of the suite covers both via desktop structural proxies
+    (R4.1/R4.2 focus-restore-skip; R3.1/R3.2 re-entry guard).
+  - **Undo-toast fix — a LONGSTANDING latent UX bug, NOT a regression (`afcd725`):** the S3 delete
+    toast and the S12 clear-crossed-off toast each render an "Undo" affordance, but that "Undo" was
+    inert `textContent` — it looked tappable and did nothing. It is now a real
+    `[data-role="toast-undo"]` button wired to the SAME `performUndo()` as the header `#undo-btn`.
+    This was never a regression — it shipped inert with S3/S12 back in Sprint 1 and was simply never
+    exercised.
+  - **The test-coverage gap that hid it is now CLOSED:** every prior suite only ever clicked the
+    header `#undo-btn`, never the toast's own Undo — so an inert toast button passed unnoticed for
+    the entire project. Part 15 (10 checks) closes it: the toast button restores for BOTH the delete
+    and clear toasts (name + checked + note + aisle + original index preserved), the header
+    `#undo-btn` still works, a stale-toast tap is a safe dismiss-only no-op after the single-slot
+    buffer is clobbered, the exact toast textContent is byte-unchanged, and the new `.toast-undo`
+    button does not overflow at 320/390px. **New baseline 308/308 is purely ADDITIVE to the prior
+    294** (14 new `afcd725`-fix checks: Part 15 undo-toast 10 + Part 16 round-3/round-4 4); S26/S27's
+    own layout is byte-identical to `7f6a327`, so Parts 1-14 re-ran VERBATIM with NO retrofit and
+    zero regressions — contrast the S22→S8 / S19→S13 rows where a whole mechanism was retired.
+  - **Cross-check against REGRESSION_LOG.md (Tester-owned, NOT edited):** its 2026-09-14 `afcd725`
+    308/308 row is the current canonical figure (0 open defects; S26 and S27 both marked CLEAR for
+    Done), the 294→308 chain is intact and additive, and the prior 269/294 rows are correctly marked
+    superseded — fully coherent with these two Done-flips.
+  - **MILESTONE:** with S26 and S27 Done, the ENTIRE active backlog is now Done — S1-S10, S12-S17,
+    S19-S27 all Done — EXCEPT the two long-parked stretch goals, **S11** (recipe-paste alternate
+    ingest) and **S18** (collapsible aisle groups). No active story remains open.
+- **Outcome:** S26/S27 → Done with the 308/308 `afcd725` citation; the reciprocal supersession notes
+  on S22/S16/S9/S20 are preserved and all four stay Done; the add-aisle iOS 4-round saga, the
+  undo-toast latent-bug fix, and its now-closed coverage gap are all recorded above; QUESTIONS.md's
+  S26 presentation-pick entry closed (tag-when-set + ⌖ U+2316); and the prior duplicated Outcome
+  sentence in this section is tidied. Nothing else regressed — the backlog is Done except parked
+  S11/S18. **Pre-existing staleness flagged (NOT fixed — out of this task's scope):** the top-of-file
+  Priority Queue summary parenthetical was never updated past Sprint 3 — it does not mention Sprint 4
+  (S21-S25) or S26/S27 at all; partially patching it for S26/S27 alone would make it more inconsistent,
+  so it is left as-is and flagged to the Orchestrator for a future dedicated summary refresh. Nothing
+  committed by me — the Orchestrator commits the docs after confirmation.
 
 ## Parked / unscheduled
 
