@@ -84,6 +84,10 @@
     </div>
   </div>
 
+  <!-- S29: the Auto-Aisle item->aisle dictionary. MUST load BEFORE script.js so
+       window.AISLE_DICTIONARY is present when the matcher builds its lookup at
+       init. Readable, hand-editable data file (the PO edits it directly). -->
+  <script src="aisle-dictionary.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

@@ -19,7 +19,37 @@
   // LABEL of the intrinsic no-aisle bucket, NOT an assignable aisle - it is
   // excluded from the seeded assignable set (S22 N11). The rest are the real
   // starter aisles.
-  var AISLE_STARTER_LIST = ['Produce', 'Dairy', 'Meat/Seafood', 'Bakery', 'Frozen', 'Pantry', 'Beverages', 'Household', 'Other'];
+  //
+  // S28 (2026-09-14): expanded to the Auto-Aisle spec's 18-aisle taxonomy (17
+  // real + 'Other'), in store-walk order (spec §1). These 17 real names are
+  // byte-identical (after normalize()) to the keys of window.AISLE_DICTIONARY
+  // (S29) - a single source of truth so every matcher output resolves to a
+  // seeded <select> option. FRESH state seeds directly from this list (correct
+  // store-walk order, no legacy 'Meat/Seafood'); ALREADY-SEEDED states get the
+  // one-time versioned re-seed below (migrateAislesV2) - editing this list ALONE
+  // is a silent no-op for them because migrateAisles() short-circuits on an
+  // existing state.aisles.
+  var AISLE_STARTER_LIST = ['Produce', 'Meat', 'Seafood', 'Deli', 'Bakery', 'Dairy & Eggs', 'Frozen', 'Cereal & Breakfast', 'Canned & Jarred', 'Pasta, Rice & Grains', 'Baking & Spices', 'Condiments & Sauces', 'Snacks & Candy', 'Beverages', 'Household & Cleaning', 'Personal Care & Health', 'Pantry', 'Other'];
+
+  // ---- S28: versioned one-time aisle re-seed --------------------------------
+  // migrateAisles() (S22) short-circuits on an already-seeded state.aisles, so a
+  // taxonomy expansion needs its OWN gated, one-time migration keyed on
+  // state.seedVersion (absent/undefined = pre-S28 = "behind current" = run once;
+  // fresh defaultState() gets stamped to current the same load). Runs EXACTLY
+  // once per device (idempotent: a reload at the current version is a no-op).
+  var AISLE_SEED_VERSION = 2; // bumped from the implicit v1 (pre-S28 seeded set)
+  // Genuinely-NEW starters this version introduces (never existed in the pre-S28
+  // taxonomy). ONLY these are unioned in, so the union can NEVER resurrect a
+  // user-DELETED old starter (N13 no-resurrect): the carry-over old starters
+  // (Produce, Bakery, Frozen, Pantry, Beverages) are deliberately NOT listed, and
+  // 'Dairy & Eggs' / 'Household & Cleaning' arrive ONLY via the renames below
+  // (when their source aisle still exists), never via this union.
+  var AISLE_V2_NEW_STARTERS = ['Meat', 'Seafood', 'Deli', 'Cereal & Breakfast', 'Canned & Jarred', 'Pasta, Rice & Grains', 'Baking & Spices', 'Condiments & Sauces', 'Snacks & Candy', 'Personal Care & Health'];
+  // Q3 = rename-migration: [oldNormalizedKey, newName]. One-time rename + item
+  // re-tag (MERGE-not-duplicate if the target already exists). 'Meat/Seafood' is
+  // intentionally NOT renamed - it survives untouched as a custom aisle while
+  // 'Meat' and 'Seafood' are added fresh (via AISLE_V2_NEW_STARTERS).
+  var AISLE_V2_RENAMES = [['dairy', 'Dairy & Eggs'], ['household', 'Household & Cleaning']];
   // Built-in default label for the no-aisle bucket, and the hard fallback once
   // the user deletes that label in Settings (S23). Compared against the
   // LITERAL constant at first migration (state.unassignedLabel does not exist
@@ -87,6 +117,83 @@
     return st;
   }
 
+  // ---- S28: one-time versioned taxonomy re-seed ----------------------------
+  // Runs AFTER loadState() on every load, but MUTATES exactly once per device:
+  // gated on st.seedVersion so a reload at the current version is a pure no-op
+  // (idempotency; NB-7 re-pointed to "stable AFTER the one-time upgrade"). For a
+  // FRESH state (already seeded from the new AISLE_STARTER_LIST by migrateAisles)
+  // this is a near no-op - the renames find no old source, the union finds all
+  // starters present - it just stamps the version. For an EXISTING pre-S28
+  // device it: renames Dairy->"Dairy & Eggs" and Household->"Household &
+  // Cleaning" (+ re-tags their items, MERGE-not-duplicate), then UNIONS the
+  // genuinely-new starters, then stamps the version. Order is pinned (M27):
+  // renames FIRST, then the new-starter union, then the version stamp - the
+  // renames can only turn an old source into a new target (never the reverse),
+  // and the union's dedup is case-insensitive, so the end state is
+  // order-independent, but this order keeps the renamed entries adjacent to
+  // where they already sat (existing users keep their familiar ordering; only
+  // fresh users get the pure store-walk order). Returns true iff it mutated.
+  // Reuses the S23 cascade helper (renameAisleByKey) for the plain-rename case;
+  // both are normalized-key re-tags so non-canonical item values come along
+  // (NB-2). No item.aisle is re-mapped except by the two explicit renames.
+  function migrateAislesV2(st) {
+    // Defensive (R1 posture - this runs at init and must never throw/blank the
+    // page): migrateAisles() always leaves st.aisles/st.items as arrays, but
+    // guard anyway rather than trust it.
+    if (!st || !Array.isArray(st.aisles) || !Array.isArray(st.items)) return false;
+    if (typeof st.seedVersion === 'number' && st.seedVersion >= AISLE_SEED_VERSION) {
+      return false; // already at/after current - one-time gate closed (idempotent)
+    }
+    var i, r;
+    // 1. RENAMES (+ item re-tag, MERGE-not-duplicate). Only when the OLD source
+    //    aisle still exists (normalized-key), so a user-deleted 'Dairy' is NOT
+    //    resurrected as 'Dairy & Eggs' (no-resurrect).
+    for (r = 0; r < AISLE_V2_RENAMES.length; r++) {
+      reseedRenameAisle(st, AISLE_V2_RENAMES[r][0], AISLE_V2_RENAMES[r][1]);
+    }
+    // 2. UNION the genuinely-new starters (append if absent, case-insensitive).
+    var have = {};
+    for (i = 0; i < st.aisles.length; i++) have[normalize(st.aisles[i])] = true;
+    for (i = 0; i < AISLE_V2_NEW_STARTERS.length; i++) {
+      var nk = normalize(AISLE_V2_NEW_STARTERS[i]);
+      if (!have[nk]) { have[nk] = true; st.aisles.push(AISLE_V2_NEW_STARTERS[i]); }
+    }
+    // 3. Stamp the version so this whole step never runs again on this device.
+    st.seedVersion = AISLE_SEED_VERSION;
+    return true;
+  }
+
+  // S28 rename helper: rename oldKey's aisle to newName + re-tag its items. If a
+  // 'newName' aisle already exists (user created it), MERGE - re-tag the source
+  // items onto the surviving target and DROP the source entry (never create a
+  // duplicate). No source aisle at all -> no-op (no-resurrect). Operates on the
+  // passed state so it is safe to call during init before the module `state` var
+  // read paths matter; the plain-rename branch reuses S23's renameAisleByKey.
+  function reseedRenameAisle(st, oldKey, newName) {
+    var newKey = normalize(newName);
+    var hasSource = false, targetDisplay = null, i, k;
+    for (i = 0; i < st.aisles.length; i++) {
+      k = normalize(st.aisles[i]);
+      if (k === oldKey) hasSource = true;
+      else if (k === newKey) targetDisplay = st.aisles[i];
+    }
+    if (!hasSource) return; // no-resurrect
+    if (!targetDisplay) {
+      renameAisleByKey(oldKey, newName); // S23 cascade helper: relabel + re-tag items
+      return;
+    }
+    // MERGE onto the pre-existing target: re-tag source items, then drop the
+    // source entry so state.aisles doesn't gain a duplicate 'newName'.
+    for (i = 0; i < st.items.length; i++) {
+      if (st.items[i].aisle && normalize(st.items[i].aisle) === oldKey) {
+        st.items[i].aisle = targetDisplay;
+      }
+    }
+    for (i = st.aisles.length - 1; i >= 0; i--) {
+      if (normalize(st.aisles[i]) === oldKey) st.aisles.splice(i, 1);
+    }
+  }
+
   // S1 locked AC / QA finding R1 (Developer sanity-check finding,
   // 2026-09-04): persisted as ONE object { items: [...], nextId: N }, not a
   // bare array at the top level - storing the array directly would make a
@@ -136,6 +243,13 @@
   }
 
   var state = loadState();
+  // S28: one-time versioned taxonomy re-seed (18-aisle Auto-Aisle taxonomy).
+  // Runs here, right after loadState(), because migrateAisles() (called inside
+  // loadState via parseStoredState) short-circuits on an already-seeded
+  // state.aisles and would never see the expanded starter list. Idempotent -
+  // mutates once per device (seedVersion gate), then the saveState() below makes
+  // the upgraded set durable from the outset.
+  migrateAislesV2(state);
   // S22 (N13): persist the seeded aisle set once on first load so it is durable
   // from the outset. Idempotent - a state that was already seeded serializes
   // back byte-for-identical, and the Other->'' item remap only runs when
@@ -955,6 +1069,295 @@
       map[normalize(pool[i])] = pool[i];
     }
     return map;
+  }
+
+  // ==== S29: auto-aisle dictionary matcher (pure engine, no DOM) ============
+  // The graduated dictionary is window.AISLE_DICTIONARY (aisle-dictionary.js,
+  // loaded via <script> BEFORE this file, so it is present at init). Shape:
+  //   window.AISLE_DICTIONARY[aisle] = [ { name: string, aliases: [string] } ]
+  // authored in store-walk order (spec §1). The PO hand-edits this file, so
+  // EVERYTHING here DEGRADES GRACEFULLY (R16): the runtime lookup-build and the
+  // matcher must NEVER throw before the render loop - a typo/malformed entry is
+  // console.warn+skipped and a canonical-vs-canonical collision resolves by
+  // first-write-wins (store-walk order), exactly parseStoredState's R1 posture.
+  // The HARD fail-fast (throw on any shape/type/uniqueness/collision problem)
+  // lives ONLY in validateDictionary() - the dev/test data-integrity gate, which
+  // is NEVER called at runtime.
+
+  // Frozen quantity/unit token set: stripped from the ITEM name (not from the
+  // dictionary) before the whole-token (tier 4) scan, so a leading "2 lbs " /
+  // "16 oz " tolerates through to the real item token(s) (spec §3.4). Kept
+  // deliberately CONSERVATIVE - pure measurement/quantity words only, never
+  // container words (can/bag/jar/box/bottle/head/bunch/stick), which appear
+  // inside real dictionary aliases and must stay matchable.
+  var AUTO_AISLE_STRIP_TOKENS = {
+    lb: 1, lbs: 1, pound: 1, pounds: 1, oz: 1, ounce: 1, ounces: 1,
+    g: 1, gram: 1, grams: 1, kg: 1, kilogram: 1, kilograms: 1, mg: 1,
+    ml: 1, l: 1, liter: 1, liters: 1, litre: 1, litres: 1,
+    gal: 1, gallon: 1, gallons: 1, qt: 1, quart: 1, quarts: 1,
+    pt: 1, pint: 1, pints: 1, tsp: 1, teaspoon: 1, teaspoons: 1,
+    tbsp: 1, tablespoon: 1, tablespoons: 1, cup: 1, cups: 1,
+    ct: 1, count: 1, dozen: 1, pk: 1, pkg: 1, pack: 1, packs: 1, x: 1
+  };
+
+  // The soft LOWER-BOUND for the item count - a LOG/warn only, never a hard
+  // error (R16 folded: don't false-tripwire the very hand-edits the file invites).
+  var AUTO_AISLE_MIN_COUNT = 1286;
+
+  // The intentional easter egg, whitelisted by the data-integrity gate so it is
+  // never treated as a data error (typing "difficult" resolves lemon->Produce
+  // via tier 3). Exposed so the Tester's standing assertion matches the ship.
+  var AUTO_AISLE_INTEGRITY_WHITELIST = [
+    { aisle: 'Produce', canonical: 'lemon', alias: 'difficult' }
+  ];
+
+  function autoAisleWarn(msg) {
+    try { if (typeof console !== 'undefined' && console.warn) console.warn('[auto-aisle] ' + msg); } catch (e) {}
+  }
+  function autoAisleHasOwn(obj, key) {
+    return Object.prototype.hasOwnProperty.call(obj, key);
+  }
+  // Loose tokenization: lowercase (via normalize), split on ANY non-alphanumeric
+  // so punctuation ("(organic)", "st.", "1/2", "t-bone") never defeats a token
+  // match. Used for BOTH the dictionary token maps and the item scan (the item
+  // scan additionally drops pure-number and strip-set tokens).
+  function autoAisleLooseTokens(value) {
+    var raw = normalize(value).split(/[^a-z0-9]+/);
+    var out = [];
+    for (var i = 0; i < raw.length; i++) { if (raw[i]) out.push(raw[i]); }
+    return out;
+  }
+  function autoAisleTokenKey(value) {
+    return autoAisleLooseTokens(value).join(' ');
+  }
+  function autoAisleItemTokens(value) {
+    var raw = autoAisleLooseTokens(value);
+    var out = [];
+    for (var i = 0; i < raw.length; i++) {
+      var t = raw[i];
+      if (/^[0-9]+$/.test(t)) continue;           // pure number -> strip
+      if (AUTO_AISLE_STRIP_TOKENS[t]) continue;    // measurement/quantity word -> strip
+      out.push(t);
+    }
+    return out;
+  }
+
+  // Build the O(1) lookup once (spec §4). Returns FOUR maps (a superset of the
+  // { canonicalMap, aliasMap } contract): exact maps keyed by normalize() for
+  // tiers 2/3, and token maps keyed by the loose token-key for tier 4. Every map
+  // is first-write-wins in store-walk order (dictionary key order), which is the
+  // deterministic canonical-vs-canonical / alias-vs-alias cross-aisle tiebreak
+  // (e.g. bare "drumstick": alias of Meat's chicken drumstick AND Frozen's ice
+  // cream cone -> Meat wins, earlier in the walk). NEVER throws (R16 degrade):
+  // an absent/empty/malformed dictionary yields empty maps; malformed entries
+  // are console.warn+skipped. INJECTABLE - pass any dictionary for tests.
+  function buildLookup(dictionary) {
+    var canonicalMap = {}, aliasMap = {}, canonicalTokenMap = {}, aliasTokenMap = {};
+    var result = {
+      canonicalMap: canonicalMap, aliasMap: aliasMap,
+      canonicalTokenMap: canonicalTokenMap, aliasTokenMap: aliasTokenMap
+    };
+    if (!dictionary || typeof dictionary !== 'object' || Array.isArray(dictionary)) return result;
+    var aisles;
+    try { aisles = Object.keys(dictionary); } catch (e) { return result; }
+    for (var a = 0; a < aisles.length; a++) {
+      var aisle = aisles[a];
+      if (normalize(aisle) === normalize(OTHER_LABEL)) continue; // "Other" = no-match bucket, never a target
+      var entries = dictionary[aisle];
+      if (!Array.isArray(entries)) { autoAisleWarn('aisle "' + aisle + '" is not an array - skipped'); continue; }
+      for (var e = 0; e < entries.length; e++) {
+        var entry = entries[e];
+        if (!entry || typeof entry !== 'object' || typeof entry.name !== 'string') {
+          autoAisleWarn('malformed entry in "' + aisle + '" - skipped'); continue;
+        }
+        var name = entry.name;
+        var nk = normalize(name);
+        if (!nk) { autoAisleWarn('empty canonical in "' + aisle + '" - skipped'); continue; }
+        var crec = { aisle: aisle, canonical: name, text: name };
+        if (!autoAisleHasOwn(canonicalMap, nk)) canonicalMap[nk] = crec; // first-write-wins
+        var ctk = autoAisleTokenKey(name);
+        if (ctk && !autoAisleHasOwn(canonicalTokenMap, ctk)) canonicalTokenMap[ctk] = crec;
+        var aliases = entry.aliases;
+        if (aliases != null && !Array.isArray(aliases)) { autoAisleWarn('aliases of "' + name + '" not an array - ignored'); aliases = null; }
+        if (Array.isArray(aliases)) {
+          for (var al = 0; al < aliases.length; al++) {
+            var alias = aliases[al];
+            if (typeof alias !== 'string') { autoAisleWarn('non-string alias in "' + name + '" - skipped'); continue; }
+            var ak = normalize(alias);
+            if (!ak) continue;
+            var arec = { aisle: aisle, canonical: name, text: alias };
+            if (!autoAisleHasOwn(aliasMap, ak)) aliasMap[ak] = arec; // first-write-wins
+            var atk = autoAisleTokenKey(alias);
+            if (atk && !autoAisleHasOwn(aliasTokenMap, atk)) aliasTokenMap[atk] = arec;
+          }
+        }
+      }
+    }
+    return result;
+  }
+
+  // Resolve an item name to an aisle. Precedence (spec §3.4, first hit wins;
+  // FIRM: t2 canonical-exact beats t3 alias-exact beats t4 whole-token):
+  //   1 personal override (S30; exact on normalize(name)) - dictionary-INDEPENDENT
+  //   2 dictionary canonical-exact      3 dictionary alias-exact
+  //   4 whole-token (canonical beats alias, longest match wins) with leading
+  //     quantity/unit tolerance          5 no match -> no-aisle ('')
+  // Returns { aisle, tier, matchedText } always (tier 5 -> aisle '', matchedText '').
+  // opts (all optional, INJECTABLE for tests): { lookup, dictionary, overrides }.
+  // Runtime callers pass nothing -> the once-at-load autoAisleLookup + no
+  // overrides (S30 will pass overrides). The `dictionary` param REBUILDS a lookup
+  // (tests only); runtime never rebuilds per item.
+  function matchAisle(name, opts) {
+    opts = opts || {};
+    var lookup = opts.lookup || (opts.dictionary != null ? buildLookup(opts.dictionary) : autoAisleLookup) || buildLookup(null);
+    var overrides = opts.overrides || null;
+    var key = normalize(name);
+    if (!key) return { aisle: '', tier: 5, matchedText: '' };
+    // Tier 1: personal override (dictionary-independent; degrade-seam safe).
+    if (overrides && autoAisleHasOwn(overrides, key)) {
+      var ov = overrides[key];
+      if (typeof ov === 'string' && ov !== '') return { aisle: ov, tier: 1, matchedText: key };
+    }
+    // Tier 2: canonical exact.
+    if (autoAisleHasOwn(lookup.canonicalMap, key)) {
+      var c = lookup.canonicalMap[key];
+      return { aisle: c.aisle, tier: 2, matchedText: c.text };
+    }
+    // Tier 3: alias exact.
+    if (autoAisleHasOwn(lookup.aliasMap, key)) {
+      var al2 = lookup.aliasMap[key];
+      return { aisle: al2.aisle, tier: 3, matchedText: al2.text };
+    }
+    // Tier 4: whole-token (NOT raw substring - "ham" never matches "hamburger",
+    // "corn"/"popcorn", "ice"/"rice", "pepper"/"peppercorns", "oat"/"goat").
+    // Scan contiguous token windows longest-first; at a given length prefer a
+    // canonical hit over an alias hit (both maps are already cross-aisle-resolved).
+    var toks = autoAisleItemTokens(name);
+    for (var L = toks.length; L >= 1; L--) {
+      var aliasHit = null;
+      for (var i = 0; i + L <= toks.length; i++) {
+        var phrase = toks.slice(i, i + L).join(' ');
+        if (autoAisleHasOwn(lookup.canonicalTokenMap, phrase)) {
+          var ct = lookup.canonicalTokenMap[phrase];
+          return { aisle: ct.aisle, tier: 4, matchedText: ct.text }; // canonical wins at this length
+        }
+        if (!aliasHit && autoAisleHasOwn(lookup.aliasTokenMap, phrase)) {
+          aliasHit = lookup.aliasTokenMap[phrase]; // remember leftmost alias at this length
+        }
+      }
+      if (aliasHit) return { aisle: aliasHit.aisle, tier: 4, matchedText: aliasHit.text };
+    }
+    // Tier 5: no match -> the intrinsic no-aisle value.
+    return { aisle: '', tier: 5, matchedText: '' };
+  }
+
+  // ---- S29: standing dev/test data-integrity gate (HARD fail-fast) ----------
+  // NEVER called at runtime - only from the Tester's suite / the exposed hook,
+  // where a PO hand-edit regression belongs (R16). THROWS on any structural /
+  // type / within-aisle-canonical-uniqueness / canonical-vs-canonical
+  // cross-aisle-collision problem, EXCEPT the whitelisted easter egg. The item
+  // count is a SOFT lower-bound LOG (never an error). Returns { count, aisleCount,
+  // warnings } on success. INJECTABLE dictionary (defaults to window's).
+  function validateDictionary(dictionary) {
+    var dict = dictionary || (typeof window !== 'undefined' ? window.AISLE_DICTIONARY : null);
+    if (!dict || typeof dict !== 'object' || Array.isArray(dict)) {
+      throw new Error('AISLE_DICTIONARY integrity: not a plain object');
+    }
+    var wl = {}; // normalized "aisle|canonical|alias" -> true
+    for (var w = 0; w < AUTO_AISLE_INTEGRITY_WHITELIST.length; w++) {
+      var e0 = AUTO_AISLE_INTEGRITY_WHITELIST[w];
+      wl[normalize(e0.aisle) + '|' + normalize(e0.canonical) + '|' + normalize(e0.alias)] = true;
+    }
+    var errors = [], warnings = [], canonHome = {}, count = 0;
+    var aisles = Object.keys(dict);
+    for (var a = 0; a < aisles.length; a++) {
+      var aisle = aisles[a];
+      var entries = dict[aisle];
+      if (!Array.isArray(entries)) { errors.push('aisle "' + aisle + '" is not an array'); continue; }
+      var within = {};
+      for (var e = 0; e < entries.length; e++) {
+        var entry = entries[e];
+        if (!entry || typeof entry !== 'object') { errors.push('non-object entry in "' + aisle + '"'); continue; }
+        if (typeof entry.name !== 'string' || !entry.name.trim()) { errors.push('non-string/empty canonical in "' + aisle + '"'); continue; }
+        count++;
+        var nk = normalize(entry.name);
+        if (within[nk]) errors.push('within-aisle duplicate canonical: "' + entry.name + '" in ' + aisle);
+        within[nk] = true;
+        if (autoAisleHasOwn(canonHome, nk) && canonHome[nk] !== aisle) {
+          errors.push('canonical-vs-canonical cross-aisle collision: "' + entry.name + '" in ' + canonHome[nk] + ' & ' + aisle);
+        } else if (!autoAisleHasOwn(canonHome, nk)) {
+          canonHome[nk] = aisle;
+        }
+        var aliases = entry.aliases;
+        if (aliases != null && !Array.isArray(aliases)) { errors.push('aliases of "' + entry.name + '" is not an array'); aliases = []; }
+        for (var al = 0; al < (aliases || []).length; al++) {
+          if (typeof aliases[al] !== 'string' || !aliases[al].trim()) {
+            if (!wl[normalize(aisle) + '|' + nk + '|' + normalize(aliases[al])]) {
+              errors.push('non-string/empty alias of "' + entry.name + '" in ' + aisle);
+            }
+          }
+        }
+      }
+    }
+    warnings.push('item count = ' + count + ' across ' + aisles.length + ' aisles');
+    if (count < AUTO_AISLE_MIN_COUNT) warnings.push('count ' + count + ' below soft floor ' + AUTO_AISLE_MIN_COUNT);
+    if (errors.length) throw new Error('AISLE_DICTIONARY integrity FAILED (' + errors.length + '):\n  ' + errors.join('\n  '));
+    return { count: count, aisleCount: aisles.length, warnings: warnings };
+  }
+
+  // Guarded dev/test parity: the seeded starter names (minus Other) should be
+  // byte-identical (after normalize) to the dictionary keys, so every matcher
+  // output resolves to a seeded <select> option (closes the R15 dangling-value
+  // class at the source). GUARDED on dictionary presence (degrade: skip if
+  // absent) - never throws. Returns { ok, onlyInStarters, onlyInDict, skipped }.
+  function assertSeedDictParity(dictionary) {
+    var dict = dictionary || (typeof window !== 'undefined' ? window.AISLE_DICTIONARY : null);
+    var result = { ok: true, onlyInStarters: [], onlyInDict: [], skipped: false };
+    if (!dict || typeof dict !== 'object' || Array.isArray(dict)) { result.skipped = true; return result; }
+    var otherKey = normalize(OTHER_LABEL), i, starters = {}, dictKeys = {};
+    for (i = 0; i < AISLE_STARTER_LIST.length; i++) {
+      var sk = normalize(AISLE_STARTER_LIST[i]);
+      if (sk !== otherKey) starters[sk] = true;
+    }
+    var keys = Object.keys(dict);
+    for (i = 0; i < keys.length; i++) {
+      var dk = normalize(keys[i]);
+      if (dk !== otherKey) dictKeys[dk] = true;
+    }
+    for (var s in starters) { if (autoAisleHasOwn(starters, s) && !dictKeys[s]) { result.onlyInStarters.push(s); result.ok = false; } }
+    for (var d in dictKeys) { if (autoAisleHasOwn(dictKeys, d) && !starters[d]) { result.onlyInDict.push(d); result.ok = false; } }
+    return result;
+  }
+
+  // Build the runtime lookup ONCE at load (never rebuilt per item). Wrapped so
+  // even an unexpected throw degrades to empty maps rather than blanking the page.
+  var autoAisleLookup;
+  try {
+    autoAisleLookup = buildLookup(typeof window !== 'undefined' ? window.AISLE_DICTIONARY : null);
+  } catch (e) {
+    autoAisleWarn('lookup build failed, degrading to no-match: ' + (e && e.message));
+    autoAisleLookup = buildLookup(null);
+  }
+  // Guarded parity warn at load (never throws; skipped when the dictionary is absent).
+  try {
+    if (typeof window !== 'undefined' && window.AISLE_DICTIONARY) {
+      var parity = assertSeedDictParity();
+      if (!parity.ok) autoAisleWarn('starter/dictionary key mismatch: ' + JSON.stringify(parity));
+    }
+  } catch (e) {}
+
+  // DOM-free test hook (spec §3.4/§4; injectable dictionary/overrides for tests).
+  if (typeof window !== 'undefined') {
+    window.__voppingAutoAisle = {
+      matchAisle: matchAisle,
+      buildLookup: buildLookup,
+      validateDictionary: validateDictionary,
+      assertSeedDictParity: assertSeedDictParity,
+      getLookup: function () { return autoAisleLookup; },
+      STRIP_TOKENS: AUTO_AISLE_STRIP_TOKENS,
+      INTEGRITY_WHITELIST: AUTO_AISLE_INTEGRITY_WHITELIST,
+      SEED_VERSION: AISLE_SEED_VERSION
+    };
   }
 
   // ---- S9: sort view (view-only, never rewrites state.items' own order) ---
