@@ -616,6 +616,33 @@
   var newAisleOpenedAt = 0;
   var NEW_AISLE_OPEN_GRACE_MS = 400;
 
+  // S28 iOS regression fix (2026-09-14, ROUND 3). After a SUCCESSFUL new-aisle
+  // create the flow must settle CLOSED, but on iOS Safari it re-opened: rounds
+  // 1+2 made the typed name save+assign (commitNewAisle nulls editingField and
+  // re-renders, so the reveal input is correctly gone) - yet the PO saw "the
+  // menu is not closing after populating the aisle". Confirmed mechanism (A/B-
+  // proven on desktop, see vop-r3-verify.js): the create appends the new aisle
+  // to state.aisles right BEFORE the always-last "+ Add new aisle…" sentinel, so
+  // in the freshly re-rendered <select> the just-created option and the sentinel
+  // are ADJACENT. commitNewAisle's render() rebuilds that collapsed <select> at
+  // the exact spot the just-dismissed reveal input / keyboard occupied, and iOS
+  // re-dispatches the trailing touch (the keyboard-dismiss "ghost tap" after the
+  // layout shrinks back a line) onto it - nudging the native picker onto the
+  // adjacent sentinel and firing a SECOND `change` carrying the sentinel value.
+  // That re-enters the change handler's sentinel branch -> openNewAisleEditor()
+  // -> the reveal editor re-appears even though the aisle is already set (the
+  // <select> still shows the created aisle, matching the PO's "populated but the
+  // menu stayed open"). Desktop never hit it because there is no ghost tap. Fix:
+  // a short post-commit re-entry window (mirroring round-1's open-transition
+  // grace idiom) - a sentinel `change` on the SAME row within
+  // NEW_AISLE_REENTRY_GUARD_MS of that row's own successful create is treated as
+  // the ghost re-fire: snap the <select> back to the committed aisle, do NOT
+  // re-open. Scoped to id+time so it never blocks legitimately re-opening the
+  // picker to add another aisle later, or on any other row (the mirror-bug trap).
+  var newAisleCommittedAt = 0;
+  var newAisleCommittedId = null;
+  var NEW_AISLE_REENTRY_GUARD_MS = 400;
+
   function openEditor(id, field) {
     var idx = findIndexById(id);
     if (idx === -1) return;
@@ -857,6 +884,10 @@
     var idx = findIndexById(id);
     if (idx !== -1) state.items[idx].aisle = trimmed;
     editingField = null;
+    // S28: arm the post-commit re-entry window for THIS row (see the
+    // newAisleCommittedAt declaration + the change handler's sentinel guard).
+    newAisleCommittedAt = Date.now();
+    newAisleCommittedId = id;
     saveState();
     render();
   }
@@ -1520,6 +1551,16 @@
     // sentinel-reveal path (S24) is covered by this same flush (QA requirement).
     if (editingField) commitEditor();
     if (isSentinel) {
+      // S28 iOS re-entry guard: a sentinel change on the SAME row within the
+      // post-commit window is the keyboard-dismiss ghost tap re-selecting the
+      // sentinel adjacent to the aisle we just created - snap the <select> back
+      // to the committed aisle and DON'T re-open the reveal (which would leave
+      // "the menu" open after the aisle is already populated). Long after the
+      // window, or on any other row, this is a genuine re-open and runs normally.
+      if (id === newAisleCommittedId && (Date.now() - newAisleCommittedAt) < NEW_AISLE_REENTRY_GUARD_MS) {
+        render();
+        return;
+      }
       openNewAisleEditor(id); // S24: "+ Add new aisle…" reveal
     } else {
       saveAisle(id, chosen);  // canonical option value (or '' for no-aisle)
