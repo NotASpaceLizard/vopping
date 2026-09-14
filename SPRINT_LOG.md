@@ -1660,6 +1660,39 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   so it is left as-is and flagged to the Orchestrator for a future dedicated summary refresh. Nothing
   committed by me — the Orchestrator commits the docs after confirmation.
 
+## Sprint 5 — Auto-Aisle backlog slicing (S28-S32 drafted), 2026-09-14
+
+- **Goal:** Slice the researched Auto-Aisle feature (`AUTO_AISLE_SPEC.md`) into a
+  sequenced, dependency-ordered backlog. On-demand automatic aisle assignment (never
+  silent-on-add), at two scopes (a whole-list button + a per-item picker option), that
+  learns from every manual correction. No implementation this session — planning/slicing
+  + pre-Lock findings only.
+- **Committed stories:** None implemented — five stories DRAFTED into BACKLOG.md
+  (S28-S32, Sprint 5), all **Not Started, Locks HELD**. S28 taxonomy+versioned-reseed
+  migration → S29 dictionary+matcher engine → S30 personal-override map → (S31 list-wide
+  button, S32 per-item Auto-detect). S28→S29→S30→(S31,S32); S31/S32 depend on S29+S30.
+- **Outcome:** Sliced per the spec's §6 with SM judgment; the Dev/Tester/QA pre-Lock
+  convergence (relayed by the Orchestrator) folded directly into each AC — the S28
+  `migrateAisles()` short-circuit blocker (a versioned one-time re-seed is required, not a
+  constant edit; never resurrect user-deleted starters, never re-map items; starter names
+  byte-identical to the dictionary keys); S29's two-map + whole-token matcher with fail-fast
+  collision asserts, a standing data-integrity test, a DOM-free test hook, and the corrected
+  `chicken breast` example; S30's own-key defensive parse, record-only-on-hand-pick, R15
+  managed-option guarantee, and S23-cascade-into-the-map coverage; S31's `.sort-controls`
+  placement, fill-empty-only, and locked toast string; S32's structural reserved-value
+  detection riding the existing R14-safe change→saveAisle→render path. Three PO questions
+  logged to QUESTIONS.md's Blocking table with recommended defaults, each gating only its own
+  story's Lock: **Q1** bulk-run single-undo (S31, default = yes/one undoable action), **Q2**
+  clear-to-no-aisle as a learned override (S30, default = no, learn non-empty only), **Q3**
+  old↔new aisle-name drift on taxonomy expansion (S28, default = pure-union). Two data-quality
+  items flagged as fix-on-PO-confirm (not applied unilaterally, since the PO hand-edits the
+  dictionary): the junk alias `lemon`→`"difficult"` (`AISLE_DICTIONARY.draft.js` ~line 359).
+  `AISLE_DICTIONARY.draft.js` is deliberately NOT committed this session — it graduates into
+  the app at S29. Docs (BACKLOG + QUESTIONS + this log + the spec) committed/pushed by the
+  Scrum Master per the Orchestrator's go; console files untouched. Reported the story list
+  back to the Orchestrator; standing by — each story enters Developer sanity-check → Tester
+  testability-check → QA Lock gate after the PO answers Q1/Q2/Q3.
+
 ## Parked / unscheduled
 
 - **S11** (recipe-paste alternate ingest mode) — explicitly not sequenced into
