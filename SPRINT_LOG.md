@@ -1708,6 +1708,25 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   S29's data-integrity test WHITELISTS it, no fix. Docs re-committed/pushed. Next: per-story
   Developer sanity-check → Tester testability-check → QA Lock gate → build, in
   S28→S29→S30→(S31,S32) order.
+- **Update, 2026-09-14 (pre-Lock gate results, same session):** the per-story Developer
+  sanity-check + Tester testability-check + QA per-story gate ran on S28-S32. **4 of 5 CLEAR
+  (Lock-ready): S28, S30, S31, S32.** **S29 HOLDS on QA Real finding R16** — the runtime
+  dictionary-load / lookup-build path must DEGRADE GRACEFULLY (console.warn+skip on a malformed
+  entry, first-write-wins on a canonical collision), never throw before render, so a PO typo in
+  the hand-edited ~1,286-entry dictionary can't blank the offline page; HARD fail-fast is now
+  scoped to the dev/test data-integrity gate ONLY. Consolidated sharpenings folded into every AC:
+  S28 M27 (step-order + append-not-store-walk dropdown order for migrated users), the `seedVersion`
+  field name, and build-after-`loadState()` placement; S29 the `{aisle,tier,matchedText}` matcher
+  contract, the named `window.__voppingAutoAisle` test-hook + injectable empty-dictionary path, the
+  frozen quantity/unit strip set, the named `drumstick` alias-vs-alias tie (→ Meat), the soft count,
+  and the `chicken`→Canned organic-curation track; S30 M28 (delete-cascade DROPS the override, never
+  blanks it), the `vopping-overrides-v1` key, and record-suppress co-design with S32; S31 M29
+  (`.sort-controls` overflow re-check) + M30 (fill-empty eligibility = intrinsic `''` only; a
+  non-undoable pick doesn't clobber the bulk slot) + the FROZEN toast string and the Orchestrator's
+  when-shown UX (feedback toast whenever eligible items existed, even n=0/m>0; fully-silent only for
+  zero-eligible) + `setLastAction` before `showToast`; S32 top-option (index 0), no ghost-tap guard
+  needed, N17 undo-asymmetry FYI. Docs re-committed/pushed. Next: QA's R16 re-read on S29; on clean →
+  Lock S28-S32 → Dev builds S28 first.
 
 ## Parked / unscheduled
 
