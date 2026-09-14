@@ -1751,6 +1751,31 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   now), and `QA_FINDINGS.md` (per this sprint's convention). **Next:** Developer is building
   increment 1 (S28+S29) in parallel; stories flip to Done only after their formal passes, same
   gate every story on this project has gone through.
+- **S28 + S29 built, verified, and DONE, 2026-09-14 (same day, continued; increment PUSHED
+  `e0a0f77`):** the Developer implemented the S28+S29 increment and Tester's independent formal
+  pass landed — **345/345 assertions, 0 defects** (sha `e0a0f77`; new canonical baseline in
+  REGRESSION_LOG.md). **S28 → Done:** the versioned one-time re-seed (`seedVersion`-gated union
+  runs EXACTLY ONCE, never resurrecting user-deleted starters) expanding the seeded taxonomy to
+  the 18 store-walk aisles, plus the PO Q3 rename-migration (`Dairy`→`Dairy & Eggs`,
+  `Household`→`Household & Cleaning` renamed with a one-time normalized-key item re-tag,
+  merge-not-duplicate; old `Meat/Seafood` kept as a custom aisle with `Meat`+`Seafood` added as
+  new starters, no item split; custom aisles preserved). **S29 → Done:**
+  `AISLE_DICTIONARY.draft.js` graduated into the committed hand-editable app data file, loaded
+  before `script.js` so `window.AISLE_DICTIONARY` is available at init; the first-hit-wins matcher
+  (t1 override slot for S30, t2 canonical, t3 alias, t4 whole-token, t5 no-match) over the two
+  load-time maps, the frozen quantity/unit strip, and the `{aisle,tier,matchedText}` contract; R16
+  satisfied — the runtime load/lookup path degrades gracefully (console.warn+skip, first-write-wins,
+  absent-dictionary → no-match) and never throws before render, with hard fail-fast confined to the
+  dev/test data-integrity gate (which whitelists the intentional lemon easter egg); the named
+  `window.__voppingAutoAisle` test hook ships. Flipped both rows to Done in BACKLOG.md (standard
+  Done format, 345/345 @`e0a0f77` citation) and synced the Priority Queue Sprint-5 summary (S28+S29
+  Done, S30-S32 Locked). **S30, S31, S32 stay Locked** — S30 is built + self-verified but UNPUSHED
+  (its `script.js` change sits uncommitted in the working tree), awaiting its own formal pass next
+  session; S31/S32 not yet built. **Commit scope — BACKLOG.md + SPRINT_LOG.md ONLY:** deliberately
+  left `script.js` UNSTAGED (the in-progress S30 work stays in the working tree for next session),
+  and excluded the console files, the dictionary draft/review, QA_FINDINGS.md, PLAYBOOK, and images;
+  confirmed the staged set was exactly the two docs via `git status --short` before committing.
+  Wind-down for the day.
 
 ## Parked / unscheduled
 
