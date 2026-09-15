@@ -7,6 +7,12 @@
 
   var STORAGE_KEY = 'vopping-list-state-v1';
   var FREQUENCY_KEY = 'vopping-frequency-v1';
+  // S30: personal override map ("learning") - its OWN localStorage record,
+  // separate from list state + frequency. Shape: { "<normalized item name>":
+  // "<aisle display string>" }. Records ONLY hand picks (never auto-writes), and
+  // never a ''-value (Q2). Feeds matcher tier 1 (personal override) ahead of the
+  // dictionary tiers.
+  var OVERRIDES_KEY = 'vopping-overrides-v1';
 
   // ---- S22: aisle set constants -------------------------------------------
   // Declared up here (not mid-file) specifically because migrateAisles() runs
@@ -243,6 +249,13 @@
   }
 
   var state = loadState();
+  // S30: load the personal override map BEFORE the re-seed below, because the
+  // S23 rename/delete cascade helpers (renameAisleByKey/deleteAisleByKey) now
+  // also cascade into `overrides`, and migrateAislesV2 can call renameAisleByKey
+  // during a direct pre-S28 -> S30 upgrade. Loading it here keeps the reference
+  // always-defined (the map is empty on that upgrade path, so the cascade is a
+  // harmless no-op). Defensive parse (R1 posture) - never throws before render.
+  var overrides = loadOverrides();
   // S28: one-time versioned taxonomy re-seed (18-aisle Auto-Aisle taxonomy).
   // Runs here, right after loadState(), because migrateAisles() (called inside
   // loadState via parseStoredState) short-circuits on an already-seeded
@@ -303,6 +316,75 @@
   }
 
   var frequency = loadFrequency();
+
+  // ---- S30: personal override map (learning) --------------------------------
+  // Same defensive-guard posture as parseStoredState (R1) / parseFrequencyState:
+  // a wrong-shape / null / non-object / array top-level value, or any individual
+  // entry that isn't a non-empty string->non-empty string pair, is dropped rather
+  // than allowed to crash a later read. NEVER throws before the render loop.
+  // Q2 is enforced at WRITE time (recordOverride never stores ''), but the parse
+  // also drops any stray ''-value defensively so a hand-edited/corrupt file can't
+  // reintroduce a no-aisle override.
+  function parseOverrideState(raw) {
+    if (!raw) return {};
+    var parsed;
+    try { parsed = JSON.parse(raw); } catch (e) { return {}; }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    var result = {};
+    for (var key in parsed) {
+      if (!Object.prototype.hasOwnProperty.call(parsed, key)) continue;
+      var val = parsed[key];
+      if (typeof key === 'string' && key.trim() && typeof val === 'string' && val.trim()) {
+        result[key] = val;
+      }
+    }
+    return result;
+  }
+
+  function loadOverrides() {
+    try {
+      return parseOverrideState(window.localStorage.getItem(OVERRIDES_KEY));
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function saveOverrides() {
+    try {
+      window.localStorage.setItem(OVERRIDES_KEY, JSON.stringify(overrides));
+    } catch (e) {
+      // localStorage unavailable (private browsing) - same graceful degradation
+      // as saveState/saveFrequency; the map still works for this session.
+    }
+  }
+
+  // Record a learned override for a HAND pick only (callers gate on that). Q2:
+  // a clear-to-no-aisle ('') records NOTHING and leaves any existing entry
+  // untouched (never a ''-override). Keyed by normalize(name), same key space
+  // the matcher's tier-1 lookup uses.
+  function recordOverride(name, aisle) {
+    var key = normalize(name);
+    if (!key) return;
+    var a = String(aisle).trim();
+    if (!a) return; // Q2: no ''-override
+    overrides[key] = a;
+    saveOverrides();
+  }
+
+  // R15: an aisle that gets ASSIGNED to an item must exist in state.aisles so it
+  // renders as a real <select> option (closes the dangling-value class for
+  // custom-aisle override/matcher targets). Case-insensitive; no-op for '' or an
+  // already-present aisle. Callers that assign an aisle route through saveAisle,
+  // which calls this.
+  function ensureAisleExists(aisle) {
+    var a = String(aisle).trim();
+    if (!a) return;
+    var key = normalize(a);
+    for (var i = 0; i < state.aisles.length; i++) {
+      if (normalize(state.aisles[i]) === key) return;
+    }
+    state.aisles.push(a);
+  }
 
   // Suggestion threshold (locked AC default: 2, "added at least twice
   // before") - explicitly flagged in BACKLOG.md as an easily-tunable
@@ -869,7 +951,7 @@
     render();
   }
 
-  function saveAisle(id, rawValue) {
+  function saveAisle(id, rawValue, opts) {
     var idx = findIndexById(id);
     if (idx === -1) return;
     // S22: rawValue is the chosen <option>'s canonical display string (or ''
@@ -878,7 +960,22 @@
     // is displayed correctly via normalized-key <option> selection until the
     // user actively re-picks, at which point it becomes the canonical casing.
     // trim() is harmless (option values carry no stray whitespace).
-    state.items[idx].aisle = String(rawValue).trim();
+    var value = String(rawValue).trim();
+    // R15: make sure the assigned aisle is a real option (matters for the future
+    // S31/S32 auto-assign of a custom-aisle override target; a no-op for a hand
+    // pick, whose value always came from the existing <select>).
+    ensureAisleExists(value);
+    state.items[idx].aisle = value;
+    // S30: LEARN from this pick unless it's an auto-write. This is the single
+    // choke point for aisle assignment, so the record-SUPPRESS flag lives here:
+    // a HAND pick (the delegated change handler + commitNewAisle) records the
+    // override; a future auto-write (S31 bulk-run / S32 Auto-detect) passes
+    // { viaAuto: true } to set the aisle WITHOUT learning ("record only on hand
+    // pick"). Q2 (clear-to-no-aisle records nothing) is handled inside
+    // recordOverride, which ignores an empty value.
+    if (!(opts && opts.viaAuto)) {
+      recordOverride(state.items[idx].name, value);
+    }
     saveState();
     render();
   }
@@ -925,6 +1022,19 @@
         state.items[i].aisle = trimmed;
       }
     }
+    // S30: cascade the rename INTO the personal override map - update every
+    // override whose learned TARGET is this aisle so the learning survives the
+    // rename (preserves "a wrong guess is never repeated" across a rename; M28
+    // pinned cascade over validate-and-drop). Guarded: `overrides` may be
+    // undefined if this runs during a pre-S28 migration (empty then anyway).
+    if (overrides) {
+      for (var ok in overrides) {
+        if (Object.prototype.hasOwnProperty.call(overrides, ok) && normalize(overrides[ok]) === oldKey) {
+          overrides[ok] = trimmed;
+        }
+      }
+      saveOverrides();
+    }
     saveState();
   }
 
@@ -939,6 +1049,18 @@
       if (state.items[i].aisle && normalize(state.items[i].aisle) === key) {
         state.items[i].aisle = '';
       }
+    }
+    // S30: cascade the delete INTO the personal override map - DROP every
+    // override whose learned target was this aisle (M28: DROP, never blank to
+    // '' - a ''-override would silently defeat Q2 and pin the item to no-aisle
+    // on a later auto-run). Guarded like the rename cascade.
+    if (overrides) {
+      for (var ok in overrides) {
+        if (Object.prototype.hasOwnProperty.call(overrides, ok) && normalize(overrides[ok]) === key) {
+          delete overrides[ok];
+        }
+      }
+      saveOverrides();
     }
     saveState();
   }
@@ -1005,7 +1127,13 @@
     }
     addAisle(trimmed);
     var idx = findIndexById(id);
-    if (idx !== -1) state.items[idx].aisle = trimmed;
+    if (idx !== -1) {
+      state.items[idx].aisle = trimmed;
+      // S30: creating + assigning a NEW aisle by hand is a hand pick - learn it.
+      // This is precisely how CUSTOM aisles get auto-populated (the built-in
+      // dictionary only knows the 17 canonical aisles), per the spec's §3.3.
+      recordOverride(state.items[idx].name, trimmed);
+    }
     editingField = null;
     // S28: arm the post-commit re-entry window for THIS row (see the
     // newAisleCommittedAt declaration + the change handler's sentinel guard).
@@ -1210,12 +1338,19 @@
   function matchAisle(name, opts) {
     opts = opts || {};
     var lookup = opts.lookup || (opts.dictionary != null ? buildLookup(opts.dictionary) : autoAisleLookup) || buildLookup(null);
-    var overrides = opts.overrides || null;
+    // S30 tier-1 source: an EXPLICITLY-injected `overrides` (tests / future
+    // callers) wins; otherwise the RUNTIME reads the persisted personal override
+    // map (module `overrides`). Using hasOwnProperty on opts so a test can force
+    // "no overrides" with { overrides: null }. Dictionary-INDEPENDENT: tier 1
+    // resolves even when the dictionary is absent (the R16 degrade seam).
+    var overrideMap = (opts && Object.prototype.hasOwnProperty.call(opts, 'overrides'))
+      ? opts.overrides
+      : (typeof overrides !== 'undefined' ? overrides : null);
     var key = normalize(name);
     if (!key) return { aisle: '', tier: 5, matchedText: '' };
     // Tier 1: personal override (dictionary-independent; degrade-seam safe).
-    if (overrides && autoAisleHasOwn(overrides, key)) {
-      var ov = overrides[key];
+    if (overrideMap && autoAisleHasOwn(overrideMap, key)) {
+      var ov = overrideMap[key];
       if (typeof ov === 'string' && ov !== '') return { aisle: ov, tier: 1, matchedText: key };
     }
     // Tier 2: canonical exact.
@@ -1354,6 +1489,17 @@
       validateDictionary: validateDictionary,
       assertSeedDictParity: assertSeedDictParity,
       getLookup: function () { return autoAisleLookup; },
+      // S30: read a snapshot of the persisted personal override map.
+      getOverrides: function () {
+        var out = {};
+        for (var k in overrides) { if (Object.prototype.hasOwnProperty.call(overrides, k)) out[k] = overrides[k]; }
+        return out;
+      },
+      // S30: the aisle-assignment seam the future S31 bulk-run / S32 Auto-detect
+      // will use internally - set an item's aisle via the real saveAisle path
+      // with viaAuto=true (assign WITHOUT learning). Exposed so tests can exercise
+      // the auto-write (suppress) path before S31/S32 exist.
+      setItemAisle: function (id, aisle, viaAuto) { saveAisle(id, aisle, { viaAuto: !!viaAuto }); },
       STRIP_TOKENS: AUTO_AISLE_STRIP_TOKENS,
       INTEGRITY_WHITELIST: AUTO_AISLE_INTEGRITY_WHITELIST,
       SEED_VERSION: AISLE_SEED_VERSION
