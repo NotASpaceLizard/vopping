@@ -56,6 +56,17 @@ header h1 {
   flex-wrap: wrap;
 }
 
+/* S9 sort control + S31's list-wide Auto-aisle button share this row. flex +
+   wrap keeps the added button from overflowing the viewport at 320-390px (M29
+   worst-case re-check) - it drops onto a second line instead of clipping. */
+.sort-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
 button {
   font: inherit;
   padding: 0.4rem 0.75rem;

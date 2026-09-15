@@ -68,6 +68,17 @@
   // normalized name equals this label - N12, belt-and-suspenders).
   var ADD_AISLE_VALUE = '__VOPPING_ADD_NEW_AISLE__';
   var ADD_AISLE_LABEL = '+ Add new aisle…';
+  // S32: the per-item "Auto-detect" trigger inside the ⌖ aisle <select>. Detected
+  // STRUCTURALLY (reserved VALUE + data-autodetect="1"), exactly mirroring S24's
+  // sentinel - NEVER matched by label (N12), so a user aisle literally named
+  // "Auto-detect" can never collide. Rendered as the TOP option (index 0); the
+  // "+ Add new aisle…" sentinel stays LAST. ICON_GLYPH (⭍ U+2B4D; ↯ U+21AF is
+  // the NB-6 on-device fallback) is decorative; AUTODETECT_LABEL is the
+  // human-facing / N12-validation label (no glyph, so normalize() rejects a
+  // plain "Auto-detect" too).
+  var AUTODETECT_VALUE = '__VOPPING_AUTODETECT__';
+  var AUTODETECT_LABEL = 'Auto-detect';
+  var AUTODETECT_ICON_GLYPH = '⭍';
   // S23: marker identifying the no-aisle bucket row in the Settings rename
   // editor (distinct from any normalized real-aisle key).
   var BUCKET_EDIT_KEY = '__VOPPING_BUCKET_ROW__';
@@ -707,6 +718,15 @@
         state.items.splice(reorderIdx, 1);
         state.items.splice(action.fromIndex, 0, reorderItem);
       }
+    } else if (action.type === 'aisle-bulk') {
+      // S31: undo a list-wide Auto-aisle run - restore every TOUCHED item to its
+      // prior aisle. Each touched item was empty ('') at run time, so this
+      // re-clears them. Re-derive by id (defensive, like the reorder branch);
+      // an item could have been deleted since - skip those.
+      for (var ab = 0; ab < action.entries.length; ab++) {
+        var abIdx = findIndexById(action.entries[ab].id);
+        if (abIdx !== -1) state.items[abIdx].aisle = action.entries[ab].prevAisle;
+      }
     }
     // Undo itself is not further undoable (no redo) - clears the buffer and
     // the control disables until a new mutating action creates a fresh
@@ -980,6 +1000,59 @@
     render();
   }
 
+  // ---- S31: list-wide fill-empty-only "Auto-aisle" run ---------------------
+  // Runs the S29/S30 matcher on every item whose aisle is the INTRINSIC '' (M30:
+  // the empty value itself, NOT "normalizes to the bucket label" - so a
+  // re-created real, assignable 'Other' aisle is a SET aisle and is left alone).
+  // A matched item is assigned via the saveAisle-SHAPE write (set aisle + R15
+  // ensureAisleExists) with NO override recorded - auto-writes never learn (S30),
+  // so tier 1 is never poisoned. The whole run is ONE undoable 'aisle-bulk'
+  // action snapshotting { id, prevAisle } for each TOUCHED (matched) item; it
+  // clobbers the single S6 slot ONLY when >=1 item actually changed.
+  function runAutoAisle() {
+    var entries = [];   // { id, prevAisle } for each item actually assigned
+    var eligible = 0;   // items with the intrinsic '' aisle (M30 eligibility)
+    for (var i = 0; i < state.items.length; i++) {
+      var it = state.items[i];
+      if (it.aisle !== '') continue; // fill-empty-ONLY: never touch a set aisle
+      eligible++;
+      var res = matchAisle(it.name); // no opts = runtime dictionary + tier-1 overrides
+      if (res && res.aisle) {
+        entries.push({ id: it.id, prevAisle: it.aisle }); // prevAisle is '' here
+        ensureAisleExists(res.aisle); // R15: keep a matcher-assigned aisle a real option
+        it.aisle = res.aisle;
+      }
+    }
+    // ZERO-ELIGIBLE run: fully silent no-op - no toast, no undo entry, no slot
+    // change (reserved for "no item had an empty aisle", per the locked UX).
+    if (eligible === 0) return;
+    var n = entries.length; // sorted (matched + assigned)
+    var m = eligible - n;   // eligible-but-unmatched
+    // Arm the bulk-undo + clobber the single slot ONLY when >=1 item changed
+    // (n>=1); setLastAction runs BEFORE showToast so the toast's Undo binds to
+    // this action. The n=0/m>=1 feedback toast must NOT touch the slot (M30/M1).
+    if (n >= 1) {
+      setLastAction({ type: 'aisle-bulk', entries: entries });
+      saveState();
+      render();
+    }
+    // FROZEN toast strings (no trailing period; showToast appends " — Undo" for
+    // the armed forms). '·' = U+00B7 middle dot, one space each side;
+    // "couldn't be matched" is invariant (never pluralizes); "Sorted {n}" for
+    // all n>=1 (n=1 -> "Sorted 1", no "item").
+    if (n >= 1 && m === 0) {
+      showToast('Sorted ' + n);
+    } else if (n >= 1 && m >= 1) {
+      showToast('Sorted ' + n + ' · ' + m + ' couldn\'t be matched');
+    } else {
+      // n===0, m>=1: nothing matched, but eligible>0 so the user still gets
+      // feedback their tap acted. withUndo=false: no live Undo affordance and
+      // toastAction stays null, so a stray tap can never undo an unrelated
+      // prior action (the single slot is deliberately left untouched).
+      showToast(m + ' couldn\'t be matched', false);
+    }
+  }
+
   // ---- S23/S24: persisted aisle-set mutations ------------------------------
   // All matching is by NORMALIZED key (NB-2) so pre-existing non-canonical item
   // values (which S22 migration deliberately leaves untouched) stay in sync
@@ -990,6 +1063,11 @@
     if (!trimmed) return 'Enter a name.';
     var key = normalize(trimmed);
     if (key === normalize(ADD_AISLE_LABEL)) return 'That name is reserved.';
+    // S32 N12 (belt-and-suspenders): reject a name that normalizes to the
+    // Auto-detect label - same treatment the S24 sentinel label gets above.
+    // Detection itself is structural (data-autodetect), never by this label; the
+    // label has no glyph so normalize() also rejects a plain "Auto-detect".
+    if (key === normalize(AUTODETECT_LABEL)) return 'That name is reserved.';
     // Collision with the no-aisle bucket label (skip when renaming the bucket
     // itself - that is the same entry). Per N11, once Other has been deleted
     // (bucket falls back to 'Unassigned') a real 'Other' becomes creatable,
@@ -1586,6 +1664,7 @@
   // lingers, the toast-Undo no-ops rather than undoing that unrelated action.
   var toastAction = null;
   var sortSelect = document.getElementById('sort-select');
+  var autoAisleBtn = document.getElementById('auto-aisle-btn'); // S31 list-wide run
   var suggestionsRoot = document.getElementById('suggestions-root');
   // S21: settings menu shell.
   var settingsBtn = document.getElementById('settings-btn');
@@ -1758,6 +1837,11 @@
     // S24 sentinel are ALL UNCHANGED - this is a presentation-only rework.
     var html = '<span class="aisle-control">';
     html += '<select class="aisle-select" data-role="aisle-select" aria-label="Aisle" title="Aisle">';
+    // S32: "Auto-detect" TOP option (index 0), ABOVE the no-aisle option.
+    // Structural trigger only (reserved value + data-autodetect="1"); it is
+    // NEVER `selected` - the item's real aisle option below carries the
+    // selection - so a native <select> shows the chosen aisle, not this option.
+    html += '<option value="' + escapeHtml(AUTODETECT_VALUE) + '" data-autodetect="1">' + escapeHtml(AUTODETECT_ICON_GLYPH + ' ' + AUTODETECT_LABEL) + '</option>';
     html += '<option value=""' + (curKey === '' ? ' selected' : '') + '>' + escapeHtml(noAisleLabel()) + '</option>';
     var pool = getAislePool();
     for (var i = 0; i < pool.length; i++) {
@@ -1953,12 +2037,21 @@
   // "<message> — Undo" (unchanged for existing text assertions). The message is
   // escaped explicitly - it can carry an arbitrary item name, and unlike the old
   // textContent assignment, innerHTML does not escape for us.
-  function showToast(message) {
+  function showToast(message, withUndo) {
     if (toastTimer) clearTimeout(toastTimer);
-    toastAction = lastAction; // bind the toast's Undo to the current action
-    toastEl.innerHTML =
-      '<span class="toast-msg">' + escapeHtml(message) + ' — </span>' +
-      '<button type="button" class="toast-undo" data-role="toast-undo">Undo</button>';
+    if (withUndo === false) {
+      // S31 feedback-only toast (the n=0 / m>=1 "nothing matched" run): NO live
+      // Undo affordance, and toastAction stays null so a stray tap can never
+      // undo an unrelated prior action (the single S6 slot is left untouched).
+      // Every other caller omits the arg -> the armed branch below, unchanged.
+      toastAction = null;
+      toastEl.innerHTML = '<span class="toast-msg">' + escapeHtml(message) + '</span>';
+    } else {
+      toastAction = lastAction; // bind the toast's Undo to the current action
+      toastEl.innerHTML =
+        '<span class="toast-msg">' + escapeHtml(message) + ' — </span>' +
+        '<button type="button" class="toast-undo" data-role="toast-undo">Undo</button>';
+    }
     toastEl.hidden = false;
     toastTimer = setTimeout(function () {
       hideToast();
@@ -2158,6 +2251,9 @@
     // Capture id + selection FIRST, before any commit/render detaches the node.
     var selOpt = target.options[target.selectedIndex];
     var isSentinel = !!(selOpt && selOpt.dataset && selOpt.dataset.sentinel === '1');
+    // S32: structural detection of the Auto-detect trigger (data-autodetect),
+    // never by label/value string (N12) - same posture as the sentinel above.
+    var isAutodetect = !!(selOpt && selOpt.dataset && selOpt.dataset.autodetect === '1');
     var chosen = target.value;
     // Commit any OPEN text editor first (mirrors openEditor's commit-first
     // guard) so an in-progress note/name draft on another row is not lost; the
@@ -2180,6 +2276,29 @@
         return;
       }
       openNewAisleEditor(id); // S24: "+ Add new aisle…" reveal
+    } else if (isAutodetect) {
+      // S32: run the matcher for THIS one item. An ACTUAL match (tiers 1-4, a
+      // non-empty aisle) is written through the SAME saveAisle -> render() path
+      // with { viaAuto: true } - MAY overwrite an existing aisle (explicit
+      // per-item request) but records NO learning override (an auto-guess is not
+      // a hand pick). A tier-5 NO-MATCH writes NOTHING: it must NOT clear an
+      // existing aisle it couldn't improve, so render() alone resets the
+      // transient Auto-detect selection back to the current aisle. No new
+      // render/commit seam; id + name captured, no DOM ref carried across the
+      // render (C1/R13). The round-4 focus-restore skip and the R14 deferred-
+      // focusout guard both key on data-role="aisle-select", so they apply
+      // unchanged. Non-undoable (per PO Q1 / N17).
+      var aIdx = findIndexById(id);
+      if (aIdx !== -1) {
+        var res = matchAisle(state.items[aIdx].name);
+        if (res && res.aisle) {
+          saveAisle(id, res.aisle, { viaAuto: true }); // tiers 1-4: assign, no learning
+        } else {
+          render(); // tier-5 no match: LEAVE the current aisle; just reset the picker
+        }
+      } else {
+        render(); // row gone mid-interaction - just reset the picker display
+      }
     } else {
       saveAisle(id, chosen);  // canonical option value (or '' for no-aisle)
     }
@@ -2238,6 +2357,12 @@
   sortSelect.addEventListener('change', function () {
     sortMode = sortSelect.value;
     render();
+  });
+
+  // S31: the list-wide Auto-aisle run - an isolated click listener in
+  // .sort-controls (no per-row / R14 surface). See runAutoAisle().
+  autoAisleBtn.addEventListener('click', function () {
+    runAutoAisle();
   });
 
   // S10: tapping a suggestion chip adds it via the exact same mechanic as a

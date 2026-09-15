@@ -53,6 +53,13 @@
       <option value="alpha">Alphabetical</option>
       <option value="aisle">By Aisle</option>
     </select>
+    <!-- S31: list-wide fill-empty-only "Auto-aisle" run. Lives HERE in
+         .sort-controls (NOT .global-controls) as an isolated element with its
+         own click listener - introduces no per-row / R14 surface. Glyph ⭍
+         (U+2B4D) + text label; ↯ (U+21AF) is the NB-6 on-device fallback if ⭍
+         tofu-boxes on iOS. Plain monochrome Unicode (no emoji). The glyph is
+         aria-hidden - the "Auto-aisle" text carries the accessible name. -->
+    <button type="button" id="auto-aisle-btn" class="auto-aisle-btn"><span aria-hidden="true">⭍</span> Auto-aisle</button>
   </div>
 
   <!-- Row density/interaction - LOCKED, 2026-09-04 (PO's final pick from
