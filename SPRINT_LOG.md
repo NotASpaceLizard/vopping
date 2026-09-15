@@ -1776,6 +1776,34 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   and excluded the console files, the dictionary draft/review, QA_FINDINGS.md, PLAYBOOK, and images;
   confirmed the staged set was exactly the two docs via `git status --short` before committing.
   Wind-down for the day.
+- **S30 built, verified, and DONE, 2026-09-15 (fresh SM re-spawn; increment PUSHED
+  `fbc046e`):** the Developer implemented S30 and Tester's independent formal pass landed —
+  **379/379 assertions, 0 defects** (sha `fbc046e`; new canonical baseline in
+  REGRESSION_LOG.md), and QA's implementation re-check also came back CLEAR. **S30 → Done:**
+  a persisted per-item learned-aisle map in its OWN localStorage key `vopping-overrides-v1`
+  with an R1-defensive parse (parse-failure / `null` / non-object / wrong entry shape → empty
+  map, never throws before render); learning is recorded ONLY on a user HAND pick, via the
+  shared `saveAisle` choke point — a `{viaAuto:true}` record-suppress flag lets the S31 bulk
+  run and the S32 per-item Auto-detect set an aisle WITHOUT recording an override, so matcher
+  tier 1 is never poisoned by an auto-guess. The map feeds matcher TIER 1 (an exact
+  `normalize(name)` hit wins ahead of ALL S29 dictionary tiers; degrade-seam safe — resolves
+  with no dictionary present). S23 rename cascades UPDATE the override's target aisle by
+  normalized key and S23 delete DROPS the matching override entry entirely (never blanks it to
+  `''`, per M28). R15 `ensureAisleExists` keeps any matcher-assigned aisle (dictionary OR
+  override) present in `state.aisles` as a real managed `<select>` option, never a dangling
+  label. PO Q2 honored — a hand clear-to-no-aisle records nothing and keeps any prior
+  override. Flipped S30's row to Done in BACKLOG.md (standard Done format, 379/379 @`fbc046e`
+  citation) and synced the Priority Queue Sprint-5 summary (S28-S30 Done, S31/S32 Locked).
+  **S31, S32 stay Locked** — the Developer is building the S31/S32 app-code
+  (`script.js`/`style.css`/`index.html`) in parallel, so that in-progress work is deliberately
+  left UNSTAGED in the working tree. **Commit scope — BACKLOG.md + SPRINT_LOG.md ONLY:**
+  excluded the console files, the (now-deleted) dictionary draft/review, QA_FINDINGS.md,
+  PLAYBOOK, images, and the incoming S31/S32 app code; confirmed the staged set was exactly the
+  two docs via `git status --short` before committing. **Housekeeping (queued non-blocking
+  cleanup, actioned this session):** deleted the superseded untracked `AISLE_DICTIONARY.draft.js`
+  and `AISLE_DICTIONARY_REVIEW.md` from the working tree — both graduated into the committed
+  `aisle-dictionary.js` source of truth at S29, so they were redundant (untracked, so no commit
+  needed for the deletion).
 
 ## Parked / unscheduled
 
