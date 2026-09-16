@@ -1928,6 +1928,76 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   the untracked `test-plans/S31`/`S32` test-plan docs (Tester's in-flight work, riding the eventual
   auto-aisle Done-flip). No app code changed — slicing only.
 
+## Sprint 7 — S35/S36 pre-Lock review folded + PO scope expansion + Locked, 2026-09-16
+
+- **Pre-Lock review result:** Dev **BUILDABLE**, Tester **TESTABLE**, QA **CLEAR to Lock (no
+  hold)**. Since QA cleared with no hold and every folded item is an AC-tightening (not a new
+  hazard), S35 + S36 were flipped to **Locked** in the same pass, per the Orchestrator's
+  instruction. Docs only — no `aisle-dictionary.js` edit; the dictionary POPULATION is the
+  Developer's build step, and S36's AC now SPECIFIES the required contents.
+- **PART 1 — PO expanded International into a full multi-cuisine aisle (folded into S36's AC).**
+  Populate `International` by MOVING each named existing term out of its current aisle (a MOVE —
+  remove-from-source + add-to-International, never a duplicate; `validateDictionary()` enforces
+  cross-aisle canonical uniqueness) and ADDING the net-new ones, across five cuisines:
+  - **Mexican/Latin:** tortilla + corn/flour variants (MOVE from Bakery), taco shells, tostadas,
+    salsa + salsa verde (MOVE the Condiments & Sauces canonicals), refried beans (MOVE from
+    Canned & Jarred), + enchilada sauce, taco seasoning (net-new, judgment).
+  - **Asian (broad):** soy sauce family incl. low/reduced-sodium/lite/gluten-free (MOVE from
+    Condiments & Sauces), sriracha, hoisin (MOVE), ramen + rice noodles (MOVE from Pasta, Rice &
+    Grains), coconut milk (MOVE from Canned & Jarred), sesame oil, rice vinegar (+ its
+    `rice wine vinegar` alias) (MOVE from Condiments & Sauces), + nori/seaweed wraps, teriyaki
+    sauce, korean bbq sauce, plum wine vinegar, mirin, miso, fish sauce, oyster sauce, wasabi,
+    curry paste (net-new, judgment).
+  - **Mediterranean/Middle-Eastern:** tahini (MOVE from Condiments & Sauces), hummus (MOVE from
+    Deli), couscous (MOVE from Pasta, Rice & Grains), + falafel mix, harissa (net-new, judgment).
+  - **Indian (NEW category the PO added):** curry/curries, chutney/chutneys, butter chicken
+    sauce, tikka masala sauce, korma sauce, curry paste (net-new; prepared sauces/pastes/packaged
+    ONLY), + papadum, ghee (MOVE ghee from Dairy & Eggs — flagged). Pure SPICES (garam masala,
+    curry powder, turmeric) STAY in Baking & Spices per the PO's split.
+  - **Kosher:** matzah/matzo, gefilte fish, Manischewitz + a modest set.
+  - **Stays put:** naan/pita/flatbread stay in Bakery (PO's earlier call).
+- **CRITICAL matcher rule folded into the AC** (verified against the S29 tier ladder: t2
+  canonical-exact > t3 alias-exact > t4 whole-token): any International multi-word term whose
+  individual tokens S35 routes elsewhere — `sesame oil`, `rice wine vinegar`, `rice vinegar`,
+  `plum wine vinegar`, `rice noodles` — MUST be International CANONICALS, so they resolve at tier-2
+  and beat S35's new bare `oil`/`vinegar`/`rice`/`noodles` head-words (which would otherwise catch
+  the phrase at tier-4).
+- **PART 2 — review sharpenings folded:**
+  - **Dev (S36, CRITICAL):** `migrateAislesV2`'s gate AND stamp BOTH become the LITERAL `2` (never
+    the global `AISLE_SEED_VERSION`; half-applying silently re-opens V2's gate on a v2 device —
+    `2 >= 3` false — re-running its union, RESURRECTING a user-deleted v2 starter (N13) and
+    re-stamping to 3, skipping V3). New `migrateAislesV3` gated `>= 3` / stamps `= 3`; its union
+    set is ONLY `['International']` (never the full starter list). Run V2 then V3;
+    `AISLE_SEED_VERSION` is just the current/highest marker (`3`). (Confirms + reinforces the
+    data-safety hazard note already in the drafted S36 entry above.)
+  - **Dev (S35):** compound-token regression cases for the tier-4 broadening — `canola oil`→
+    Condiments & Sauces, `chicken parmesan`→Meat.
+  - **Dev/Tester (not a bug — stated in the AC):** existing users get `International` APPENDED at
+    the tail via the V3 union push; only FRESH installs get the store-walk slot between Condiments
+    & Sauces and Snacks & Candy in `AISLE_STARTER_LIST`.
+  - **Tester (S36):** `assertSeedDictParity()` must be CLEAN post-S36 — `International` in BOTH the
+    starter list AND the dict key, byte-identical post-normalize (**QA N22**); a
+    `tortilla chips`→Snacks & Candy (and `nacho cheese tortilla chips`→Snacks & Candy) regression
+    so the tortilla MOVE never over-reaches the `tortilla` substring.
+  - **Tester (S35):** S35's tier-4 side-effects are acknowledged in-scope + guarded —
+    `tuna steak`→Seafood (t2), `chicken broth`→Canned & Jarred (t2), `fish sticks`→Frozen (t2) each
+    still resolve to their existing aisle; bare `chicken` pinned tier-2 (→Meat); singular/plural
+    pairs assert the AISLE only, not the tier.
+  - **QA N21:** the `window.__voppingAutoAisle.SEED_VERSION` hook now reads `3` (Tester fixtures
+    move 2→3).
+- **Borderline moves FLAGGED to the Orchestrator/PO** (executed as specified, but called out for a
+  quick sanity check): (1) `ghee` moves OUT of Dairy & Eggs (dairy-adjacent); (2) `hummus` moves
+  out of Deli while its flavored variants (`garlic hummus`, `roasted red pepper hummus`) are left
+  in place by default; (3) `salsa` exists in TWO aisles today — the Condiments & Sauces canonicals
+  (MOVED) and Deli `fresh salsa`/`salsa fresca` aliases (LEFT); (4) bare `curry`/`curries`→
+  International routes `chicken curry` to Meat (tier-4 leftmost `chicken`) while `curry powder`
+  stays Baking & Spices (tier-2) — expected, not a defect.
+- **Commit scope — docs ONLY (`BACKLOG.md`, `SPRINT_LOG.md`):** staging verified before commit.
+  EXCLUDED the local-only console files (`status.js`, `status.html`, `backlog-status.js`,
+  `status-archive.js`), `QA_FINDINGS.md`, `PLAYBOOK_UPDATES_PENDING.md`, the `*.png`/`*.jpg`
+  screenshots, `test-plans/REGRESSION_LOG.md`, and the untracked `test-plans/S31`/`S32` docs. No
+  app code changed — the `aisle-dictionary.js` population is the Developer's build step.
+
 ## Parked / unscheduled
 
 - **S11** (recipe-paste alternate ingest mode) — explicitly not sequenced into
