@@ -799,3 +799,102 @@ button:disabled {
 .settings-delete-btn {
   color: #e08080;
 }
+
+/* ---------------------------------------------------------------------
+   S34: the Settings "Icons" picker panel. Lists every registry action with
+   its current EFFECTIVE glyph + a Change control that expands a candidate
+   palette; a pick applies + persists live. M33: the swatch/candidate boxes
+   are deliberately NOT clipped (no overflow:hidden) so a tofu/overflow shows
+   honestly on the PO's device - that render IS the acceptance signal (NB-6).
+   M34: the swatch + each candidate are previewed at the target draw-site's
+   own font-size (set inline per action in renderIconsSection). ------------ */
+.icon-manage-list {
+  list-style: none;
+  margin: 0.5rem 0 0.75rem;
+  padding: 0;
+}
+
+.icon-manage-item {
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--bg-page);
+}
+
+.icon-manage-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* Current-glyph swatch. A fixed, roomy box (bigger than the row's 19.5px so
+   the glyph is easy to read here) with the glyph centered; NOT clipped. */
+.icon-swatch {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  line-height: 1;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-page);
+}
+
+.icon-manage-label {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+/* The expanded candidate palette for one action - a wrap of tap targets. */
+.icon-palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.5rem 0 0.2rem;
+}
+
+/* Each candidate is a comfortable phone tap target; glyph centered, box NOT
+   clipped (M33) so tofu is visible. iOS-safe: no appearance tricks. */
+.icon-cand {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.6rem;
+  height: 2.6rem;
+  line-height: 1;
+  padding: 0 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-page);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.icon-cand:hover {
+  background: rgba(128, 128, 128, 0.15);
+}
+
+.icon-cand:active {
+  transform: scale(0.92);
+}
+
+/* The candidate matching the current effective glyph, so the PO sees which
+   one is live. */
+.icon-cand--current {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.icon-reset-all-btn {
+  display: inline-block;
+  margin-top: 0.25rem;
+}
+
+.icon-reset-all-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

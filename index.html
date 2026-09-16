@@ -18,7 +18,7 @@
       <!-- S21: settings entry point. GLYPH IS A PLACEHOLDER (U+2699 GEAR) -
            plain monochrome Unicode symbol, never a colored emoji; flagged for
            the PO's final pick, same pattern as S16/S7's icon picks. -->
-      <button type="button" id="settings-btn" class="settings-btn" title="Settings" aria-label="Settings">⚙</button>
+      <button type="button" id="settings-btn" class="settings-btn" title="Settings" aria-label="Settings" data-static-icon="settings-gear">⚙</button>
     </div>
   </header>
 
@@ -59,7 +59,7 @@
          (U+2B4D) + text label; ↯ (U+21AF) is the NB-6 on-device fallback if ⭍
          tofu-boxes on iOS. Plain monochrome Unicode (no emoji). The glyph is
          aria-hidden - the "Auto-aisle" text carries the accessible name. -->
-    <button type="button" id="auto-aisle-btn" class="auto-aisle-btn"><span aria-hidden="true">⭍</span> Auto-aisle</button>
+    <button type="button" id="auto-aisle-btn" class="auto-aisle-btn"><span class="auto-aisle-glyph" data-static-icon="auto-aisle-run" aria-hidden="true">⭍</span> Auto-aisle</button>
   </div>
 
   <!-- Row density/interaction - LOCKED, 2026-09-04 (PO's final pick from
@@ -85,7 +85,7 @@
     <div class="settings-panel" role="dialog" aria-modal="true" aria-label="Settings">
       <div class="settings-panel-header">
         <h2 class="settings-title">Settings</h2>
-        <button type="button" class="settings-close" data-role="settings-close" title="Close" aria-label="Close settings">✕</button>
+        <button type="button" class="settings-close" data-role="settings-close" title="Close" aria-label="Close settings" data-static-icon="settings-close">✕</button>
       </div>
       <div id="settings-body" class="settings-body"></div>
     </div>

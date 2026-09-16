@@ -98,7 +98,10 @@
   // plain "Auto-detect" too).
   var AUTODETECT_VALUE = '__VOPPING_AUTODETECT__';
   var AUTODETECT_LABEL = 'Auto-detect';
-  var AUTODETECT_ICON_GLYPH = '⭍';
+  // S33: the Auto-detect option glyph now lives in ICON_REGISTRY as the
+  // 'auto-detect-option' action-id (default U+2B4D, byte-identical to before);
+  // the draw-site below pulls it via iconFor('auto-detect-option'). AUTODETECT_LABEL
+  // stays here (it is also the N12-validation label, no glyph).
   // S23: marker identifying the no-aisle bucket row in the Settings rename
   // editor (distinct from any normalized real-aisle key).
   var BUCKET_EDIT_KEY = '__VOPPING_BUCKET_ROW__';
@@ -840,16 +843,263 @@
   // color emoji rendering - same text-colorable category as S16's ⚑ pick,
   // even though it happens to use the default `.icon-btn` muted-gray color
   // rather than a mode-specific accent color the way S16's does.
-  var NOTE_TOGGLE_ICON_GLYPH = '🗋';
+  // S33: this note-toggle default now lives in ICON_REGISTRY ('note-toggle',
+  // default U+1F5CB, byte-identical to before) - see the registry block below.
+
+  // ==== S33: central icon registry + iconFor() + persisted overrides ==========
+  // ONE source of truth for every glyph-bearing action (the 10 in the icon-picker
+  // spec §1). DEFAULTS ARE BYTE-IDENTICAL to the glyphs shipped today, so with no
+  // override stored the app renders exactly as before this story (the §2
+  // non-regression contract). Every draw-site pulls its glyph from iconFor(): the
+  // 4 former *_ICON_GLYPH constants, the 3 inline renderRow literals
+  // (up/down/delete), and the 3 static index.html glyphs (via applyStaticIcons).
+  // `candidates` are the FROZEN spec §4 palette used by S34's picker (kept here so
+  // the registry stays the single source); the retained U+2B4D auto-* candidate is
+  // whitelisted in the non-emoji guard so the PO can confirm on-device it IS the
+  // tofu one. Registry ORDER == the S34 panel's display order.
+  var ICONS_KEY = 'vopping-icons-v1';
+  // Defensive fallback for an unregistered/typo'd id: a plain BMP Geometric-
+  // Shapes box (U+25A1). iconFor() never returns undefined and never throws
+  // (assertion R-NOTHROW). No real draw-site passes an unregistered id.
+  var FALLBACK_GLYPH = '□'; // U+25A1 WHITE SQUARE
+  var ICON_OVERRIDE_MAX_LEN = 8; // R17b: UTF-16 code-unit cap on a stored glyph
+  var ICON_REGISTRY_ORDER = [
+    'settings-gear', 'settings-close', 'auto-aisle-run', 'note-toggle',
+    'name-edit', 'move-up', 'move-down', 'delete-item', 'aisle-marker',
+    'auto-detect-option'
+  ];
+  var ICON_REGISTRY = {
+    'settings-gear':      { def: '⚙',       label: 'Settings menu',           candidates: ['⚙', '⛭', '☰', '⋮', '⚒', '✜'] },
+    'settings-close':     { def: '✕',       label: 'Close settings',          candidates: ['✕', '✗', '×', '⨯'] },
+    'auto-aisle-run':     { def: '⭍',       label: 'Auto-aisle (button)',     candidates: ['↯', '⌁', '✦', '✧', '✳', '✷', '⟳', '⊛', '★', '⭍'] },
+    'note-toggle':        { def: '🗋', label: 'Add / edit note',         candidates: ['✎', '☰', '▤', '≡', '✍', '⊞'] },
+    'name-edit':          { def: '✎',       label: 'Edit item name',          candidates: ['✎', '✍'] },
+    'move-up':            { def: '▲',       label: 'Move item up',            candidates: ['▲', '↑', '⌃', '∧'] },
+    'move-down':          { def: '▼',       label: 'Move item down',          candidates: ['▼', '↓', '⌄', '∨'] },
+    'delete-item':        { def: '✕',       label: 'Delete item',             candidates: ['✕', '✗', '×', '⌫', '⊘', '⦸'] },
+    'aisle-marker':       { def: '⌖',       label: 'Aisle picker',            candidates: ['⌖', '⚑', '⚐', '◉', '⊚', '▣', '⌂'] },
+    'auto-detect-option': { def: '⭍',       label: 'Auto-detect (aisle option)', candidates: ['↯', '⌁', '✦', '✧', '✳', '✷', '⟳', '⊛', '★', '⭍'] }
+  };
+  // U+2B4D is deliberately kept as an auto-* candidate so the PO can confirm
+  // on-device that it is the tofu one; whitelisted out of the avoid-block guard -
+  // the same documented carve-out shape as AUTO_AISLE_INTEGRITY_WHITELIST.
+  var ICON_CANDIDATE_WHITELIST = { '⭍': true };
+  // M34: preview each candidate + the current swatch at the target draw-site's
+  // real font-size, so the PO's on-device tofu-vs-real read happens under real
+  // rendering conditions (a glyph fine at header size may overflow the ~19.5px
+  // row box). Values mirror style.css: row-icon base 1.15rem, S27 per-role bumps
+  // (name/delete 1.35, up/down 1.28), the aisle-glyph overlay 1.35, and the
+  // header/button glyphs at the ~1rem button font-size.
+  var ICON_PREVIEW_FONT = {
+    'settings-gear': '1rem', 'settings-close': '1rem',
+    'auto-aisle-run': '1rem', 'auto-detect-option': '1rem',
+    'note-toggle': '1.15rem', 'name-edit': '1.35rem',
+    'move-up': '1.28rem', 'move-down': '1.28rem',
+    'delete-item': '1.35rem', 'aisle-marker': '1.35rem'
+  };
+
+  // R17b CONTENT constraint on a stored override VALUE: string / non-empty after
+  // trim / <= ICON_OVERRIDE_MAX_LEN UTF-16 units / no ASCII control chars (C0/C1)
+  // and none of the HTML-markup chars < > & " '. SHAPE alone is not enough (the
+  // key is hand-editable). A value failing ANY check is DROPPED, so that id falls
+  // back to its default. Defense-in-depth WITH the R17a draw-site escaping.
+  function isValidIconOverride(v) {
+    if (typeof v !== 'string') return false;
+    if (!v.trim()) return false;
+    if (v.length > ICON_OVERRIDE_MAX_LEN) return false;
+    for (var ci = 0; ci < v.length; ci++) {
+      var cc = v.charCodeAt(ci);
+      if (cc < 0x20 || (cc >= 0x7F && cc <= 0x9F)) return false; // C0/C1 control chars
+      if (cc === 0x3C || cc === 0x3E || cc === 0x26 || cc === 0x22 || cc === 0x27) return false; // < > & " '
+    }
+    return true;
+  }
+
+  // Defensive parse (R1 posture; M31 array-reject, matching the state / frequency
+  // / S30-override parsers): NEVER throws before render. On parse failure / null /
+  // a top-level array / any non-plain-object -> {} (all defaults). Each value must
+  // pass the R17b content constraint or that entry is dropped; a glyph stored for
+  // an unregistered id is harmless (iconFor only consults registered ids).
+  function parseIconOverrides(raw) {
+    if (!raw) return {};
+    var parsed;
+    try { parsed = JSON.parse(raw); } catch (e) { return {}; }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    var result = {};
+    for (var key in parsed) {
+      if (!Object.prototype.hasOwnProperty.call(parsed, key)) continue;
+      if (typeof key === 'string' && key && isValidIconOverride(parsed[key])) {
+        result[key] = parsed[key];
+      }
+    }
+    return result;
+  }
+  function loadIcons() {
+    try { return parseIconOverrides(window.localStorage.getItem(ICONS_KEY)); }
+    catch (e) { return {}; } // localStorage unavailable (private browsing) -> all defaults
+  }
+  function saveIcons() {
+    try { window.localStorage.setItem(ICONS_KEY, JSON.stringify(iconOverrides)); }
+    catch (e) { /* localStorage unavailable - same graceful degradation as saveState */ }
+  }
+  // M32: parsed ONCE at init into this in-memory object; iconFor() reads it;
+  // writes update BOTH this object and localStorage. No getItem/JSON.parse per
+  // iconFor() call (renderList / renderRow is a hot path - iconFor fires for every
+  // glyph on every row on every render).
+  var iconOverrides = loadIcons();
+
+  // The EFFECTIVE glyph for an action-id: a valid stored override wins, else the
+  // registry default. An unregistered id -> FALLBACK_GLYPH (never undefined, never
+  // a throw). This is the single accessor every draw-site routes through.
+  function iconFor(actionId) {
+    if (Object.prototype.hasOwnProperty.call(iconOverrides, actionId)) {
+      var ov = iconOverrides[actionId];
+      if (isValidIconOverride(ov)) return ov;
+    }
+    var entry = ICON_REGISTRY[actionId];
+    return entry ? entry.def : FALLBACK_GLYPH;
+  }
+
+  // Static-HTML glyphs (settings-gear, settings-close, auto-aisle-run): set from
+  // iconFor() at init AND on every override write. Neither render()/renderList()
+  // nor renderSettings() touches these - renderSettings rebuilds only
+  // #settings-body, so the header close/gear and the (list-external) auto-aisle
+  // button need this dedicated setter. Each node carries data-static-icon="<id>";
+  // we write .textContent (inherently markup-safe - no escaping needed, R17a is
+  // only for the innerHTML draw-sites). N18/Dev-1: the auto-aisle-run node is the
+  // NESTED aria-hidden <span> (data-static-icon on the span), NEVER
+  // #auto-aisle-btn itself (whose textContent also holds the ' Auto-aisle' label).
+  // N20: accessible names live in attributes / sibling text and are untouched.
+  function applyStaticIcons() {
+    var nodes = document.querySelectorAll('[data-static-icon]');
+    for (var i = 0; i < nodes.length; i++) {
+      nodes[i].textContent = iconFor(nodes[i].getAttribute('data-static-icon'));
+    }
+  }
+  // Re-apply an override EVERYWHERE with no reload: the list (row icons + aisle
+  // overlay, via render()), the open Settings panel (render() re-runs
+  // renderSettings when open), and the three static glyphs.
+  function applyIcons() {
+    applyStaticIcons();
+    render();
+  }
+  // S34 write seams (also the __voppingIcons test hook). Only a REGISTERED id and
+  // a value passing the content constraint are accepted; picking the registry
+  // default clears the override (== reset). Persists + re-applies live.
+  function setIcon(actionId, glyph) {
+    if (!ICON_REGISTRY[actionId]) return false;
+    if (!isValidIconOverride(glyph)) return false;
+    if (glyph === ICON_REGISTRY[actionId].def) {
+      delete iconOverrides[actionId];
+    } else {
+      iconOverrides[actionId] = glyph;
+    }
+    saveIcons();
+    applyIcons();
+    return true;
+  }
+  function resetIcon(actionId) {
+    if (Object.prototype.hasOwnProperty.call(iconOverrides, actionId)) {
+      delete iconOverrides[actionId];
+      saveIcons();
+      applyIcons();
+    }
+  }
+  function resetAllIcons() {
+    iconOverrides = {};
+    try { window.localStorage.removeItem(ICONS_KEY); } catch (e) {}
+    applyIcons();
+  }
+
+  // S34/N23 non-emoji palette guard. A candidate counts as emoji-presentation-
+  // default (and would be rejected) ONLY if it carries a VS16 (U+FE0F) selector
+  // OR its base codepoint is emoji-presentation-default: astral pictographs
+  // (>= U+1F000) or the BMP Emoji_Presentation=Yes set below. It does NOT reject
+  // on mere Emoji=Yes / RGI membership (N23): text-default dingbats (U+2733,
+  // U+2737, U+2726, U+2727, U+2605) in the frozen palette default to TEXT
+  // presentation and MUST pass. Used by assertPaletteClean() (a Tester assertion;
+  // the palette is frozen + hand-curated, so this validates, it does not filter).
+  var BMP_EMOJI_PRESENTATION_RANGES = [
+    [0x231A, 0x231B], [0x23E9, 0x23EC], [0x23F0, 0x23F0], [0x23F3, 0x23F3],
+    [0x25FD, 0x25FE], [0x2614, 0x2615], [0x2648, 0x2653], [0x267F, 0x267F],
+    [0x2693, 0x2693], [0x26A1, 0x26A1], [0x26AA, 0x26AB], [0x26BD, 0x26BE],
+    [0x26C4, 0x26C5], [0x26CE, 0x26CE], [0x26D4, 0x26D4], [0x26EA, 0x26EA],
+    [0x26F2, 0x26F3], [0x26F5, 0x26F5], [0x26FA, 0x26FA], [0x26FD, 0x26FD],
+    [0x2705, 0x2705], [0x270A, 0x270B], [0x2728, 0x2728], [0x274C, 0x274C],
+    [0x274E, 0x274E], [0x2753, 0x2755], [0x2757, 0x2757], [0x2795, 0x2797],
+    [0x27B0, 0x27B0], [0x27BF, 0x27BF], [0x2B1B, 0x2B1C], [0x2B50, 0x2B50],
+    [0x2B55, 0x2B55]
+  ];
+  function isEmojiPresentationDefault(glyph) {
+    if (typeof glyph !== 'string' || !glyph) return false;
+    if (glyph.indexOf(String.fromCharCode(0xFE0F)) !== -1) return true; // VS16 emoji selector
+    for (var i = 0; i < glyph.length; i++) {
+      var cp = glyph.codePointAt(i);
+      if (cp > 0xFFFF) i++; // consumed a surrogate pair
+      if (cp >= 0x1F000) return true; // astral pictograph planes
+      for (var r = 0; r < BMP_EMOJI_PRESENTATION_RANGES.length; r++) {
+        if (cp >= BMP_EMOJI_PRESENTATION_RANGES[r][0] && cp <= BMP_EMOJI_PRESENTATION_RANGES[r][1]) return true;
+      }
+    }
+    return false;
+  }
+  // Assert every FROZEN §4 candidate is non-emoji-presentation AND outside the
+  // avoided blocks (U+2B00-2BFF and astral U+1F300+), EXCEPT the whitelisted
+  // tofu-confirm candidate U+2B4D. Returns { ok, offenders }.
+  function assertPaletteClean() {
+    var offenders = [];
+    for (var a = 0; a < ICON_REGISTRY_ORDER.length; a++) {
+      var cand = ICON_REGISTRY[ICON_REGISTRY_ORDER[a]].candidates;
+      for (var c = 0; c < cand.length; c++) {
+        var g = cand[c];
+        if (ICON_CANDIDATE_WHITELIST[g]) continue;
+        var cp = g.codePointAt(0);
+        var inAvoidBlock = (cp >= 0x2B00 && cp <= 0x2BFF) || cp >= 0x1F000;
+        if (isEmojiPresentationDefault(g) || inAvoidBlock) {
+          offenders.push({ action: ICON_REGISTRY_ORDER[a], glyph: g, cp: 'U+' + cp.toString(16).toUpperCase() });
+        }
+      }
+    }
+    return { ok: offenders.length === 0, offenders: offenders };
+  }
+
+  // Test hook (mirrors window.__voppingAutoAisle) - lands WITH S33 so the
+  // foundation is verifiable in its own formal pass BEFORE S34's UI exists.
+  if (typeof window !== 'undefined') {
+    window.__voppingIcons = {
+      iconFor: iconFor,
+      getRegistry: function () {
+        var entries = {};
+        for (var i = 0; i < ICON_REGISTRY_ORDER.length; i++) {
+          var id = ICON_REGISTRY_ORDER[i], e = ICON_REGISTRY[id];
+          entries[id] = { def: e.def, label: e.label, candidates: e.candidates.slice() };
+        }
+        return { order: ICON_REGISTRY_ORDER.slice(), entries: entries, fallback: FALLBACK_GLYPH };
+      },
+      getOverrides: function () {
+        var out = {};
+        for (var k in iconOverrides) { if (Object.prototype.hasOwnProperty.call(iconOverrides, k)) out[k] = iconOverrides[k]; }
+        return out;
+      },
+      ICONS_KEY: ICONS_KEY,
+      setIcon: setIcon,
+      resetIcon: resetIcon,
+      resetAll: resetAllIcons,
+      applyIcons: applyIcons,
+      assertPaletteClean: assertPaletteClean,
+      isEmojiPresentationDefault: isEmojiPresentationDefault
+    };
+  }
 
   // S15 (Locked, 2026-09-08): dedicated edit-icon glyph for in-place
   // item-name editing, PO's confirmed pick from `s15-edit-gesture-picker.html`
   // Option 3 ("dedicated edit-icon/button", not double-tap or long-press —
   // long-press was explicitly ruled out since S13 already claims it for
   // drag-pickup). This is the pencil glyph FREED from S7's own note-toggle
-  // (which moved to NOTE_TOGGLE_ICON_GLYPH above) — same glyph, different
+  // (now the ICON_REGISTRY 'note-toggle' default above) — same glyph, different
   // job, per the PO's explicitly-confirmed icon-pairing.
-  var NAME_EDIT_ICON_GLYPH = '✎';
+  // S33: this glyph now lives in ICON_REGISTRY ('name-edit', default U+270E,
+  // byte-identical); the draw-site pulls it via iconFor('name-edit').
 
   // S26 (Locked, 2026-09-11): the per-item aisle affordance glyph - the PO's
   // pick from the post-Lock set-aisle/glyph mockup (s26-aisle-presentation-
@@ -860,7 +1110,8 @@
   // falls THROUGH to the native <select> and opens the picker directly (one
   // tap, no showPicker()). S27 sizes THIS glyph via the overlay span's own
   // font-size - it is NOT an .icon-btn box (M26).
-  var AISLE_ICON_GLYPH = '⌖';
+  // S33: this glyph now lives in ICON_REGISTRY ('aisle-marker', default U+2316,
+  // byte-identical); the overlay span pulls it via iconFor('aisle-marker').
 
   // Editor field types sharing this one mechanism (mutual exclusivity, cross-
   // row/cross-action commit, draft-survives-unrelated-render): S7's 'note',
@@ -1737,6 +1988,12 @@
   var settingsEdit = null;        // { key, draft, error } while renaming an aisle/bucket
   var settingsCreateDraft = '';   // in-progress "New aisle…" text (survives re-render)
   var settingsCreateError = null; // inline create-field validation message
+  // S34 (R18): the action-id whose candidate palette is currently expanded (or
+  // null). Kept OUTSIDE `state` like settingsEdit, so it survives the panel's
+  // innerHTML rebuild - a candidate tap re-renders the panel and this keeps the
+  // same palette open (and the scroll offset is preserved in renderSettings), so
+  // the picker stays usable as the on-device tap-through-candidates decision tool.
+  var settingsIconOpen = null;
 
   function escapeHtml(value) {
     return String(value)
@@ -1780,7 +2037,7 @@
     // being edited (avoids a redundant icon next to that same field's own
     // open editor/display on the second line).
     var noteAffordance = (!noteVal && !isEditingNote)
-      ? '<button type="button" class="icon-btn" data-role="note-toggle" title="Add note">' + NOTE_TOGGLE_ICON_GLYPH + '</button>'
+      ? '<button type="button" class="icon-btn" data-role="note-toggle" title="Add note">' + escapeHtml(iconFor('note-toggle')) + '</button>'
       : '';
 
     // S26 (Locked, 2026-09-11): the per-item aisle affordance is a COLLAPSED
@@ -1809,7 +2066,7 @@
     // aisle affordance and delete) matches the exact arrangement the PO
     // reviewed and approved via that same decision-tool page.
     var editButton = !isEditingName
-      ? '<button type="button" class="icon-btn" data-role="name-toggle" title="Edit item">' + NAME_EDIT_ICON_GLYPH + '</button>'
+      ? '<button type="button" class="icon-btn" data-role="name-toggle" title="Edit item">' + escapeHtml(iconFor('name-edit')) + '</button>'
       : '';
 
     // S19 (Locked, 2026-09-09): Up/Down reorder controls, restored from S5,
@@ -1826,8 +2083,8 @@
     var reorderButtons = '';
     if (sortMode === 'manual') {
       reorderButtons =
-        '<button type="button" class="icon-btn" data-role="up" title="Move up"' + (index === 0 ? ' disabled' : '') + '>▲</button>' +
-        '<button type="button" class="icon-btn" data-role="down" title="Move down"' + (index === total - 1 ? ' disabled' : '') + '>▼</button>';
+        '<button type="button" class="icon-btn" data-role="up" title="Move up"' + (index === 0 ? ' disabled' : '') + '>' + escapeHtml(iconFor('move-up')) + '</button>' +
+        '<button type="button" class="icon-btn" data-role="down" title="Move down"' + (index === total - 1 ? ' disabled' : '') + '>' + escapeHtml(iconFor('move-down')) + '</button>';
     }
 
     // Second line (.row-meta): S26 emits it ONLY when it has real content (N14 -
@@ -1869,7 +2126,7 @@
       ' role="checkbox" tabindex="0" aria-checked="' + (item.checked ? 'true' : 'false') + '" aria-label="' + safeName + '">' +
       nameContent +
       noteAffordance + aisleControl + editButton + reorderButtons +
-      '<button type="button" class="icon-btn delete-btn" data-role="delete" title="Delete">✕</button>' +
+      '<button type="button" class="icon-btn delete-btn" data-role="delete" title="Delete">' + escapeHtml(iconFor('delete-item')) + '</button>' +
       secondLine +
       '</li>';
   }
@@ -1901,7 +2158,7 @@
     // Structural trigger only (reserved value + data-autodetect="1"); it is
     // NEVER `selected` - the item's real aisle option below carries the
     // selection - so a native <select> shows the chosen aisle, not this option.
-    html += '<option value="' + escapeHtml(AUTODETECT_VALUE) + '" data-autodetect="1">' + escapeHtml(AUTODETECT_ICON_GLYPH + ' ' + AUTODETECT_LABEL) + '</option>';
+    html += '<option value="' + escapeHtml(AUTODETECT_VALUE) + '" data-autodetect="1">' + escapeHtml(iconFor('auto-detect-option') + ' ' + AUTODETECT_LABEL) + '</option>';
     html += '<option value=""' + (curKey === '' ? ' selected' : '') + '>' + escapeHtml(noAisleLabel()) + '</option>';
     var pool = getAislePool();
     for (var i = 0; i < pool.length; i++) {
@@ -1920,7 +2177,7 @@
     // S26: the visible glyph, overlaid on the collapsed <select>. aria-hidden
     // (N15 - the <select>'s aria-label carries the accessible name); the CSS
     // makes it pointer-events:none so a tap falls through to the <select>.
-    html += '<span class="aisle-glyph" aria-hidden="true">' + AISLE_ICON_GLYPH + '</span>';
+    html += '<span class="aisle-glyph" aria-hidden="true">' + escapeHtml(iconFor('aisle-marker')) + '</span>';
     html += '</span>';
     return html;
   }
@@ -2439,6 +2696,7 @@
     settingsEdit = null;
     settingsCreateDraft = '';
     settingsCreateError = null;
+    settingsIconOpen = null; // S34: start with every icon palette collapsed
     settingsOverlay.hidden = false;
     renderSettings();
     // Deliberately do NOT auto-focus the create input - avoids popping the
@@ -2448,6 +2706,7 @@
   function closeSettings() {
     settingsOpen = false;
     settingsEdit = null;
+    settingsIconOpen = null;
     settingsOverlay.hidden = true;
   }
 
@@ -2458,6 +2717,11 @@
     // the caret out of the create field.
     var active = document.activeElement;
     var wasCreate = !!(active && active.dataset && active.dataset.role === 'aisle-create-input');
+    // S34 (R18): preserve the scroll offset of the scrollable panel across the
+    // full innerHTML rebuild, so tapping a candidate (which re-renders the panel)
+    // never jumps the PO away from the palette they are working through.
+    var scrollEl = settingsOverlay.querySelector('.settings-panel');
+    var savedScroll = scrollEl ? scrollEl.scrollTop : 0;
 
     var html = '<div class="settings-section">';
     html += '<h3 class="settings-section-title">Aisles</h3>';
@@ -2478,6 +2742,12 @@
     }
     html += '</ul>';
     html += '</div>';
+
+    // S34: the Icons panel (below Aisles) - every registry action's label +
+    // current effective glyph + a Change affordance opening its frozen candidate
+    // palette, per-action reset, and a global reset-all.
+    html += renderIconsSection();
+
     settingsBody.innerHTML = html;
 
     // Focus restore: an open rename editor wins; otherwise keep the create field
@@ -2489,6 +2759,9 @@
       var ci = settingsBody.querySelector('[data-role="aisle-create-input"]');
       if (ci) { ci.focus(); if (ci.setSelectionRange) { var cl = ci.value.length; ci.setSelectionRange(cl, cl); } }
     }
+    // S34 (R18): restore the panel scroll AFTER any focus restore (focusing an
+    // already-in-view input won't scroll, so this simply pins the offset).
+    if (scrollEl) scrollEl.scrollTop = savedScroll;
   }
 
   function renderAisleManageRow(key, display, isBucket) {
@@ -2506,6 +2779,58 @@
       h += '<button type="button" class="settings-mini-btn settings-delete-btn" data-role="aisle-delete" data-key="' + escapeHtml(key) + '" title="Delete">Delete</button>';
     }
     h += '</li>';
+    return h;
+  }
+
+  // S34: the Icons picker section. Each registry action shows its label, its
+  // current EFFECTIVE glyph (previewed at the target draw-site font-size - M34),
+  // and a Change control that expands the FROZEN candidate palette. R18: the open
+  // action-id is settingsIconOpen (preserved across the panel rebuild + the
+  // scroll offset), so tapping candidate after candidate never collapses the
+  // palette. A per-action Reset (shown only when overridden) and a global
+  // reset-all give the PO a way back to the known-rendering defaults. Candidates
+  // are addressed by INDEX (data-cand) so no glyph round-trips through a DOM
+  // attribute; every glyph is escapeHtml()'d at output (R17a). NB-6/M33: the boxes
+  // are NOT clipped, so a tofu/overflow shows honestly on-device.
+  function renderIconsSection() {
+    var overridden = 0, id, i;
+    for (i = 0; i < ICON_REGISTRY_ORDER.length; i++) {
+      if (Object.prototype.hasOwnProperty.call(iconOverrides, ICON_REGISTRY_ORDER[i])) overridden++;
+    }
+    var h = '<div class="settings-section" data-role="icons-section">';
+    h += '<h3 class="settings-section-title">Icons</h3>';
+    h += '<p class="settings-hint">Tap Change to try a different symbol, then pick one that shows clearly on your phone (not a blank box). Changes save automatically.</p>';
+    h += '<ul class="icon-manage-list">';
+    for (i = 0; i < ICON_REGISTRY_ORDER.length; i++) {
+      id = ICON_REGISTRY_ORDER[i];
+      var entry = ICON_REGISTRY[id];
+      var glyph = iconFor(id);
+      var fontSize = ICON_PREVIEW_FONT[id] || '1.15rem';
+      var isOpen = (settingsIconOpen === id);
+      var isOver = Object.prototype.hasOwnProperty.call(iconOverrides, id);
+      h += '<li class="icon-manage-item">';
+      h += '<div class="icon-manage-head">';
+      h += '<span class="icon-swatch" data-role="icon-current" style="font-size:' + fontSize + '">' + escapeHtml(glyph) + '</span>';
+      h += '<span class="icon-manage-label">' + escapeHtml(entry.label) + '</span>';
+      h += '<button type="button" class="settings-mini-btn" data-role="icon-change" data-icon-id="' + escapeHtml(id) + '"' + (isOpen ? ' aria-expanded="true"' : '') + '>' + (isOpen ? 'Done' : 'Change') + '</button>';
+      if (isOver) {
+        h += '<button type="button" class="settings-mini-btn" data-role="icon-reset" data-icon-id="' + escapeHtml(id) + '">Reset</button>';
+      }
+      h += '</div>';
+      if (isOpen) {
+        h += '<div class="icon-palette" data-role="icon-palette" data-icon-id="' + escapeHtml(id) + '">';
+        for (var c = 0; c < entry.candidates.length; c++) {
+          var cand = entry.candidates[c];
+          var isCur = (cand === glyph);
+          h += '<button type="button" class="icon-cand' + (isCur ? ' icon-cand--current' : '') + '" data-role="icon-pick" data-icon-id="' + escapeHtml(id) + '" data-cand="' + c + '"' + (isCur ? ' aria-pressed="true"' : '') + ' style="font-size:' + fontSize + '">' + escapeHtml(cand) + '</button>';
+        }
+        h += '</div>';
+      }
+      h += '</li>';
+    }
+    h += '</ul>';
+    h += '<button type="button" class="settings-mini-btn icon-reset-all-btn" data-role="icon-reset-all"' + (overridden ? '' : ' disabled') + '>Reset all icons to default</button>';
+    h += '</div>';
     return h;
   }
 
@@ -2570,6 +2895,23 @@
       commitSettingsRename();
     } else if (role === 'aisle-delete') {
       deleteSettingsAisle(control.dataset.key);
+    } else if (role === 'icon-change') {
+      // S34: toggle this action's candidate palette open/closed (R18 open-state).
+      var cid = control.dataset.iconId;
+      settingsIconOpen = (settingsIconOpen === cid) ? null : cid;
+      renderSettings();
+    } else if (role === 'icon-pick') {
+      // S34: apply + persist the tapped candidate. setIcon -> applyIcons ->
+      // render() -> renderSettings() (settingsOpen), which re-renders THIS panel
+      // with the palette still open (settingsIconOpen unchanged) at the same
+      // scroll offset - R18. The row icons / static glyphs update live too.
+      var pid = control.dataset.iconId;
+      var reg = ICON_REGISTRY[pid];
+      if (reg) setIcon(pid, reg.candidates[Number(control.dataset.cand)]);
+    } else if (role === 'icon-reset') {
+      resetIcon(control.dataset.iconId); // -> applyIcons -> renderSettings (palette stays open)
+    } else if (role === 'icon-reset-all') {
+      resetAllIcons();
     }
   });
 
@@ -2630,5 +2972,9 @@
   });
 
   render();
+  // S33: set the three static-HTML glyphs from iconFor() at init (render() above
+  // only draws the JS row icons + aisle overlay). With no override stored this is
+  // a no-op write (same glyph) - the byte-identical contract holds.
+  applyStaticIcons();
 
 }());
