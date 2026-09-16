@@ -5,8 +5,10 @@ Pre-Lock review DONE (Developer feasibility / Tester testability / QA hazard): Q
 with 2 Real findings (**R17**, **R18**) plus minors (M31–M34) and nitpicks (N18–N20); the Developer
 and Tester added sharpenings. ALL of those are now folded into the acceptance criteria below
 (SM, 2026-09-16) — the finding-by-finding ledger is **§8 (Pre-Lock review resolutions)**, which QA
-re-reads to confirm R17/R18 are closed before Lock. Do NOT build yet, and do NOT flip Status to
-Locked — Lock is the pipeline's call after QA's re-read. Supersedes the old pre-agreed
+re-reads to confirm R17/R18 are closed. **UPDATE 2026-09-16 — QA's re-read came back CLEAR:**
+R17a/R17b + R18 confirmed closed at f6e08c3, plus a Tester implementation note **N23** on the
+non-emoji guard (§4/§8). **S33 + S34 are now LOCKED (2026-09-16) — ready to build (S33 foundation
+first, then S34).** Supersedes the old pre-agreed
 U+2B4D→U+21AF blind-swap fallback.
 
 ## Goal
@@ -157,7 +159,7 @@ the vague "✐/verify" and "‹/›" placeholders):
 - `aisle-marker`: ⌖ U+2316 · ⚑ U+2691 · ⚐ U+2690 · ◉ U+25C9 · ⊚ U+229A · ▣ U+25A3 · ⌂ U+2302.
 
 **Non-emoji / avoid-block guard on the frozen palette (Tester sharpening).** A guard asserts no
-candidate is a colored-emoji pictograph (RGI-emoji / emoji-presentation-default) and none falls in
+candidate is a colored-emoji pictograph — keying on EMOJI-PRESENTATION-DEFAULT (`Emoji_Presentation=Yes`, or a glyph carrying a VS16 U+FE0F selector), **NOT** mere RGI-emoji / `Emoji=Yes` membership (**N23**, Tester implementation note): several text-default dingbats in the frozen palette (✳ U+2733, ✷ U+2737, ✦ U+2726, ✧ U+2727, ★ U+2605) ARE `Emoji=Yes` members but default to TEXT presentation, so an RGI-membership guard would false-fail the very candidates it exists to bless — and none falls in
 U+2B00–2BFF or astral U+1F300+ — with ONE explicit WHITELIST entry: **⭍ U+2B4D**, the intentionally
 retained tofu-confirm candidate, exempted from the avoid-U+2B00–2BFF rule the same way the auto-aisle
 lemon→'difficult' entry is exempted in `AUTO_AISLE_INTEGRITY_WHITELIST` (a deliberate, documented
@@ -305,6 +307,11 @@ Every pre-Lock-review finding, with where its AC now lives. QA re-reads this to 
   as the auto-aisle `lemon→'difficult'` integrity whitelist).
 - **Reset scope PINNED** — BOTH per-action reset AND a single reset-all (§3/§5).
 - **`iconFor('unknown-id')` PINNED** — returns `FALLBACK_GLYPH` `□` U+25A1, never throws (§2).
+- **N23 [S34] (Tester implementation note, added 2026-09-16)** — the non-emoji palette guard MUST
+  key on EMOJI-PRESENTATION-DEFAULT (`Emoji_Presentation=Yes`, or a VS16 U+FE0F selector), NOT on
+  mere RGI-emoji / `Emoji=Yes` membership: several frozen candidates (✳ U+2733, ✷ U+2737, ✦ U+2726,
+  ✧ U+2727, ★ U+2605) are `Emoji=Yes` members that default to TEXT presentation, and an
+  RGI-membership guard would false-fail the very candidates it exists to bless (§4).
 
 ## Open items for the PO (surface via Orchestrator)
 1. **Q4:** treat `auto-aisle-run` (S31 button) and `auto-detect-option` (S32 picker-wheel option) as
