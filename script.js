@@ -35,7 +35,14 @@
   // one-time versioned re-seed below (migrateAislesV2) - editing this list ALONE
   // is a silent no-op for them because migrateAisles() short-circuits on an
   // existing state.aisles.
-  var AISLE_STARTER_LIST = ['Produce', 'Meat', 'Seafood', 'Deli', 'Bakery', 'Dairy & Eggs', 'Frozen', 'Cereal & Breakfast', 'Canned & Jarred', 'Pasta, Rice & Grains', 'Baking & Spices', 'Condiments & Sauces', 'Snacks & Candy', 'Beverages', 'Household & Cleaning', 'Personal Care & Health', 'Pantry', 'Other'];
+  // S36 (2026-09-16): added 'International' in store-walk position between
+  // 'Condiments & Sauces' and 'Snacks & Candy' (18 real aisles + 'Other' = 19).
+  // Byte-identical (after normalize()) to the new window.AISLE_DICTIONARY
+  // 'International' key. FRESH state seeds all 19 directly from this list; an
+  // ALREADY-SEEDED (v2) device gets 'International' via the one-time
+  // migrateAislesV3 union below (appended at the tail of that device's own
+  // aisle order, not this store-walk slot - matches how v2's new starters land).
+  var AISLE_STARTER_LIST = ['Produce', 'Meat', 'Seafood', 'Deli', 'Bakery', 'Dairy & Eggs', 'Frozen', 'Cereal & Breakfast', 'Canned & Jarred', 'Pasta, Rice & Grains', 'Baking & Spices', 'Condiments & Sauces', 'International', 'Snacks & Candy', 'Beverages', 'Household & Cleaning', 'Personal Care & Health', 'Pantry', 'Other'];
 
   // ---- S28: versioned one-time aisle re-seed --------------------------------
   // migrateAisles() (S22) short-circuits on an already-seeded state.aisles, so a
@@ -43,7 +50,15 @@
   // state.seedVersion (absent/undefined = pre-S28 = "behind current" = run once;
   // fresh defaultState() gets stamped to current the same load). Runs EXACTLY
   // once per device (idempotent: a reload at the current version is a no-op).
-  var AISLE_SEED_VERSION = 2; // bumped from the implicit v1 (pre-S28 seeded set)
+  // S36 (2026-09-16): bumped 2->3 for the 'International' aisle. This is now ONLY
+  // the current/highest marker (used for fresh-state final stamping + the debug
+  // readout). It is CRITICAL that each migration step is pinned to its OWN
+  // LITERAL version target below (V2 gates>=2/stamps=2; V3 gates>=3/stamps=3),
+  // NOT this global - otherwise bumping this constant would re-open V2's gate on
+  // an existing v2 device (2 >= 3 is false), re-running V2's union and
+  // resurrecting a user-deleted v2 starter (N13 violation) then stamping to 3
+  // and skipping V3. See migrateAislesV2/migrateAislesV3.
+  var AISLE_SEED_VERSION = 3;
   // Genuinely-NEW starters this version introduces (never existed in the pre-S28
   // taxonomy). ONLY these are unioned in, so the union can NEVER resurrect a
   // user-DELETED old starter (N13 no-resurrect): the carry-over old starters
@@ -56,6 +71,11 @@
   // intentionally NOT renamed - it survives untouched as a custom aisle while
   // 'Meat' and 'Seafood' are added fresh (via AISLE_V2_NEW_STARTERS).
   var AISLE_V2_RENAMES = [['dairy', 'Dairy & Eggs'], ['household', 'Household & Cleaning']];
+  // S36 v3 union: the single genuinely-new starter this version introduces. ONLY
+  // 'International' is unioned in (NEVER the full starter list), so V3 can never
+  // resurrect a user-deleted v2 starter (N13). No renames/re-tags in v3 - it is a
+  // pure additive union, so it never re-maps an item.aisle.
+  var AISLE_V3_NEW_STARTERS = ['International'];
   // Built-in default label for the no-aisle bucket, and the hard fallback once
   // the user deletes that label in Settings (S23). Compared against the
   // LITERAL constant at first migration (state.unassignedLabel does not exist
@@ -158,8 +178,13 @@
     // page): migrateAisles() always leaves st.aisles/st.items as arrays, but
     // guard anyway rather than trust it.
     if (!st || !Array.isArray(st.aisles) || !Array.isArray(st.items)) return false;
-    if (typeof st.seedVersion === 'number' && st.seedVersion >= AISLE_SEED_VERSION) {
-      return false; // already at/after current - one-time gate closed (idempotent)
+    // S36: gate on the LITERAL 2 (NOT the global AISLE_SEED_VERSION, now 3) - so
+    // this step runs exactly on a device below v2 and NEVER re-runs on a v2/v3
+    // device. Pinning to the literal is the data-safety fix: keying this to the
+    // global would re-open the gate whenever the global is bumped, re-running the
+    // union and resurrecting a user-deleted v2 starter (N13).
+    if (typeof st.seedVersion === 'number' && st.seedVersion >= 2) {
+      return false; // already at/after v2 - one-time gate closed (idempotent)
     }
     var i, r;
     // 1. RENAMES (+ item re-tag, MERGE-not-duplicate). Only when the OLD source
@@ -175,8 +200,39 @@
       var nk = normalize(AISLE_V2_NEW_STARTERS[i]);
       if (!have[nk]) { have[nk] = true; st.aisles.push(AISLE_V2_NEW_STARTERS[i]); }
     }
-    // 3. Stamp the version so this whole step never runs again on this device.
-    st.seedVersion = AISLE_SEED_VERSION;
+    // 3. Stamp the LITERAL 2 (NOT the global) so this step never runs again on
+    //    this device even after AISLE_SEED_VERSION is bumped past 2. V3 runs
+    //    right after and advances the stamp to 3.
+    st.seedVersion = 2;
+    return true;
+  }
+
+  // ---- S36: one-time versioned taxonomy re-seed (v3: International) ----------
+  // Mirrors migrateAislesV2's shape, pinned to its OWN LITERAL target (3), NOT
+  // the global AISLE_SEED_VERSION. V2 is gated >=2/stamps=2 and V3 is gated
+  // >=3/stamps=3; run V2 then V3 in ascending order after loadState(). Because
+  // each step owns its literal gate, bumping AISLE_SEED_VERSION to 3 can NEVER
+  // re-open V2's gate on a v2 device (which would re-run V2's union and
+  // resurrect a user-deleted v2 starter - N13). V3 is a PURE ADDITIVE union of
+  // the single new starter 'International' (AISLE_V3_NEW_STARTERS): no
+  // rename/re-tag, so it never re-maps an item.aisle and never drops a user
+  // aisle; union-by-normalized-key means a user-hand-created 'International' is
+  // merged, not duplicated; and once it stamps seedVersion=3 the gate closes, so
+  // a later user delete of 'International' is never resurrected (N13). Runs at
+  // init - R1-defensive, must never throw/blank the page. Returns true iff it
+  // mutated.
+  function migrateAislesV3(st) {
+    if (!st || !Array.isArray(st.aisles) || !Array.isArray(st.items)) return false;
+    if (typeof st.seedVersion === 'number' && st.seedVersion >= 3) {
+      return false; // already at/after v3 - one-time gate closed (idempotent)
+    }
+    var i, have = {};
+    for (i = 0; i < st.aisles.length; i++) have[normalize(st.aisles[i])] = true;
+    for (i = 0; i < AISLE_V3_NEW_STARTERS.length; i++) {
+      var nk = normalize(AISLE_V3_NEW_STARTERS[i]);
+      if (!have[nk]) { have[nk] = true; st.aisles.push(AISLE_V3_NEW_STARTERS[i]); }
+    }
+    st.seedVersion = 3; // literal target - see header
     return true;
   }
 
@@ -274,6 +330,10 @@
   // mutates once per device (seedVersion gate), then the saveState() below makes
   // the upgraded set durable from the outset.
   migrateAislesV2(state);
+  // S36: v3 union runs right after v2, in ascending version order. Each step owns
+  // its literal gate/stamp (V2:2, V3:3), so both run exactly once on a pre-v2
+  // device, only V3 runs on a v2 device, and neither runs on a v3 device.
+  migrateAislesV3(state);
   // S22 (N13): persist the seeded aisle set once on first load so it is durable
   // from the outset. Idempotent - a state that was already seeded serializes
   // back byte-for-identical, and the Other->'' item remap only runs when
