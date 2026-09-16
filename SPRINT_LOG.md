@@ -1998,6 +1998,30 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   screenshots, `test-plans/REGRESSION_LOG.md`, and the untracked `test-plans/S31`/`S32` docs. No
   app code changed — the `aisle-dictionary.js` population is the Developer's build step.
 
+## Sprint 7 — S35/S36 shipped + DONE, 2026-09-16
+
+- **Dev shipped both (`e549ac2`); Tester formal pass 441/441, 0 defects — S35 + S36 → DONE.** Flipped
+  both in BACKLOG.md (master-table Status cells + prose rows) and here. The whole pass is **fully
+  desktop-verifiable — NO NB-6 device gate**: `International` is a data string (an aisle name +
+  dictionary entries), not a rendered glyph, so there is no tofu-vs-real on-device question of the
+  kind the icon picker (S33/S34) carries.
+- **S36 shipped** the versioned **V2/V3 migration** (with the Dev-critical literal-version fix — V2
+  gated/stamped at literal `2`, new V3 gated `>= 3` / stamps `3`, union set ONLY `['International']`),
+  so `International` lands in `state.aisles` on the PO's next app-open, exactly once, **N13-safe** (no
+  resurrect of a user-deleted aisle, merge-not-duplicate, no item re-map) — plus the multi-cuisine
+  dictionary population (Mexican/Latin, broad Asian, Mediterranean/Middle-Eastern, the new Indian
+  category, Kosher), the MOVEs out of source aisles, and the tier-2 International canonicals for the
+  matcher-critical multi-word terms (`sesame oil`, `rice`/`rice wine` vinegar, `plum wine vinegar`,
+  `rice noodles`).
+- **S35 shipped** the dictionary correctness fix pass (missing bare head-word staples + `chicken`
+  re-home to Meat), with the tier-4 side-effect + compound-token regression guards all passing.
+- **S31/S32 deliberately UNCHANGED** — they stay "Done GATED on the S34 icon-picker glyph fix" (their
+  U+2B4D glyph is the tofu the picker resolves); a separate track from this data-only work.
+- **Commit scope — docs ONLY (`BACKLOG.md`, `SPRINT_LOG.md`):** staging verified via
+  `git -C "<repo>" diff --cached --name-only`. Excluded the local-only console files, `QA_FINDINGS.md`,
+  `PLAYBOOK_UPDATES_PENDING.md`, the `*.png`/`*.jpg` images, and the untracked `test-plans/S31-*.md` /
+  `S32-*.md` docs. No app code changed here — the ship was the Developer's `e549ac2`.
+
 ## Parked / unscheduled
 
 - **S11** (recipe-paste alternate ingest mode) — explicitly not sequenced into
