@@ -1868,6 +1868,66 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   testability → QA hazard) before Lock and build. QA is currently on a separate dictionary audit;
   the Orchestrator brings the reviewers in after this slice.
 
+## Sprint 7 — Auto-Aisle dictionary/taxonomy follow-ups (S35/S36 drafted) + icon-picker follow-up resolutions, 2026-09-16
+
+- **Icon-picker follow-ups folded in (from the Orchestrator, same session):** (1) **Q4 → Answered
+  (A)** in QUESTIONS.md — `auto-aisle-run` (S31 button) and `auto-detect-option` (S32 picker-wheel
+  option) are TWO separate registry entries sharing one default glyph + palette (my recommended
+  default, adopted). (2) **S31/S32 disposition REVISED** — the Orchestrator is NOT flipping them
+  Done: the PO sees the ⭍/U+2B4D Auto-aisle button as a visible tofu box on their phone, and won't
+  mark "Done" something the PO sees as broken. Updated the S31/S32 BACKLOG rows to
+  "implemented + Tester formal pass 404/404 + function confirmed on-device; **Done GATED on the S34
+  icon-picker glyph fix**"; the blind U+2B4D→U+21AF swap stays superseded; the uncommitted 404/404
+  REGRESSION_LOG row + Tester's S31/S32 test-plan docs ride the eventual auto-aisle Done-flip after
+  S34. Also synced the Priority Queue Sprint-5 summary line to match. (No new commit was strictly
+  required for these, but they ride this session's docs commit.)
+- **New slicing task — the PO's dictionary fixes (from QA's audit) + a new International aisle.**
+  Continued numbering from S34. Verified the relevant code from the files (not memory): the S28
+  versioned re-seed machinery (`AISLE_STARTER_LIST`, `AISLE_SEED_VERSION = 2`, `AISLE_V2_NEW_STARTERS`,
+  `AISLE_V2_RENAMES`, `migrateAislesV2` gated on + stamping the GLOBAL `AISLE_SEED_VERSION`,
+  `reseedRenameAisle`, run once after `loadState()`), and confirmed in `aisle-dictionary.js` that bare
+  `chicken` currently resolves to Canned & Jarred (its only occurrence is the alias under canonical
+  `canned chicken`, ~line 4556) and that `tortilla`/`corn tortilla`/`flour tortilla` (~2726/2393/2491)
+  live in Bakery, while `naan`/`pita`/`flatbread` are also in Bakery.
+- **S35 — dictionary correctness fix pass (data-only, low risk, Sprint 7):** add the missing bare
+  head-word staples as canonicals (`cheese`→Dairy & Eggs; `rice`/`pasta`/`noodles`→Pasta, Rice &
+  Grains; `beef`/`steak`/`sausage`→Meat; `fish`→Seafood; `vinegar`→Condiments & Sauces;
+  `batteries`/`battery`→Household & Cleaning; + lower-freq pork/oil/cream/juice/vitamins) and RE-HOME
+  `chicken` to Meat via a new Meat canonical (canonical-beats-alias; `canned chicken` stays in Canned).
+  Judgment-calls (peas, tuna, colby/condensed-milk/broth-stock) left untouched. AC requires a matcher
+  assertion per new/changed term + a regression assertion that existing multi-word terms still resolve
+  + `validateDictionary()` clean. No migration/UI. Depends on S29 (Done).
+- **S36 — new International aisle (taxonomy 18→19 + S28-style versioned migration + dictionary
+  population, Sprint 7):** add `International` to `AISLE_STARTER_LIST` (store-walk position: between
+  Condiments & Sauces and Snacks & Candy, adjustable), bump `AISLE_SEED_VERSION` 2→3, add a once-only
+  version-gated `migrateAislesV3`-style union of `International` (runs exactly once, N13 no-resurrect,
+  merge-not-duplicate, never drops user aisles / never re-maps item aisles, R1-defensive). Populate an
+  `International` dictionary key: tortillas MOVED out of Bakery, taco shells, tostadas, kosher staples
+  (matzah/matzo, gefilte fish, Manischewitz) + a modest international set. Naan/pita/flatbread stay in
+  Bakery.
+- **Data-safety hazard called out in S36's AC (same class as the S28 short-circuit blocker):**
+  `migrateAislesV2` is gated on AND stamps the GLOBAL `AISLE_SEED_VERSION`, so naively bumping that
+  constant to 3 would re-open V2's gate on a v2 device (`2 >= 3` false) — re-running V2's union and
+  RESURRECTING any user-deleted v2 starter (e.g. a deleted `Deli`), an N13 violation — and re-stamp
+  seedVersion=3, skipping V3. Required fix folded into the AC: pin each version step to its OWN literal
+  target (V2 gated `>= 2`/stamps `= 2`; V3 gated `>= 3`/stamps `= 3`), run V2 then V3 in order;
+  `AISLE_SEED_VERSION` becomes just the current/highest marker (3). QA's hazard review focuses here.
+- **PO question logged (QUESTIONS.md Non-blocking):** per the Orchestrator's flag-don't-move
+  instruction, listed the well-placed dictionary items that MIGHT belong in International later
+  (salsa/salsa verde/soy sauce/sriracha/hoisin/tahini, coconut milk/refried beans, couscous/ramen/rice
+  noodles, hummus) and left them all in their current aisles by default; the PO can request any move as
+  a cheap future data edit. Naan/pita/flatbread flagged as staying in Bakery.
+- **Sequence:** S35 → S36 (both edit `aisle-dictionary.js`, so sequenced to avoid two passes stepping
+  on the same file even though logically independent). Both then run the standard pre-Lock review
+  (Dev feasibility → Tester testability → QA hazard) before Lock + build; S36's migration is the
+  data-safety focus.
+- **Commit scope — docs ONLY (`BACKLOG.md`, `QUESTIONS.md`, `SPRINT_LOG.md`):** verified staging
+  before committing. EXCLUDED the local-only console files (`status.js`, `backlog-status.js`,
+  `status-archive.js`), `QA_FINDINGS.md`, `PLAYBOOK_UPDATES_PENDING.md`, the PO's `*.png`/`*.jpg`
+  screenshots, the pre-existing uncommitted `test-plans/REGRESSION_LOG.md` (incl. the 404/404 row) and
+  the untracked `test-plans/S31`/`S32` test-plan docs (Tester's in-flight work, riding the eventual
+  auto-aisle Done-flip). No app code changed — slicing only.
+
 ## Parked / unscheduled
 
 - **S11** (recipe-paste alternate ingest mode) — explicitly not sequenced into
