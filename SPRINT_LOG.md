@@ -1805,6 +1805,69 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   `aisle-dictionary.js` source of truth at S29, so they were redundant (untracked, so no commit
   needed for the deletion).
 
+## Sprint 6 — Settings icon picker slicing (S33/S34 drafted), 2026-09-16
+
+- **Goal (fresh SM re-spawn; slicing only, no build):** the PO tried Auto-Aisle (S28-S32) on
+  their phone — the FUNCTION works well (list-wide fill-empty run; per-item Auto-detect), but the
+  ⭍ (U+2B4D) glyph chosen for it renders as a tofu box on iOS Safari. Rather than blind-swap to
+  another guessed glyph (the old pre-agreed U+2B4D→U+21AF fallback), the PO decided to build an
+  ICON PICKER covering ALL app icons, since glyph-tofu has recurred across the project (S7/S16/
+  S21/S26 all shipped "placeholder pending PO pick" glyphs). Sliced the feature into stories,
+  continuing the numbering from S32.
+- **Icon inventory (read from the code, not memory):** enumerated all 10 glyph-bearing actions —
+  `settings-gear` ⚙ U+2699 (index.html), `settings-close` ✕ U+2715 (index.html),
+  `auto-aisle-run` ⭍ U+2B4D (index.html, the tofu), `note-toggle` 🗋 U+1F5CB (script.js
+  `NOTE_TOGGLE_ICON_GLYPH`), `name-edit` ✎ U+270E, `move-up` ▲ U+25B2, `move-down` ▼ U+25BC,
+  `delete-item` ✕ U+2715, `aisle-marker` ⌖ U+2316, `auto-detect-option` ⭍ U+2B4D (script.js
+  `AUTODETECT_ICON_GLYPH`, inside a native `<option>`). Text-only controls (Undo, Clear crossed
+  off, Add/Save/Rename/Delete, sort select) carry no glyph → out of scope. No CSS-drawn
+  pseudo-element glyphs exist (checked style.css). Wrote it up in a new short spec,
+  `ICON_PICKER_SPEC.md` (§1 inventory table, §2 registry, §3 persistence, §4 evidence-based
+  candidate palette, §5 picker UI, §6 non-regression, §7 slicing, Open item Q4).
+- **Slice (Sprint 6, sequenced S33 → S34):** **S33** — central icon registry (`action-id →
+  default glyph`) + an `iconFor()` accessor routing EVERY draw-site through it (JS row icons AND
+  the three static index.html glyphs) + a persisted override map `vopping-icons-v1` (R1-defensive
+  parse, override-else-default). No visible change — the regression-safety foundation. **S34** —
+  the Settings "Icons" panel: per-action "Change" → curated candidate palette (plain Unicode,
+  several known-iOS-safe) → applies + persists live, with reset-to-default; the PO picks the
+  auto-aisle glyph (and any other) ON-DEVICE, resolving the U+2B4D tofu. NB-6: on-device
+  rendering is the acceptance signal; desktop verifies registry/persistence/apply-everywhere
+  structure. Do-not-regress: S26/S27 density + icon layout, R14 timing/focus, S21 shell / S23
+  aisle-CRUD.
+- **Candidate-palette rationale (folded into S34's AC + spec §4):** the palette MUST include
+  glyphs known to render on iOS or it's useless. Anchored the curation on THIS project's own
+  proven-on-device glyphs (⚑ U+2691 S16, ⌖ U+2316 S26 PO-picked on-device, ✎ U+270E S15,
+  ▲/▼ U+25B2/25BC S19, ✕ U+2715) and their BMP blocks (Dingbats/Geometric/Misc-Symbols/Arrows/
+  Misc-Technical); AVOID the U+2B00–2BFF block (where the tofu'd U+2B4D lives) and astral-plane
+  U+1F300+ (the note-toggle U+1F5CB collapsed here). The shipped picker doubles as the on-device
+  decision tool (density-picker / s16 / s26 precedent).
+- **PO question logged (QUESTIONS.md Blocking):** **Q4** — treat `auto-aisle-run` (S31 button)
+  and `auto-detect-option` (S32 picker-wheel option) as ONE shared pickable icon or TWO
+  independent entries? They render in different contexts, so a glyph safe in one isn't
+  guaranteed safe in the other. Recommended default: TWO entries sharing one default glyph +
+  palette (superset-safe; collapses to a shared pick if the PO picks B). Blocks S33/S34 Lock
+  only; S33 can build on the default.
+- **S31/S32 disposition (recommendation, awaiting Orchestrator confirmation):** verified from git
+  that S31/S32 are already IMPLEMENTED (sha `3ac58fb`, "IMPLEMENTED (NOT YET DONE)") with the
+  function confirmed on the PO's phone, awaiting their Tester formal passes. Recommend NOT holding
+  their Done for the icon picker: per NB-6 the on-device glyph is a NON-blocking real-device
+  signal and the function is already confirmed, so their functional Done should proceed on their
+  own formal passes (desktop structure/undo/toast/eligibility), with the U+2B4D glyph-rendering
+  acceptance TRANSFERRED to S34 and the blind U+2B4D→U+21AF swap SUPERSEDED. Coupling two
+  stories' Done in lockstep to a downstream feature would contradict NB-6 and this project's
+  cross-story-supersession precedent (S5 stayed Done through S13's UI change). Added a dated
+  disposition note to each of the S31/S32 rows; left their Status Locked pending confirmation +
+  formal passes (did NOT flip status — that's the pipeline's + Orchestrator's call).
+- **Commit scope — docs ONLY (`BACKLOG.md`, `QUESTIONS.md`, `SPRINT_LOG.md`, `ICON_PICKER_SPEC.md`):**
+  verified staging before committing. EXCLUDED the local-only console files (`status.js`,
+  `backlog-status.js`), `QA_FINDINGS.md`, `PLAYBOOK_UPDATES_PENDING.md`, the PO's `*.png`/`*.jpg`
+  screenshots, the pre-existing uncommitted `test-plans/REGRESSION_LOG.md` working-tree change and
+  the untracked `test-plans/S31`/`S32` files (Tester's in-flight work, not mine to touch). No app
+  code changed — this session is slicing only.
+- **Next:** the stories go through the standard pre-Lock review (Developer feasibility → Tester
+  testability → QA hazard) before Lock and build. QA is currently on a separate dictionary audit;
+  the Orchestrator brings the reviewers in after this slice.
+
 ## Parked / unscheduled
 
 - **S11** (recipe-paste alternate ingest mode) — explicitly not sequenced into
