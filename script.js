@@ -871,8 +871,8 @@
   var ICON_REGISTRY = {
     'settings-gear':      { def: '⚙',       label: 'Settings menu',           candidates: ['⚙', '⛭', '☰', '⋮', '⚒', '✜'] },
     'settings-close':     { def: '✕',       label: 'Close settings',          candidates: ['✕', '✗', '×', '⨯'] },
-    'auto-aisle-run':     { def: '⭍',       label: 'Auto-aisle (button)',     candidates: ['↯', '⌁', '✦', '✧', '✳', '✷', '⟳', '⊛', '★', '⭍'] },
-    'note-toggle':        { def: '🗋', label: 'Add / edit note',         candidates: ['✎', '☰', '▤', '≡', '✍', '⊞'] },
+    'auto-aisle-run':     { def: '↯',       label: 'Auto-aisle (button)',     candidates: ['↯', '⌁', '✦', '✧', '✳', '✷', '⟳', '⊛', '★', '⭍'] },
+    'note-toggle':        { def: '☰', label: 'Add / edit note',         candidates: ['✎', '☰', '▤', '≡', '✍', '⊞'] },
     'name-edit':          { def: '✎',       label: 'Edit item name',          candidates: ['✎', '✍'] },
     'move-up':            { def: '▲',       label: 'Move item up',            candidates: ['▲', '↑', '⌃', '∧'] },
     'move-down':          { def: '▼',       label: 'Move item down',          candidates: ['▼', '↓', '⌄', '∨'] },
