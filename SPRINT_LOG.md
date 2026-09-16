@@ -2022,6 +2022,33 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   `PLAYBOOK_UPDATES_PENDING.md`, the `*.png`/`*.jpg` images, and the untracked `test-plans/S31-*.md` /
   `S32-*.md` docs. No app code changed here — the ship was the Developer's `e549ac2`.
 
+## Sprint 6 — S33/S34 shipped + THE FINISH: S31–S34 all DONE, 2026-09-16
+
+- **S33 + S34 (icon picker) → DONE.** Dev shipped; Tester reconfirmed the 2 new icon defaults CLEAN
+  at **483/483 @`8322b59`, 0 defects** (NUL-clean; `node --check` passes). Both the desktop
+  acceptance (registry / persistence / apply-everywhere, R17a escaping, R17b content-guard, R18
+  palette-state) AND the **NB-6 on-device** acceptance are met: the PO used the shipped picker on
+  their phone, saw the candidates render, and picked **↯ U+21AF for the Auto-aisle button** + **☰
+  U+2630 for the note toggle** — both confirmed rendering at their draw-sites.
+- **The 2 picks were PROMOTED to the registry DEFAULTS** (the durable fix the whole feature existed
+  for): `auto-aisle-run` **↯ U+21AF** replaces the boxing `⭍ U+2B4D`; `note-toggle` **☰ U+2630**
+  replaces the astral `🗋 U+1F5CB`. That retires the last two tofu/indistinct glyphs.
+- **S31 + S32 (auto-aisle triggers) → DONE.** Their Done was GATED on the S34 glyph fix (the
+  Auto-aisle button + Auto-detect option both drew `⭍ U+2B4D`, which boxed on iOS). S34 delivered it
+  — the button now renders `↯` — so the gate is DISCHARGED. Flipped both Done, citing their prior
+  **404/404 formal pass (@`3ac58fb`)** + the now-resolved glyph. The whole Auto-aisle feature
+  (S28–S32) is on-device-complete.
+- **Master table now shows Done for S31, S32, S33, S34** (Sprint 5/6 cells), alongside S28–S30 and
+  S35/S36 — every shipped story reads Done.
+- **Commit scope — the Done bundle:** `BACKLOG.md`, `SPRINT_LOG.md`, `test-plans/REGRESSION_LOG.md`
+  (the 483/483 row), and the S31/S32/S33/S34 test-plan docs (S33/S34 updated to DONE by the Tester;
+  S31/S32 were the previously-untracked docs riding this flip). Staging verified via
+  `git -C "<repo>" diff --cached --name-only`. EXCLUDED the local-only console files
+  (`status.js`/`status.html`/`backlog-status.js`/`status-archive.js`), `QA_FINDINGS.md`,
+  `PLAYBOOK_UPDATES_PENDING.md`, and the `*.png`/`*.jpg` images.
+- **Non-blocking carry-forward (deliberately NOT in this docs commit):** the Dev flagged 2 now-stale
+  in-code comments in `script.js` ('defaults byte-identical to ship') for a later code-cleanup pass.
+
 ## Parked / unscheduled
 
 - **S11** (recipe-paste alternate ingest mode) — explicitly not sequenced into
