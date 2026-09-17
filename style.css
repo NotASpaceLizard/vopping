@@ -91,9 +91,18 @@ button:disabled {
   display: flex;
   gap: 0.5rem;
   margin: 1rem 0;
+  /* S38: keep the "Add" button top-aligned when the textarea grows to multiple
+     lines on a paste, rather than stretching the button to match. */
+  align-items: flex-start;
 }
 
-.add-form input[type="text"] {
+/* S38: the unified add control is now a <textarea id="add-input"> (was an
+   <input type="text">), so a multi-line paste keeps its newlines. Same box
+   styling as the old single-line field; rows="1" + this sizing keep it one line
+   tall at rest, and it may grow when a paste is dropped in or Shift+Enter adds
+   lines. The separate .paste-panel/.paste-form (S4) rules were removed with that
+   markup. */
+.add-form textarea {
   flex: 1;
   min-width: 0;
   font: inherit;
@@ -102,42 +111,8 @@ button:disabled {
   border-radius: 6px;
   background: var(--bg-card);
   color: var(--text);
-}
-
-/* S4: paste-to-ingest, collapsed by default (see index.html comment). */
-.paste-panel {
-  margin-bottom: 1rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.5rem 0.75rem;
-  background: var(--bg-card);
-}
-
-.paste-panel summary {
-  cursor: pointer;
-  font-weight: 600;
-  padding: 0.25rem 0;
-}
-
-.paste-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-}
-
-.paste-form textarea {
-  font: inherit;
-  padding: 0.4rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg-page);
-  color: var(--text);
   resize: vertical;
-}
-
-.paste-form button {
-  align-self: flex-start;
+  line-height: 1.3;
 }
 
 .empty-state {
@@ -366,7 +341,9 @@ button:disabled {
   font-size: 1.35rem;
 }
 .items .icon-btn[data-role="up"],
-.items .icon-btn[data-role="down"] {
+.items .icon-btn[data-role="down"],
+.items .icon-btn[data-role="aisle-up"],   /* S39: header arrows share the size */
+.items .icon-btn[data-role="aisle-down"] {
   font-size: 1.28rem;
 }
 .items .icon-btn[data-role="delete"] {
@@ -602,6 +579,26 @@ button:disabled {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--accent);
+  /* S39: seat the group label + its up/down reorder arrows on one line. */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+/* S39: the reorder arrows sit at the header's trailing edge; the label takes the
+   remaining width and ellipsizes if long, so the arrows never get pushed off. */
+.items .aisle-group-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.items .aisle-group-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
 }
 
 .items li.aisle-group-header:first-child {

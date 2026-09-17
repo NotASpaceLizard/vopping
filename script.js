@@ -1572,6 +1572,55 @@
     return state.aisles;
   }
 
+  // S39: aisle-group reorder helpers (By-Aisle view). A reorder is a pure
+  // in-place permutation of the persisted state.aisles array (NO new key, NO
+  // version bump) - the SAME array drives both the by-aisle grouping order and
+  // the picker option order (getAislePool reads it), so FT3's dropdown-order fix
+  // is automatic.
+  function indexInAisles(key) {
+    for (var i = 0; i < state.aisles.length; i++) {
+      if (normalize(state.aisles[i]) === key) return i;
+    }
+    return -1;
+  }
+  // The VISIBLE (item-bearing) real aisles, in current persisted order. Excludes
+  // the no-aisle bucket and any R15 dangling value not present in state.aisles
+  // (those render headers but carry NO reorder arrows). This is the sequence the
+  // header arrows move within, matching how the grouping comparator lays groups
+  // out, so first/last-disable and neighbor-finding agree with what's rendered.
+  function getVisibleAisleOrder() {
+    var present = Object.create(null);
+    for (var i = 0; i < state.items.length; i++) {
+      var k = state.items[i].aisle ? normalize(state.items[i].aisle) : '';
+      if (k) present[k] = true;
+    }
+    var out = [];
+    for (var j = 0; j < state.aisles.length; j++) {
+      var ak = normalize(state.aisles[j]);
+      if (present[ak]) out.push(ak);
+    }
+    return out;
+  }
+  // Move a whole aisle up (-1) or down (+1) by SWAPPING its state.aisles slot
+  // with its nearest VISIBLE neighbor's slot, so every tap visibly moves the
+  // group in the list (any empty, headerless aisles between them keep their own
+  // slots and ride along). Persists + re-renders.
+  function moveAisle(aisleKey, dir) {
+    var visible = getVisibleAisleOrder();
+    var vpos = visible.indexOf(aisleKey);
+    if (vpos === -1) return;             // not a reorderable visible aisle
+    var tpos = vpos + dir;
+    if (tpos < 0 || tpos >= visible.length) return; // at an end (arrow disabled)
+    var from = indexInAisles(aisleKey);
+    var to = indexInAisles(visible[tpos]);
+    if (from === -1 || to === -1) return;
+    var tmp = state.aisles[from];
+    state.aisles[from] = state.aisles[to];
+    state.aisles[to] = tmp;
+    saveState();
+    render();
+  }
+
   // S22: the live label for the intrinsic no-aisle bucket - state.unassignedLabel
   // (default 'Other'), or the built-in 'Unassigned' fallback once the user has
   // deleted the Other label in Settings (S23).
@@ -1896,9 +1945,33 @@
   }
 
   // ---- S9: sort view (view-only, never rewrites state.items' own order) ---
-  // In-memory only, per locked AC - does not persist across reload (always
-  // resets to 'manual').
+  // S37 (2026-09-17): the selected mode now PERSISTS to its own localStorage
+  // key (vopping-sort-v1) and is restored on load BEFORE the first render (see
+  // the restore just after the sortSelect capture below). Default stays 'manual'
+  // until that restore runs. Strictly view-only - persisting never touches
+  // state.items order (getSortedItems still returns a .slice()d copy per mode).
+  var SORT_KEY = 'vopping-sort-v1';
   var sortMode = 'manual'; // 'manual' | 'alpha' | 'aisle'
+
+  // S37: read the persisted sort mode with a defensive whitelist. try/catch
+  // mirrors loadFrequency/loadOverrides (private-browsing localStorage throws);
+  // an absent key, unknown/corrupt string, or non-match all fall back to
+  // 'manual' (today's default). Explicit equality (NOT an object-membership
+  // test) so an inherited property name can never sneak through.
+  function loadSortMode() {
+    try {
+      var raw = window.localStorage.getItem(SORT_KEY);
+      if (raw === 'manual' || raw === 'alpha' || raw === 'aisle') return raw;
+      return 'manual';
+    } catch (e) {
+      return 'manual';
+    }
+  }
+  function saveSortMode(mode) {
+    try {
+      window.localStorage.setItem(SORT_KEY, mode);
+    } catch (e) { /* localStorage unavailable - graceful, same as saveFrequency */ }
+  }
 
   function compareByName(a, b) {
     return normalize(a.name).localeCompare(normalize(b.name));
@@ -1915,16 +1988,31 @@
       return state.items.slice().sort(compareByName);
     }
     if (sortMode === 'aisle') {
-      return state.items.slice().sort(function (a, b) {
+      // S39 (2026-09-17): groups are ordered by their index in the PERSISTED
+      // state.aisles array - the SAME order that drives the aisle-picker options
+      // (getAislePool) - NOT alphabetically as before. Header up/down arrows
+      // permute state.aisles in place; this comparator just reads that order.
+      var order = Object.create(null); // Object.create(null) so a normalized key
+      for (var oi = 0; oi < state.aisles.length; oi++) { // like '__proto__' is safe
+        order[normalize(state.aisles[oi])] = oi;
+      }
+      var DANGLING = state.aisles.length; // R15: a value not in state.aisles
+      return state.items.slice().sort(function (a, b) { // sorts after all known
         var aKey = a.aisle ? normalize(a.aisle) : null;
         var bKey = b.aisle ? normalize(b.aisle) : null;
-        // "Unassigned" (no aisle) always sorts last, regardless of alnum
-        // order - never just falls out of a plain string comparison.
+        // No-aisle bucket ('') always pinned LAST, regardless of order.
         if (aKey === null && bKey === null) return compareByName(a, b);
         if (aKey === null) return 1;
         if (bKey === null) return -1;
-        if (aKey !== bKey) return aKey < bKey ? -1 : 1;
-        return compareByName(a, b); // alphabetical tie-break within a group
+        if (aKey !== bKey) {
+          var ai = (typeof order[aKey] === 'number') ? order[aKey] : DANGLING;
+          var bi = (typeof order[bKey] === 'number') ? order[bKey] : DANGLING;
+          if (ai !== bi) return ai - bi;
+          // R-S39-2: distinct dangling keys share the DANGLING index - break the
+          // tie by key so they don't compare equal and interleave/split headers.
+          return aKey < bKey ? -1 : 1;
+        }
+        return compareByName(a, b); // same aisle: within-group alphabetical
       });
     }
     return state.items.slice(); // 'manual' - same order as state.items itself
@@ -1966,8 +2054,8 @@
   var clearCheckedBtn = document.getElementById('clear-checked-btn');
   var addForm = document.getElementById('add-form');
   var addInput = document.getElementById('add-input');
-  var pasteForm = document.getElementById('paste-form');
-  var pasteInput = document.getElementById('paste-input');
+  // S38: the separate paste panel (#paste-form/#paste-input) was removed - the
+  // single #add-input <textarea> is now the one-or-many add control.
   var toastEl = document.getElementById('toast');
   var toastTimer = null;
   // The single-slot action this toast's own Undo affordance is bound to (bound at
@@ -1975,6 +2063,13 @@
   // lingers, the toast-Undo no-ops rather than undoing that unrelated action.
   var toastAction = null;
   var sortSelect = document.getElementById('sort-select');
+  // S37: restore the persisted sort view NOW - after the #sort-select capture,
+  // BEFORE the sole bootstrap render() below - so the control and the rendered
+  // list agree from the first paint. Parse-then-assign: loadSortMode has already
+  // whitelisted the value to manual|alpha|aisle, so #sort-select never lands on
+  // a no-selected-option state. View-only: this sets the mode, never item order.
+  sortMode = loadSortMode();
+  sortSelect.value = sortMode;
   var autoAisleBtn = document.getElementById('auto-aisle-btn'); // S31 list-wide run
   var suggestionsRoot = document.getElementById('suggestions-root');
   // S21: settings menu shell.
@@ -2203,12 +2298,23 @@
     // position, for text inputs) onto the equivalent new element after.
     var focusedId = null;
     var focusedRole = null; // null = the <li> itself, not a nested control
+    // S39 (R-S39-3): also preserve focus on an aisle-group-header reorder arrow
+    // across the rebuild, so repeated taps keep focus on the arrow.
+    var focusedAisleKey = null;
+    var focusedAisleRole = null;
     var active = document.activeElement;
     if (active && listRoot.contains(active)) {
       var activeLi = active.closest('li[data-id]');
       if (activeLi) {
         focusedId = activeLi.dataset.id;
         focusedRole = (active !== activeLi && active.dataset) ? active.dataset.role : null;
+      } else {
+        var activeHeader = active.closest('li[data-aisle-key]');
+        if (activeHeader && active.dataset &&
+            (active.dataset.role === 'aisle-up' || active.dataset.role === 'aisle-down')) {
+          focusedAisleKey = activeHeader.dataset.aisleKey;
+          focusedAisleRole = active.dataset.role;
+        }
       }
     }
 
@@ -2225,6 +2331,10 @@
     var displayItems = getSortedItems();
     var aisleDisplayMap = sortMode === 'aisle' ? getAisleDisplayMap() : null;
     var lastGroupKey; // undefined initially - first item's group always renders a header in aisle mode
+    // S39: the reorderable visible aisle sequence (known real aisles with >=1
+    // item, in persisted order) - used to place the header up/down arrows and to
+    // disable the first group's Up / last group's Down.
+    var visibleAisleKeys = sortMode === 'aisle' ? getVisibleAisleOrder() : [];
 
     var html = '<ul class="items">';
     for (var i = 0; i < displayItems.length; i++) {
@@ -2241,7 +2351,24 @@
           // fallback to the raw item.aisle string - never render literal
           // 'undefined' (same posture as parseStoredState's R1 guard).
           var groupLabel = groupKey ? (aisleDisplayMap[groupKey] || item.aisle) : noAisleLabel();
-          html += '<li class="aisle-group-header">' + escapeHtml(groupLabel) + '</li>';
+          var gpos = groupKey ? visibleAisleKeys.indexOf(groupKey) : -1;
+          if (gpos !== -1) {
+            // S39: a known, reorderable real aisle - header carries up/down
+            // arrows keyed by data-aisle-key. Disable Up on the first visible
+            // group, Down on the last (same disabled-neighbor pattern as S19 row
+            // Up/Down). Reuse the registry move-up/down glyphs, escapeHtml-wrapped.
+            html += '<li class="aisle-group-header" data-aisle-key="' + escapeHtml(groupKey) + '">' +
+              '<span class="aisle-group-label">' + escapeHtml(groupLabel) + '</span>' +
+              '<span class="aisle-group-controls">' +
+              '<button type="button" class="icon-btn" data-role="aisle-up" title="Move aisle up" aria-label="Move aisle up"' + (gpos === 0 ? ' disabled' : '') + '>' + escapeHtml(iconFor('move-up')) + '</button>' +
+              '<button type="button" class="icon-btn" data-role="aisle-down" title="Move aisle down" aria-label="Move aisle down"' + (gpos === visibleAisleKeys.length - 1 ? ' disabled' : '') + '>' + escapeHtml(iconFor('move-down')) + '</button>' +
+              '</span>' +
+              '</li>';
+          } else {
+            // The no-aisle bucket ('') and any R15 dangling value are NOT
+            // reorderable - plain header, no arrows (R15: never render undefined).
+            html += '<li class="aisle-group-header">' + escapeHtml(groupLabel) + '</li>';
+          }
         }
       }
 
@@ -2300,6 +2427,22 @@
       // If newLi itself is gone (e.g. this row was just deleted), there's
       // nothing sensible of "the same element" left to restore focus onto -
       // deliberately not guessing a fallback target here.
+    }
+
+    // S39 (R-S39-3): restore focus onto an aisle-group-header arrow after the
+    // rebuild, so repeated taps keep working. Match by data-aisle-key as a
+    // property (avoids attribute-selector escaping for arbitrary aisle names);
+    // if the arrow is now disabled (the aisle moved to an end), .focus() is a
+    // silent no-op - same acceptable behavior as row Up/Down reaching an end.
+    if (focusedAisleKey !== null) {
+      var headers = listRoot.querySelectorAll('li[data-aisle-key]');
+      for (var hh = 0; hh < headers.length; hh++) {
+        if (headers[hh].dataset.aisleKey === focusedAisleKey) {
+          var hbtn = headers[hh].querySelector('[data-role="' + focusedAisleRole + '"]');
+          if (hbtn) hbtn.focus();
+          break;
+        }
+      }
     }
   }
 
@@ -2395,6 +2538,18 @@
   // `data-role` now, and a click to position the cursor inside an open
   // editor must not fall through to the row-toggle branch either.
   listRoot.addEventListener('click', function (e) {
+    // S39 (R-S39-1): aisle-group-header reorder arrows. Headers carry NO
+    // data-id, so this MUST run BEFORE the li[data-id] early-return below or the
+    // click would be dropped. Keyed by data-aisle-key; data-role aisle-up/-down
+    // is distinct from the row up/down, so there is no moveItem collision. A
+    // native <button> also routes Enter/Space through this click, so no separate
+    // keydown branch is needed.
+    var aisleBtn = e.target.closest && e.target.closest('[data-role="aisle-up"],[data-role="aisle-down"]');
+    if (aisleBtn) {
+      var headerLi = aisleBtn.closest('li[data-aisle-key]');
+      if (headerLi) moveAisle(headerLi.dataset.aisleKey, aisleBtn.dataset.role === 'aisle-up' ? -1 : 1);
+      return;
+    }
     var li = e.target.closest && e.target.closest('li[data-id]');
     if (!li) return;
     var nested = e.target.closest('[data-role]');
@@ -2628,18 +2783,34 @@
   // machine and the document-level M18 fallback listeners were removed with
   // the drag mechanism they served.
 
-  addForm.addEventListener('submit', function (e) {
-    e.preventDefault(); // Enter key also submits via the form itself
-    if (addItem(addInput.value)) {
+  // S38 (2026-09-17): ONE unified add control. The field is now a <textarea>
+  // (index.html) so it can retain pasted newlines. BOTH a single typed line and
+  // a multi-line paste route through S4's parsePasteLines()/addPastedItems() -
+  // one code path, so a single line yields a one-item {type:'add',ids:[...]}
+  // batch and a multi-line value yields a many-item batch, each ONE undo action
+  // (S6), and both increment S10 frequency via createItem(). Marker-strip applies
+  // to a typed line too ("- milk" -> "milk"), accepted per the AC. The separate
+  // paste panel + its pasteForm/pasteInput submit handler were removed with the HTML.
+  function submitAdd() {
+    if (addPastedItems(addInput.value)) {
       addInput.value = '';
     }
     addInput.focus();
+  }
+
+  addForm.addEventListener('submit', function (e) {
+    e.preventDefault(); // the "Add" button routes here
+    submitAdd();
   });
 
-  pasteForm.addEventListener('submit', function (e) {
-    e.preventDefault();
-    if (addPastedItems(pasteInput.value)) {
-      pasteInput.value = ''; // clears only on a successful ingest
+  // A <textarea> does NOT submit a form on Enter the way an <input> does, so
+  // wire it explicitly: plain Enter submits (one item, or a whole multi-line
+  // paste as one batch); Shift+Enter inserts a literal newline so a multi-item
+  // list can be hand-composed in the box.
+  addInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      submitAdd();
     }
   });
 
@@ -2668,11 +2839,13 @@
     clearCheckedItems();
   });
 
-  // S9: sort control - view-only, in-memory, resets to Manual on reload
-  // (the <select>'s own default value already starts on Manual, so there's
-  // nothing to restore here on load).
+  // S9 + S37: sort control - view-only. S37 (2026-09-17) persists the chosen
+  // mode to vopping-sort-v1 on every change and restores it before first paint
+  // (see the restore just after the sortSelect capture, and loadSortMode). The
+  // old "resets to Manual on reload / nothing to restore" behavior is retired.
   sortSelect.addEventListener('change', function () {
     sortMode = sortSelect.value;
+    saveSortMode(sortMode);
     render();
   });
 

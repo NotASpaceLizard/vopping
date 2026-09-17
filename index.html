@@ -22,23 +22,16 @@
     </div>
   </header>
 
-  <!-- S1: always-visible single-item add control. Enter submits via the
-       <form>'s own default behavior - no separate keydown handling needed. -->
+  <!-- S1 + S38: ONE always-visible add control that handles a single typed item
+       AND a multi-line paste. It is a <textarea> (not an <input>) so a paste
+       keeps its newlines; plain Enter submits (one item, or a whole paste as one
+       batch) and Shift+Enter inserts a newline - see script.js's addInput
+       keydown. The old separate paste panel (S4) was removed here; its
+       parsePasteLines() ingest is reused by this one field. -->
   <form id="add-form" class="add-form">
-    <input type="text" id="add-input" placeholder="Add an item…" autocomplete="off">
+    <textarea id="add-input" rows="1" placeholder="Add an item, or paste a list…" autocomplete="off"></textarea>
     <button type="submit">Add</button>
   </form>
-
-  <!-- S4: paste-to-ingest bulk add, a separate control from the single-item
-       input above. Collapsed by default so it doesn't compete for space
-       with the primary single-add flow on a small phone screen. -->
-  <details class="paste-panel">
-    <summary>Paste a list</summary>
-    <form id="paste-form" class="paste-form">
-      <textarea id="paste-input" placeholder="Paste items, one per line…" rows="4"></textarea>
-      <button type="submit">Add all</button>
-    </form>
-  </details>
 
   <!-- S10: "What am I missing?" suggestion chips - populated by script.js's
        renderSuggestions(), hidden entirely when there are none. -->
