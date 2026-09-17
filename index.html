@@ -4,6 +4,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Grocery List</title>
+
+  <!-- iOS Home-Screen icon + PWA manifest. Fixes the default "G" tile: the
+       PO's white shop.png composited onto an OPAQUE app-accent (#4da6ff) tile
+       (a transparent icon would composite over black on iOS). The icon only
+       refreshes on-device after REMOVING + RE-ADDING the Home-Screen shortcut
+       (iOS caches at add-time). Manifest paths stay RELATIVE - this is served
+       under /vopping/ on GitHub Pages. -->
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Grocery">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#4da6ff">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
