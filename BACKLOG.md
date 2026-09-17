@@ -305,6 +305,7 @@ ranks, no S-numbers, no sprint assignment). To be triaged into real stories late
 - **Reorder entire aisles up/down** — user wants to move whole aisles up/down so the list follows
   the order they actually walk their store. Likely configurable and may warrant a SEPARATE, larger
   story (custom aisle ordering) — note that. Related to the default-aisle-order item above.
+- **Multi-user sync (2-phone shared list)** — epic; spike-first; see `MULTI_USER_SYNC_PLAN.md`.
 
 ---
 
