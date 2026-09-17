@@ -290,6 +290,22 @@ after drag-and-drop failed a second time on the PO's actual phone):**
   — parked, not built now. Revisit only if asked, likely after S9/S16/S17 have been lived with for
   a while.
 
+**Inbox — field-test feedback (2026-09-17), unsized / not yet sequenced:** captured so they
+aren't forgotten; per PO these are recorded only — NOT yet sized, estimated, or sequenced (no
+ranks, no S-numbers, no sprint assignment). To be triaged into real stories later.
+- **Aisle sort doesn't survive refresh** — when the list is sorted By Aisle, that sort/view choice
+  is lost on a page refresh/reload; the selected sort mode should persist across reloads (same
+  localStorage-persistence pattern the item list itself already uses). Relates to S9's sort view.
+- **Redundant add paths** — we no longer need BOTH the single-item add and the bulk/list (paste)
+  add; consolidate down to one add path. Touches S1's single-item add and S4's paste-ingest.
+- **Default aisle-dropdown order is unhelpful** — the current default order appears to follow a
+  "typical grocery-store walk" (produce first, meat/seafood nearby, etc.), but real store layouts
+  vary so much that a fixed order isn't helpful; revisit what the default ordering should be.
+  Related to the reorder-aisles item below.
+- **Reorder entire aisles up/down** — user wants to move whole aisles up/down so the list follows
+  the order they actually walk their store. Likely configurable and may warrant a SEPARATE, larger
+  story (custom aisle ordering) — note that. Related to the default-aisle-order item above.
+
 ---
 
 | # | Story (As a... I want... so that...) | Acceptance Criteria | Status | Sprint Assigned |
