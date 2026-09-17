@@ -2108,6 +2108,61 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   through the standard pre-Lock review (Developer feasibility → Tester testability → QA hazard); the
   Orchestrator spawns Dev/Tester/QA next, and their findings fold into the ACs before Lock + build.
 
+## Sprint 8 — S37/S38/S39 pre-Lock review folded + Locked, 2026-09-17
+
+- **Pre-Lock review in and consistent (Dev feasibility / Tester testability / QA hazard):** all three
+  cleared; folded every sharpening into the S37/S38/S39 master rows + the Sprint 8 narrative, then
+  LOCKED all three. HOLD — the Developer builds next, S37 → S38 → S39. No app code this session
+  (fold + Lock only).
+- **S37 (persist sort mode) — CLEAR, folded:** own key `vopping-sort-v1` (NOT inside
+  `vopping-list-state-v1`); whitelist-validate to EXACTLY `manual|alpha|aisle` (else → `manual`);
+  get/set wrapped in `try/catch` (mirrors `loadFrequency`/`saveFrequency` ~L376-388); parse-THEN-assign
+  so `#sort-select` always has a selected option; on load set BOTH `sortMode` AND `sortSelect.value`
+  BEFORE the sole bootstrap `render()` (~L2974), after the `sortSelect` capture (~L1977); strictly
+  view-only. **DOC FIX folded:** `getSortedItems()` is PARAMETERLESS (reads the closure `sortMode`) —
+  corrected the `getSortedItems("aisle")` shorthand in the ACs. **Tester baseline:** S9 TC9.7 ('reload
+  returns to Manual') INVERTED + the 'sort selection need not persist' AC line retired (supersession,
+  like TC9.8/9.9 did for S13/S19).
+- **S38 (unified add) — 1 Real, folded:** [DECIDED] element = a small `<textarea>`; its full value
+  routes through S4's existing `parsePasteLines()`/`addPastedItems()` for BOTH single + multi (one
+  path, no `ClipboardEvent`, iOS-robust); explicit Enter-submit keydown (plain Enter → submit,
+  [DECIDED] Shift+Enter → literal newline); multi-line MUST go through `addPastedItems` as ONE
+  `{type:'add', ids:[…]}` batch (never a loop of `addItem`, which would regress S6). **R-S38-1 (Real,
+  would blank the page):** delete the paste-panel HTML (index.html ~L35-41) ATOMICALLY with the
+  `pasteForm`/`pasteInput` decls (script.js ~L1969-1970) AND the submit handler (~L2639-2644) — a
+  dangling handler → `null.addEventListener` throw → aborts later wiring → dead page; keep
+  `parsePasteLines`/`addPastedItems`. Placeholder/label updated to signal one-or-many; S10 frequency
+  preserved. [DECIDED, FLAG-TO-PO] a typed leading list-marker is now stripped like a paste — accepted,
+  logged non-blocking.
+- **S39 (aisle-header reorder) — 3 Real + migration pinned, folded:** **MIGRATION PINNED** — reorder
+  mutates `state.aisles` IN PLACE (splice) + `saveState` + `render`; NO new key / NO parallel order /
+  NO version bump (a separate key would re-introduce the S28 dual-source hazard — forbidden;
+  `getAislePool` = `return state.aisles` ~L1571-1573, `migrateAisles` short-circuits on a seeded array
+  ~L124-126). **Grouping** switches from alphabetical to `state.aisles` INDEX order (comparator
+  ~L1917-1928); **R-S39-2** secondary-sorts on an index tie by aisle KEY (so distinct dangling keys
+  don't interleave), no-aisle bucket still pinned last. **FT3's dropdown fix is automatic** (dropdown
+  already reads `state.aisles`). **R-S39-1** (delegation): header-button branch at the TOP of the click
+  handler, BEFORE the `li[data-id]` early-return (~L2398-2399), matching `data-role`
+  `aisle-up`/`aisle-down` (distinct from row `up`/`down` ~L2407-2408), reading `data-aisle-key`, calling
+  a new `moveAisle(key, ±1)`; the keydown-extension idea DROPPED (native button routes Enter/Space
+  through click). **R-S39-3** (focus): extend the render focus capture/restore (~L2204-2213 / ~L2285-2298)
+  to recognize header buttons by `data-aisle-key`+role so repeated taps keep focus. **[DECIDED, FLAG-TO-PO]**
+  move-semantics: reposition relative to the nearest VISIBLE (item-bearing) neighbor so every tap visibly
+  moves the group (not a blind ±1); first/last-disable on the same visible basis. **KNOWN LIMITATION
+  logged:** empty (headerless) aisles can't be positioned in-context. `.aisle-group-header` gets a small
+  flex layout for the two `.icon-btn`s; reuse U+25B2/U+25BC (no new glyphs). **Tester baseline:** S9
+  TC9.3 ('groups A-Z') INVERTED to `state.aisles` order; within-group alpha + TC9.17 (Unassigned last)
+  preserved.
+- **QUESTIONS.md (non-blocking, PO-vetoable pre-build):** logged four rows — FT3 seed order (keep
+  store-walk seed, decided A), S38 typed-marker strip (accepted), S39 move-semantics
+  (nearest-visible-neighbor, decided), and the S39 empty-aisle known limitation.
+- **Commit scope — docs ONLY (`BACKLOG.md`, `SPRINT_LOG.md`, `QUESTIONS.md`):** verified staging
+  before committing; EXCLUDED the local-only console files (`status.js`/`status.html`/
+  `backlog-status.js`/`status-archive.js`), `QA_FINDINGS.md`, `PLAYBOOK_UPDATES_PENDING.md`, and the
+  `*.png`/`*.jpg` images. No app code changed.
+- **HOLD / next:** the Developer implements S37 → S38 → S39 against the Locked ACs; then Tester formal
+  passes, same pipeline as prior sprints.
+
 ## Parked / unscheduled
 
 - **S11** (recipe-paste alternate ingest mode) — explicitly not sequenced into
