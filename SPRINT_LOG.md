@@ -2163,6 +2163,34 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
 - **HOLD / next:** the Developer implements S37 → S38 → S39 against the Locked ACs; then Tester formal
   passes, same pipeline as prior sprints.
 
+## Sprint 8 — S37/S38/S39 Done (field-test fixes complete), 2026-09-17
+
+- **All three → DONE.** The Developer built S37 → S38 → S39 against the Locked ACs (app code live
+  @`3ed4100`); **Tester formal pass 516/516 @`3ed4100`, 0 defects; QA don't-regress CLEAR; PO
+  confirmed on-device** — the two NB-6 gates (S38's unified add box + S39's aisle-header reorder) both
+  work on the PO's phone, and S37's sort-persistence is desktop-complete. Sprint 8 (field-test fixes)
+  is complete.
+- **S37 — persist sort mode → Done.** `vopping-sort-v1` restores the chosen sort view across reload;
+  strictly view-only (item order untouched). The inverted S9 TC9.7 + retired 'need not persist' line
+  ride this pass.
+- **S38 — unified add control → Done.** One `<textarea>` add box (single + multi-line paste through
+  the one S4 ingest, one undo batch); the paste panel + its JS refs were removed atomically (R-S38-1),
+  no dead-page regression. PO used the unified box on-device (NB-6). The [DECIDED] typed-marker strip
+  shipped as accepted.
+- **S39 — aisle-header reorder → Done.** Up/Down arrows on the by-aisle group headers permute
+  `state.aisles` in place (no new key/version — the pinned migration held), driving both the list
+  grouping order and the aisle-picker option order (FT3's fix, automatic). R-S39-1/-2/-3 (delegation
+  branch above the `li[data-id]` early-return, index-tie key sort, header-button focus restore) all
+  verified. PO reordered aisles on-device (NB-6); the [DECIDED] nearest-visible-neighbor move-semantics
+  shipped.
+- **QUESTIONS.md:** the four Sprint-8 non-blocking rows (FT3 store-walk seed kept; S38 typed-marker
+  strip; S39 nearest-visible move-semantics; S39 empty-aisle known limitation) are marked
+  CONFIRMED-BY-SHIP — the PO accepted all four on-device without vetoing any.
+- **Commit scope — docs ONLY (`BACKLOG.md`, `SPRINT_LOG.md`, `QUESTIONS.md`):** the app code was
+  already committed @`3ed4100`; this docs commit only flips status to Done + records the citation.
+  Verified staging; EXCLUDED the local-only console files, `QA_FINDINGS.md`,
+  `PLAYBOOK_UPDATES_PENDING.md`, and the `*.png`/`*.jpg` images.
+
 ## Parked / unscheduled
 
 - **S11** (recipe-paste alternate ingest mode) — explicitly not sequenced into
