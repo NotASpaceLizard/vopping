@@ -2049,6 +2049,65 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
 - **Non-blocking carry-forward (deliberately NOT in this docs commit):** the Dev flagged 2 now-stale
   in-code comments in `script.js` ('defaults byte-identical to ship') for a later code-cleanup pass.
 
+## Sprint 8 — field-test fixes slicing (S37/S38/S39 drafted), 2026-09-17
+
+- **Goal (slicing only, no build):** the PO field-tested the app in a real grocery store and the
+  Orchestrator relayed four feedback items (captured 2026-09-17 as FT1-FT4 in BACKLOG.md's
+  "Inbox — field-test feedback"). The PO greenlit building three of them; sliced into stories,
+  continuing the numbering from S36 → S37/S38/S39. FT3 (unhelpful default aisle-dropdown order)
+  is folded into S39 rather than a separate story. New sprint: **Sprint 8 — field-test fixes.**
+- **Grounded in the real code (read this session, not from memory):** `index.html` (the two add
+  controls — `#add-form` single-add + the `<details class="paste-panel">` bulk-paste; the
+  `#sort-select`; the `#list-root`), and `script.js` — the S9 sort path (`sortMode` var ~L1901,
+  in-memory only, `sortSelect` change handler ~L2674 with the explicit "resets to Manual on reload"
+  comment; `getSortedItems()` ~L1913 returns a slice-copy, and its By-Aisle branch sorts groups
+  ALPHABETICALLY ~L1917-1928), the add/paste ingest (`addItem` ~L554, `parsePasteLines`/
+  `addPastedItems` ~L595-625, form handlers ~L2631-2644), and the aisle machinery
+  (`getAislePool()` = `state.aisles` ~L1571 drives the picker options ~L2163; group headers
+  rendered at ~L2244 with no controls; the list click delegation ~L2397 early-returns unless
+  `li[data-id]`; `ensureAisleExists`/`addAisle`; S28 versioned re-seed).
+- **Slice (Sprint 8, sequenced S37 → S38 → S39 — smallest/lowest-risk first; none depend on each
+  other):**
+  - **S37 (from FT1, SMALL) — persist the sort mode.** Persist the S9 sort view (Manual /
+    Alphabetical / By Aisle) to its own localStorage record (proposed `vopping-sort-v1`, matching
+    the one-key-per-feature pattern) and restore it on load into both `sortMode` and
+    `#sort-select`'s value before first render. Defensive parse (unknown → Manual). Strictly
+    view-only — must NOT rewrite `state.items` order (S9's slice-copy invariant). No migration.
+  - **S38 (from FT2, MEDIUM) — one unified add control.** Remove the separate paste panel
+    (`<details>`/`#paste-form`/"Add all"), keep the primary always-visible add field, and route a
+    multi-line paste through S4's existing `parsePasteLines()` ingest (marker-strip, blank-skip, no
+    de-dup) as ONE undo batch (S6); single line + Enter still adds one. Flagged Dev/PO build call:
+    a single-line `<input>` can't retain pasted newlines, so the unified control is either a small
+    `<textarea>`-that-submits-on-Enter or an `<input>` with a `paste`-event interceptor.
+  - **S39 (from FT4, absorbs FT3, LARGE) — reorder aisles via up/down on the group headers.**
+    In-context arrows ON the By-Aisle group headers (PO: "save a click when I'm in the middle of
+    the grocery store" — NOT Settings) move a whole aisle within a PERSISTED order that drives BOTH
+    the list grouping order AND the aisle-picker option order (the latter is FT3's fix). Make
+    `state.aisles` order authoritative for grouping too (today grouping is alphabetical; the
+    dropdown already follows `state.aisles`). Reuse the existing move-up/down registry glyphs
+    (U+25B2/U+25BC, S19 + S33) — no new glyphs; extend the list click/keydown delegation to handle
+    header buttons keyed by `data-aisle-key`. Edge cases (first/last disable, no-aisle bucket pinned
+    last, new-aisle appends, R15 dangling-value fallback) + non-regression (S16/S17/S26/S28-S36, S29
+    iOS re-open fix, R14) folded into the AC.
+- **FT3 seed-order sub-decision flagged to the PO (non-blocking, folded into S39's AC + logged for
+  QUESTIONS.md):** the INITIAL aisle order before any user reordering — keep the current store-walk
+  seed (`AISLE_STARTER_LIST`) or switch to alphabetical. **SM recommendation: keep the store-walk
+  seed** — it is now user-fixable, so there's no reason to discard a reasonable default. Minor; does
+  not block the slice or the build.
+- **Sizing + build order + dependencies:** S37 SMALL, S38 MEDIUM, S39 LARGE. All three sit on
+  already-Done stories and are independent of each other, so build order is by size/risk, not a hard
+  chain: **S37 → S38 → S39.** (S37 sits on S9; S38 on S1/S4/S6/S10; S39 on S9/S16/S17/S22/S26/S28.)
+- **Inbox updated:** FT1/FT2/FT3/FT4 moved out of the unsized "Inbox — field-test feedback" into the
+  sequenced Sprint 8 stories (with the FT→S mapping recorded in that subsection); the Multi-user
+  sync epic stays as the one remaining UNSIZED inbox item (its own `MULTI_USER_SYNC_PLAN.md`).
+- **Commit scope — docs ONLY (`BACKLOG.md`, `SPRINT_LOG.md`):** verified staging before committing.
+  EXCLUDED the local-only console files (`status.js`/`status.html`/`backlog-status.js`/
+  `status-archive.js`), `QA_FINDINGS.md`, `PLAYBOOK_UPDATES_PENDING.md`, and the `*.png`/`*.jpg`
+  images. No app code changed — slicing only.
+- **HOLD / next:** the three stories are drafted (Status "Not Started", NOT Locked) and now go
+  through the standard pre-Lock review (Developer feasibility → Tester testability → QA hazard); the
+  Orchestrator spawns Dev/Tester/QA next, and their findings fold into the ACs before Lock + build.
+
 ## Parked / unscheduled
 
 - **S11** (recipe-paste alternate ingest mode) — explicitly not sequenced into
