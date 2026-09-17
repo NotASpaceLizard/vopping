@@ -2224,6 +2224,27 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   this docs slice. Verified staging; EXCLUDED the local-only console files, `QA_FINDINGS.md`,
   `PLAYBOOK_UPDATES_PENDING.md`, and the `*.png`/`*.jpg` images.
 
+## Sprint 9 — S40 Done (app icon + manifest complete), 2026-09-17
+
+- **S40 → DONE.** The Developer built the assets + `<head>` tags in parallel (app code/assets live
+  @`f10276b`); **Dev self-verify 34/34 @`f10276b`, clean load; PO confirmed on-device** — `shop.png`
+  on the `#4da6ff` accent tile replaces the default "G" home-screen tile, and the `display:standalone`
+  full-screen launch (no Safari chrome) was accepted (PO said "yep working"; did not veto). Sprint 9
+  (app icon + manifest) is complete.
+- **What shipped:** the additive `index.html` `<head>` tags (apple-touch-icon 180 + apple-mobile-web-app-*
+  + `<link rel=manifest>` + theme-color `#4da6ff` + favicon-32), `manifest.webmanifest` at repo root
+  (RELATIVE `start_url`/`scope` "./" for the `/vopping/` project page; display standalone; accent
+  bg/theme; icons 192/512/512-maskable), and the no-build composited icons in the new `icons/` folder.
+  Additive-only — the existing page load was unaffected (the Dev's clean-load self-verify was the
+  desktop gate; device was the acceptance, NB-6).
+- **Process (as planned):** S40 did NOT run the full 3-reviewer pre-Lock gauntlet — the icon-research
+  workflow served as the design + feasibility/verify review, Dev self-verify was the desktop gate, and
+  PO on-device was the acceptance. That plan held: clean self-verify + a working on-device confirmation.
+- **Commit scope — docs ONLY (`BACKLOG.md`, `SPRINT_LOG.md`):** the app code/assets were already
+  committed @`f10276b`; this docs commit only flips S40 to Done + records the citation. Verified
+  staging; EXCLUDED the local-only console files, `QA_FINDINGS.md`, `PLAYBOOK_UPDATES_PENDING.md`, and
+  the `*.png`/`*.jpg` images.
+
 ## Parked / unscheduled
 
 - **S11** (recipe-paste alternate ingest mode) — explicitly not sequenced into
