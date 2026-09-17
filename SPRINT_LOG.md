@@ -2191,6 +2191,39 @@ Sprint 0 is team/backlog setup only, same convention as vacking's own Sprint 0.
   Verified staging; EXCLUDED the local-only console files, `QA_FINDINGS.md`,
   `PLAYBOOK_UPDATES_PENDING.md`, and the `*.png`/`*.jpg` images.
 
+## Sprint 9 — app icon + web manifest slicing + Lock (S40), 2026-09-17
+
+- **Goal (slice + Lock in ONE pass; docs-only, Dev building in parallel):** the PO's next ask after
+  the Sprint 8 field-test fixes — replace the default "G" iOS home-screen tile with a real app icon
+  and give Add-to-Home-Screen a proper name + standalone launch. The design was fully specified via
+  the icon-research workflow (which ALSO stood in for the design + feasibility/verify review), so this
+  is sliced AND Locked in one pass.
+- **S40 — iOS home-screen app icon + web app manifest.** Icon = the PO's existing `shop.png` (white
+  shop glyph, 256×256 RGBA transparent) composited onto an OPAQUE tile in the app's own accent
+  `#4da6ff` (PO: "match the app accent"; the `--accent` token, style.css ~L14). `index.html` `<head>`
+  gains (additive): `apple-touch-icon` (180×180 — the load-bearing iOS tag), `apple-mobile-web-app-capable=yes`
+  + `-status-bar-style=default` + `-title` "Grocery", `<link rel=manifest>`, `theme-color` = accent,
+  favicon-32. `manifest.webmanifest` at repo root: `name` "Grocery List", `short_name` "Grocery",
+  `start_url` + `scope` = "./" (RELATIVE — the app is a `/vopping/` project page; a hardcoded "/"
+  would break scope), `display` standalone, `background_color` + `theme_color` = accent, icons
+  192/512/512-maskable. Icons generated NO-build (composite on the accent tile) into a new `icons/`
+  folder; OPAQUE fill (transparent → iOS black tile), corners NOT pre-rounded (iOS masks its own),
+  mark within the central ~80% maskable safe zone.
+- **Acceptance DEVICE-ONLY (NB-6):** the icon shows only after the PO REMOVES + RE-ADDS the
+  home-screen shortcut (iOS caches the icon at add-time). Plus a PO-confirmable behavior change (not
+  merely cosmetic): `display:standalone` / `apple-mobile-web-app-capable` launches the app FULL-SCREEN
+  with no Safari chrome — confirm it's wanted.
+- **Process (deliberate, logged):** low-risk static/additive work AND the icon-research workflow
+  already served as the review → NOT running the full 3-reviewer pre-Lock gauntlet. Desktop gate =
+  Dev self-verify (clean page load, valid manifest, correct tags/paths); acceptance = PO on-device.
+  Non-regression: additive `<head>` tags + new files, must not break the existing load.
+- **Status: LOCKED 2026-09-17** (sliced + Locked in one pass); single story, no dependencies. The
+  Developer is building the assets + tags in parallel.
+- **Commit scope — docs ONLY (`BACKLOG.md`, `SPRINT_LOG.md`):** the app assets (`icons/`,
+  `manifest.webmanifest`, the `<head>` edits, `shop.png`) land via the Dev's own parallel commit, NOT
+  this docs slice. Verified staging; EXCLUDED the local-only console files, `QA_FINDINGS.md`,
+  `PLAYBOOK_UPDATES_PENDING.md`, and the `*.png`/`*.jpg` images.
+
 ## Parked / unscheduled
 
 - **S11** (recipe-paste alternate ingest mode) — explicitly not sequenced into
